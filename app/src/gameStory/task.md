@@ -8,7 +8,7 @@
 [x] Task 1.3: viết v1 gameStory/app.cpp - tạo loading bar theo theo thời gian hiệu ứng của logo
     - Comment codeblock này trong gamestory/app.cpp là: gamestory-loading-bar-02
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 01 và trước 03
-[ ] Task 1.4: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
+[x] Task 1.4: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là:  integration/v1
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí trên 00
     - Khơi động chương trình luôn bắt đầu bằng màn hình của gameStory.

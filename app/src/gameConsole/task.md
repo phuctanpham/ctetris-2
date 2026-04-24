@@ -27,7 +27,7 @@
     - Comment codeblock này trong gameconsole/app.cpp là: gameconsole-chen-nhac-05
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 03 và trước 05
     - Tương tự kỹ thuật lightbox, việc làm trước chèn nhạc nền trong v1 nhằm tối ưu kỹ thuật chèn media để tái sử dụng lại cho ở các version sau.
-[ ] Task 1.6: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
+[x] Task 1.6: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameConsole/app.cpp là:  integration/v1
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí trên 00
     - Khởi động chương trình luôn bắt đầu bằng màn hình của gameStory.

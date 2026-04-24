@@ -1,44 +1,71 @@
-// v23
-
-
+// phucpt: app/src/gameStory/app.cpp
 
 // =========================
-// support cross platform
+// integration/v1
+// Điểm tích hợp: hàm runGameStory() dùng khi tích hợp với main.cpp
+// Khi build standalone (STANDALONE_GAMESTORY), hàm main() thay thế
+// Ported sang VRSFML: thay SFML 3 thuần bằng vittorioromeo/VRSFML
+// - sf::GraphicsContext::create() thay thế global OpenGL state
+// - SFML_GAME_LOOP(window) thay thế while(window.isOpen()) — tương thích Emscripten
+// - sf::base::Optional thay std::optional cho pollEvent
+// - sf::Font::openFromFile(...).value() thay loadFromFile
+// =========================
+
+// =========================
+// Hỗ trợ đa nền tảng (Environment)
 // =========================
 #include <SFML/Graphics.hpp>
+
+#include <cstring>
 #include <iostream>
 #include <vector>
-#include <cstring>
+
 #ifdef _WIN32
 #  include <windows.h>
 #endif
+
+// Tìm gif_lib.h theo thứ tự đường dẫn khác nhau tuỳ hệ thống
 #ifdef __has_include
 #  if __has_include(<gif_lib.h>)
 #    include <gif_lib.h>
 #  elif __has_include(<giflib/gif_lib.h>)
 #    include <giflib/gif_lib.h>
 #  else
-#    error "gif_lib.h not found"
+#    error "gif_lib.h not found — cần cài giflib (apt: libgif-dev / brew: giflib)"
 #  endif
 #else
 #  include <gif_lib.h>
 #endif
+
 #include "include/layout.h"
 
 // =========================
-// gameconsole-tao-giao-dien-169-00
-// Tạo cửa sổ tỷ lệ 9:16, đảm bảo chạy đúng trên mọi nền tảng
+// Cấu hình (Configuration)
 // =========================
+static constexpr int   STORY_WINDOW_HEIGHT  = 720;
+static constexpr float FADE_IN_DURATION     = 0.4f;
+static constexpr float FADE_OUT_DURATION    = 0.3f;
 
-bool loadGifFrames(const std::string& path,
-                   std::vector<sf::Image>& frames,
-                   int& frameDuration)
-{
-    int err = 0;
+// =========================
+// Kết quả trả về (Model)
+// =========================
+enum class StoryResult { Finished, Quit };
+
+// =========================
+// Khối tiện ích GIF (Environment / Model)
+// Đọc tất cả frame của file GIF vào vector sf::Image
+// =========================
+static bool loadGifFrames(const std::string&      path,
+                           std::vector<sf::Image>& frames,
+                           int&                    frameDurationMs) {
+    int          err = 0;
     GifFileType* gif = DGifOpenFileName(path.c_str(), &err);
-    if (!gif) { std::cerr << "giflib: cannot open " << path << "\n"; return false; }
+    if (!gif) {
+        std::cerr << "[gameStory] giflib: không mở được " << path << "\n";
+        return false;
+    }
     if (DGifSlurp(gif) != GIF_OK) {
-        std::cerr << "giflib: DGifSlurp failed\n";
+        std::cerr << "[gameStory] giflib: DGifSlurp thất bại\n";
 #if GIFLIB_MAJOR >= 5
         DGifCloseFile(gif, &err);
 #else
@@ -47,48 +74,54 @@ bool loadGifFrames(const std::string& path,
         return false;
     }
 
-    int w = gif->SWidth, h = gif->SHeight;
-    frameDuration = 100;
-    std::vector<std::uint8_t> canvas(w * h * 4, 0);
+    const int w = gif->SWidth;
+    const int h = gif->SHeight;
+    frameDurationMs = 100;
 
-    for (int f = 0; f < gif->ImageCount; f++) {
-        SavedImage& img = gif->SavedImages[f];
-        ColorMapObject* cmap = img.ImageDesc.ColorMap ? img.ImageDesc.ColorMap : gif->SColorMap;
+    std::vector<std::uint8_t> canvas(static_cast<std::size_t>(w * h * 4), 0);
 
-        for (int e = 0; e < img.ExtensionBlockCount; e++) {
+    for (int f = 0; f < gif->ImageCount; ++f) {
+        SavedImage&     img  = gif->SavedImages[f];
+        ColorMapObject* cmap = img.ImageDesc.ColorMap
+                                   ? img.ImageDesc.ColorMap
+                                   : gif->SColorMap;
+
+        // Đọc delay từ Graphic Control Extension
+        for (int e = 0; e < img.ExtensionBlockCount; ++e) {
             ExtensionBlock& eb = img.ExtensionBlocks[e];
             if (eb.Function == GRAPHICS_EXT_FUNC_CODE && eb.ByteCount >= 4) {
-                int delay = (eb.Bytes[2] << 8 | eb.Bytes[1]) * 10;
-                if (delay > 0) frameDuration = delay;
+                int d = (eb.Bytes[2] << 8 | eb.Bytes[1]) * 10;
+                if (d > 0) frameDurationMs = d;
             }
         }
 
-        int fx = img.ImageDesc.Left, fy = img.ImageDesc.Top;
-        int fw = img.ImageDesc.Width, fh = img.ImageDesc.Height;
-        int transIdx = -1;
-        for (int e = 0; e < img.ExtensionBlockCount; e++) {
+        const int fx = img.ImageDesc.Left, fy = img.ImageDesc.Top;
+        const int fw = img.ImageDesc.Width, fh = img.ImageDesc.Height;
+        int       transIdx = -1;
+        for (int e = 0; e < img.ExtensionBlockCount; ++e) {
             ExtensionBlock& eb = img.ExtensionBlocks[e];
             if (eb.Function == GRAPHICS_EXT_FUNC_CODE && eb.ByteCount >= 4)
-                if (eb.Bytes[0] & 0x01) transIdx = (unsigned char)eb.Bytes[3];
+                if (eb.Bytes[0] & 0x01)
+                    transIdx = static_cast<unsigned char>(eb.Bytes[3]);
         }
 
-        for (int y = 0; y < fh; y++) {
-            for (int x = 0; x < fw; x++) {
-                int ci = (unsigned char)img.RasterBits[y * fw + x];
+        for (int y = 0; y < fh; ++y)
+            for (int x = 0; x < fw; ++x) {
+                int ci = static_cast<unsigned char>(img.RasterBits[y * fw + x]);
                 if (ci == transIdx) continue;
-                int px = fx + x, py = fy + y;
-                if (px >= w || py >= h) continue;
-                GifColorType& c = cmap->Colors[ci];
-                int idx = (py * w + px) * 4;
-                canvas[idx+0] = c.Red;
-                canvas[idx+1] = c.Green;
-                canvas[idx+2] = c.Blue;
-                canvas[idx+3] = 255;
+                int px2 = fx + x, py2 = fy + y;
+                if (px2 >= w || py2 >= h) continue;
+                GifColorType&  c   = cmap->Colors[ci];
+                std::size_t    idx = static_cast<std::size_t>((py2 * w + px2) * 4);
+                canvas[idx + 0] = c.Red;
+                canvas[idx + 1] = c.Green;
+                canvas[idx + 2] = c.Blue;
+                canvas[idx + 3] = 255;
             }
-        }
 
-        sf::Image sfImg(sf::Vector2u(w, h), canvas.data());
-        frames.push_back(std::move(sfImg));
+        frames.emplace_back(sf::Vector2u(static_cast<unsigned>(w),
+                                          static_cast<unsigned>(h)),
+                             canvas.data());
     }
 
 #if GIFLIB_MAJOR >= 5
@@ -96,139 +129,144 @@ bool loadGifFrames(const std::string& path,
 #else
     DGifCloseFile(gif);
 #endif
-    std::cout << "Loaded " << frames.size() << " frames, " << frameDuration << "ms/frame\n";
+    std::cout << "[gameStory] Đã tải " << frames.size()
+              << " frame, " << frameDurationMs << "ms/frame\n";
     return !frames.empty();
 }
 
-int main() {
+// =========================
+// Hàm chạy gameStory (Logic chính / Integration Entry Point)
+// VRSFML yêu cầu sf::GraphicsContext được tạo trước bất kỳ thao tác đồ hoạ nào.
+// Ở đây context được nhận từ main() để tránh tạo lại nhiều lần.
+// =========================
+StoryResult runGameStory(sf::GraphicsContext& gCtx) {
+    (void)gCtx; // Context được giữ sống từ main(); không cần dùng trực tiếp ở đây
+
 #ifdef _WIN32
-    // Bật UTF-8 cho console trên Windows
     SetConsoleOutputCP(CP_UTF8);
 #endif
 
     // =========================
     // gameconsole-tao-giao-dien-169-00
-    // Tạo cửa sổ tỷ lệ 9:16, đảm bảo chạy đúng trên mọi nền tảng
+    // Tạo cửa sổ tỷ lệ 9:16 — VRSFML dùng designated initializer
     // =========================
-    int windowHeight = 720;
-    auto window = layout::create916Window(windowHeight);
+    auto window = layout::create916Window(STORY_WINDOW_HEIGHT, "ctetris — Story");
     window.setFramerateLimit(60);
-    window.setVerticalSyncEnabled(true);
+
+    const sf::Vector2u wSize = window.getSize();
 
     // =========================
     // gameconsole-logo-intro-01
-    // Hiển thị logo UIT với hiệu ứng (có thể thêm âm thanh ở đây)
+    // Hiển thị logo giới thiệu dạng GIF với hiệu ứng fade
     // =========================
-
-
     std::vector<sf::Image> frames;
     int frameDurationMs = 100;
-    if (!loadGifFrames("gameStory_intro.gif", frames, frameDurationMs)) {
-        std::cerr << "Không load được GIF\n";
-        return 1;
+    const bool hasGif = loadGifFrames("gameStory_intro.gif", frames, frameDurationMs);
+    if (!hasGif) {
+        std::cerr << "[gameStory] Không tải được GIF — bỏ qua intro.\n";
+        return StoryResult::Finished;
     }
 
-    int totalFrames = (int)frames.size();
+    const int totalFrames = static_cast<int>(frames.size());
 
-    // v8 cách tạo texture — đã hoạt động
+    // VRSFML: sf::Texture tạo qua constructor có sẵn, update() vẫn tương tự
     sf::Texture tex(frames[0].getSize());
     tex.update(frames[0]);
-    sf::Sprite sprite(tex);
+    sf::Sprite  sprite(tex);
 
-    auto winSize = window.getSize();
-    float scaleX = winSize.x / (float)frames[0].getSize().x;
-    float scaleY = winSize.y / (float)frames[0].getSize().y;
-    float scale  = std::min(scaleX, scaleY);
-    float offX   = (winSize.x - frames[0].getSize().x * scale) / 2.f;
-    float offY   = (winSize.y - frames[0].getSize().y * scale) / 2.f;
+    const float scaleX = static_cast<float>(wSize.x) / static_cast<float>(frames[0].getSize().x);
+    const float scaleY = static_cast<float>(wSize.y) / static_cast<float>(frames[0].getSize().y);
+    const float scale  = std::min(scaleX, scaleY);
+    const float offX   = (static_cast<float>(wSize.x) - frames[0].getSize().x * scale) / 2.f;
+    const float offY   = (static_cast<float>(wSize.y) - frames[0].getSize().y * scale) / 2.f;
     sprite.setScale(sf::Vector2f(scale, scale));
     sprite.setPosition(sf::Vector2f(offX, offY));
 
     // =========================
     // gamestory-loading-bar-02
-    // Thanh loading bar chạy theo hiệu ứng logo
+    // Thanh loading bar chạy theo tiến trình frame GIF
     // =========================
+    const float barH   = 16.f, barW  = static_cast<float>(wSize.x);
+    const float barX   = 0.f,  barY  = static_cast<float>(wSize.y) - barH - 7.f;
+    const float radius = barH / 2.f;
 
-
-    // Thanh loading bar — full width, bo tròn, cách mép dưới 7pt
-    float barH  = 16.f;
-    float barW  = (float)winSize.x;
-    float barX  = 0.f;
-    float barY  = winSize.y - barH - 7.f;
-    float radius = barH / 2.f;
-
-    // Nền loading bar
     sf::RectangleShape barBgRect(sf::Vector2f(barW - barH, barH));
     barBgRect.setFillColor(sf::Color(60, 60, 60, 200));
     barBgRect.setPosition(sf::Vector2f(barX + radius, barY));
 
-    sf::CircleShape barBgCapL(radius);
+    sf::CircleShape barBgCapL(radius), barBgCapR(radius);
     barBgCapL.setFillColor(sf::Color(60, 60, 60, 200));
     barBgCapL.setPosition(sf::Vector2f(barX, barY));
-
-    sf::CircleShape barBgCapR(radius);
     barBgCapR.setFillColor(sf::Color(60, 60, 60, 200));
     barBgCapR.setPosition(sf::Vector2f(barX + barW - barH, barY));
 
-    // Foreground loading bar (tiến trình)
-    sf::RectangleShape barFgRect(sf::Vector2f(0, barH));
+    sf::RectangleShape barFgRect(sf::Vector2f(0.f, barH));
     barFgRect.setFillColor(sf::Color(100, 220, 100));
     barFgRect.setPosition(sf::Vector2f(barX + radius, barY));
 
-    sf::CircleShape barFgCapL(radius);
+    sf::CircleShape barFgCapL(radius), barFgCapR(radius);
     barFgCapL.setFillColor(sf::Color(100, 220, 100));
     barFgCapL.setPosition(sf::Vector2f(barX, barY));
-
-    sf::CircleShape barFgCapR(radius);
     barFgCapR.setFillColor(sf::Color(100, 220, 100));
     barFgCapR.setPosition(sf::Vector2f(barX, barY));
 
+    sf::RectangleShape overlay(sf::Vector2f(static_cast<float>(wSize.x),
+                                             static_cast<float>(wSize.y)));
+    overlay.setPosition(sf::Vector2f(0.f, 0.f));
+
+    sf::Clock fadeInClock, fadeOutClock, animClock;
+    bool      closing  = false;
+    StoryResult result = StoryResult::Finished;
 
     // =========================
-    // (Các phần hiệu ứng khác giữ nguyên)
+    // Vòng lặp chính (Logic + View)
+    // VRSFML: SFML_GAME_LOOP(window) thay thế while(window.isOpen())
+    // Trên Emscripten macro này gọi emscripten_set_main_loop nội bộ
+    // Trên Desktop macro này là while(window.isOpen()) thông thường
     // =========================
-
-    // Fade overlay
-    sf::RectangleShape overlay(sf::Vector2f((float)winSize.x, (float)winSize.y));
-    overlay.setPosition(sf::Vector2f(0, 0));
-    const float fadeInDuration  = 0.4f;
-    const float fadeOutDuration = 0.3f;
-    sf::Clock fadeInClock;
-    sf::Clock fadeOutClock;
-    bool closing = false;
-
-    sf::Clock clock;
-    int curFrame = 0;
-
-    while (window.isOpen()) {
-        while (const std::optional<sf::Event> ev = window.pollEvent()) {
+    SFML_GAME_LOOP(window) {
+        // Xử lý sự kiện — VRSFML: pollEvent trả sf::base::Optional
+        while (const sf::base::Optional ev = window.pollEvent()) {
             if (ev->is<sf::Event::Closed>()) {
                 if (!closing) { closing = true; fadeOutClock.restart(); }
+            }
+            if (const auto* kp = ev->getIf<sf::Event::KeyPressed>()) {
+                if (kp->code == sf::Keyboard::Key::Space ||
+                    kp->code == sf::Keyboard::Key::Enter) {
+                    result = StoryResult::Finished;
+                    window.close();
+                    return result; // Skip intro
+                }
             }
         }
 
         if (closing) {
-            float t = fadeOutClock.getElapsedTime().asSeconds();
-            if (t >= fadeOutDuration) { window.close(); break; }
+            if (fadeOutClock.getElapsedTime().asSeconds() >= FADE_OUT_DURATION) {
+                result = StoryResult::Quit;
+                window.close();
+                return result;
+            }
         }
 
-        // Chuyển frame
-        int elapsed = (int)clock.getElapsedTime().asMilliseconds();
-        curFrame = elapsed / frameDurationMs;
-        bool finished = curFrame >= totalFrames;
-        if (finished) curFrame = totalFrames - 1;
-        float progress = finished ? 1.f : (float)curFrame / (float)(totalFrames - 1);
+        const int elapsed  = static_cast<int>(animClock.getElapsedTime().asMilliseconds());
+        int curFrame       = elapsed / frameDurationMs;
+        const bool done    = curFrame >= totalFrames;
+        if (done) {
+            result = StoryResult::Finished;
+            window.close();
+            return result; // GIF xong → tự chuyển tiếp
+        }
 
-        // Cập nhật texture
+        const float progress = static_cast<float>(curFrame) /
+                               static_cast<float>(totalFrames - 1);
         tex.update(frames[curFrame]);
 
-        // Cập nhật thanh loading bar
-        float fgW    = barW * progress;
-        float innerW = std::max(0.f, fgW - barH);
+        const float fgW    = barW * progress;
+        const float innerW = std::max(0.f, fgW - barH);
         barFgRect.setSize(sf::Vector2f(innerW, barH));
         barFgCapR.setPosition(sf::Vector2f(barX + std::max(0.f, fgW - barH), barY));
 
-        // Vẽ giao diện
+        // Vẽ (View)
         window.clear(sf::Color::Black);
         window.draw(sprite);
         window.draw(barBgRect);
@@ -240,22 +278,32 @@ int main() {
             if (fgW >= barH) window.draw(barFgCapR);
         }
 
-        // Hiệu ứng fade in/out
         float alpha = 0.f;
-        float fi = fadeInClock.getElapsedTime().asSeconds();
-        if (fi < fadeInDuration) {
-            alpha = (1.f - fi / fadeInDuration) * 255.f;
+        const float fi = fadeInClock.getElapsedTime().asSeconds();
+        if (fi < FADE_IN_DURATION) {
+            alpha = (1.f - fi / FADE_IN_DURATION) * 255.f;
         } else if (closing) {
-            float t = fadeOutClock.getElapsedTime().asSeconds();
-            alpha = std::min(1.f, t / fadeOutDuration) * 255.f;
+            const float t = fadeOutClock.getElapsedTime().asSeconds();
+            alpha = std::min(1.f, t / FADE_OUT_DURATION) * 255.f;
         }
         if (alpha > 0.f) {
-            overlay.setFillColor(sf::Color(0, 0, 0, (std::uint8_t)alpha));
+            overlay.setFillColor(sf::Color(0, 0, 0, static_cast<std::uint8_t>(alpha)));
             window.draw(overlay);
         }
-
         window.display();
     }
 
+    return result;
+}
+
+// =========================
+// Điểm vào standalone — chỉ compile khi build riêng lẻ
+// =========================
+#ifdef STANDALONE_GAMESTORY
+int main() {
+    // VRSFML: bắt buộc tạo GraphicsContext trước bất kỳ thao tác đồ hoạ nào
+    auto gCtx = sf::GraphicsContext::create().value();
+    runGameStory(gCtx);
     return 0;
 }
+#endif

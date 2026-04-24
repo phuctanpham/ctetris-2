@@ -1,340 +1,328 @@
+// phucpt: app/src/gameCore/app.cpp
+
 // =========================
-// gamecore-tao-giao-dien-169-00
-// Tạo cửa sổ tỷ lệ 9:16, đảm bảo chạy đúng trên mọi nền tảng
+// integration/v1
+// Điểm tích hợp: hàm runGameCore() dùng khi tích hợp với main.cpp
+// Ported sang VRSFML:
+// - sf::GraphicsContext nhận từ main()
+// - SFML_GAME_LOOP(window) thay while(window.isOpen())
+// - sf::base::Optional cho pollEvent
+// - sf::Text(font, str, size) constructor tường minh
 // =========================
+
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <SFML/System.hpp>
-#include <random>
+
+#include <array>
 #include <ctime>
+#include <random>
 #include <string>
+
 #include "include/layout.h"
 
-constexpr int M = 20; // Height
-constexpr int N = 10; // Width
-constexpr int BLOCK_SIZE = 48;
-
-int field[M][N] = {0};
-struct Point { int x, y; } a[4], b[4];
+// =========================
+// Cấu hình (Configuration)
+// =========================
+static constexpr int   BOARD_ROWS         = 20;
+static constexpr int   BOARD_COLS         = 10;
+static constexpr int   CELL_PX            = 48;
+static constexpr int   CORE_WINDOW_HEIGHT = 960;
 
 // =========================
-// gamecore-tao-cac-khoi-xep-hinh-LITZO-01
-// Định nghĩa các khối L, I, T, Z, O
+// Mô hình dữ liệu (Model)
 // =========================
-int figures[7][4] = {
+
+// Toạ độ một ô trên lưới
+struct Point { int x, y; };
+
+// Kết quả trả về
+enum class CoreResult { BackToConsole, Quit };
+
+// Định nghĩa 7 loại khối Tetris (L,I,T,Z,S,J,O)
+static constexpr std::array<std::array<int,4>, 7> FIGURES = {{
     {1,3,5,7}, // I
     {2,4,5,7}, // Z
     {3,5,4,6}, // S
     {3,5,4,7}, // T
     {2,3,5,7}, // L
     {3,5,7,6}, // J
-    {2,3,4,5}  // O
-};
+    {2,3,4,5}, // O
+}};
 
-// =========================
-// gamecore-do-mau-02
-// Đổ màu ngẫu nhiên cho các khối
-// =========================
-sf::Color colors[8] = {
+// Bảng màu cho từng loại khối
+static constexpr std::array<sf::Color, 8> BLOCK_COLORS = {{
     sf::Color::Black,
     sf::Color::Cyan,
     sf::Color::Red,
     sf::Color::Green,
     sf::Color::Magenta,
-    sf::Color(255, 165, 0), // Orange
+    sf::Color(255,165,0),
     sf::Color::Blue,
-    sf::Color::Yellow
-};
+    sf::Color::Yellow,
+}};
 
-bool check() {
-    for (int i = 0; i < 4; i++) {
-        if (a[i].x < 0 || a[i].x >= N || a[i].y >= M) return false;
-        else if (a[i].y >= 0 && field[a[i].y][a[i].x]) return false;
+// =========================
+// Khối logic xếp hình (Logic)
+// =========================
+
+// Kiểm tra hợp lệ (không ra ngoài / không chồng lên ô đã chốt)
+static bool checkValid(const std::array<Point,4>& pts,
+                       const int board[BOARD_ROWS][BOARD_COLS]) {
+    for (const auto& p : pts) {
+        if (p.x < 0 || p.x >= BOARD_COLS || p.y >= BOARD_ROWS) return false;
+        if (p.y >= 0 && board[p.y][p.x] != 0)                   return false;
     }
     return true;
 }
 
-int main() {
-    srand(static_cast<unsigned int>(time(0)));
+// Sinh khối mới tại đỉnh lưới
+static void spawnBlock(int type, std::array<Point,4>& pts) {
+    for (int i = 0; i < 4; ++i) {
+        pts[i].x = FIGURES[type][i] % 2 + 4;
+        pts[i].y = FIGURES[type][i] / 2 - 1;
+    }
+}
+
+// Xoá các hàng đầy; trả về số hàng đã xoá
+static int clearLines(int board[BOARD_ROWS][BOARD_COLS]) {
+    int cleared = 0, k = BOARD_ROWS - 1;
+    for (int i = BOARD_ROWS - 1; i > 0; --i) {
+        int cnt = 0;
+        for (int j = 0; j < BOARD_COLS; ++j) { board[k][j]=board[i][j]; if(board[i][j])++cnt; }
+        if (cnt < BOARD_COLS) --k; else ++cleared;
+    }
+    return cleared;
+}
+
+// =========================
+// Khối tiện ích view (View Helpers)
+// =========================
+static bool loadSystemFont(sf::Font& font) {
+    const std::array<const char*, 5> paths = {
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Verdana.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+    };
+    for (const char* p : paths) {
+        // VRSFML: openFromFile trả base::Optional
+        auto opt = sf::Font::openFromFile(p);
+        if (opt.hasValue()) { font = std::move(opt.value()); return true; }
+    }
+    return false;
+}
+
+// =========================
+// Hàm chạy gameCore (Logic chính / Integration Entry Point)
+// =========================
+CoreResult runGameCore(sf::GraphicsContext& gCtx) {
+    (void)gCtx;
+
     // =========================
     // gamecore-tao-giao-dien-169-00
+    // Tạo cửa sổ tỷ lệ 9:16 — VRSFML designated initializer
     // =========================
-    int winHeight = 960;
-    auto window = layout::create916Window(winHeight);
-    float offsetX = (window.getSize().x - N * BLOCK_SIZE) / 2.0f;
-    float offsetY = (window.getSize().y - M * BLOCK_SIZE) / 2.0f;
+    auto window = layout::create916Window(CORE_WINDOW_HEIGHT, "ctetris — Core");
+    window.setFramerateLimit(60);
 
-    sf::RectangleShape gridCell({(float)BLOCK_SIZE, (float)BLOCK_SIZE});
-    gridCell.setFillColor(sf::Color::Transparent);
-    gridCell.setOutlineThickness(-1.f);
-    gridCell.setOutlineColor(sf::Color(255,255,255,40));
+    const sf::Vector2u wSize   = window.getSize();
+    const float        offX    = (static_cast<float>(wSize.x) - BOARD_COLS*CELL_PX) / 2.f;
+    const float        offY    = (static_cast<float>(wSize.y) - BOARD_ROWS*CELL_PX) / 2.f;
+    const float        uiScale = static_cast<float>(wSize.y) / 960.f;
 
-    sf::RectangleShape blockCell({(float)BLOCK_SIZE, (float)BLOCK_SIZE});
-    blockCell.setOutlineThickness(-1.f);
-    blockCell.setOutlineColor(sf::Color(255,255,255,80));
+    sf::Font font;
+    const bool hasFont = loadSystemFont(font);
 
-    int score = 0;
-    int colorNum = 1;
-    int nextBlockType = rand() % 7;
-    int nextColorNum = nextBlockType + 1;
-    int dx = 0;
-    bool rotate = false;
-    float timer = 0, delay = 0.3f;
-    bool isGameOver = false;
-    sf::Clock clock;
+    // =========================
+    // gamecore-tao-cac-khoi-xep-hinh-LITZO-01
+    // Khởi tạo lưới và trạng thái
+    // =========================
+    int board[BOARD_ROWS][BOARD_COLS] = {};
+
+    std::mt19937 rng(static_cast<unsigned>(std::time(nullptr)));
+    auto rType  = [&]{ return static_cast<int>(rng() % 7); };
+    auto rColor = [](int t){ return t + 1; };
+
+    // =========================
+    // gamecore-do-mau-02
+    // Xác định loại và màu khối hiện tại / tiếp theo
+    // =========================
+    int nextType = rType(), nextColor = rColor(nextType);
+    int curType  = rType(), curColor  = rColor(curType);
+    std::array<Point,4> cur{};
+    spawnBlock(curType, cur);
 
     // =========================
     // gamecore-xu-ly-roi-03
-    // Khối rơi tự do ở vị trí bất kỳ (on top)
+    // Biến trạng thái rơi
     // =========================
-    auto spawnNewBlock = [&]() {
-        int n = nextBlockType;
-        colorNum = nextColorNum;
-        for (int i = 0; i < 4; i++) {
-            a[i].x = figures[n][i] % 2 + 4;
-            a[i].y = figures[n][i] / 2 - 1;
-        }
-        if (!check()) isGameOver = true;
-        nextBlockType = rand() % 7;
-        nextColorNum = nextBlockType + 1;
-    };
-    spawnNewBlock();
+    float     timer = 0.f, delay = 0.3f;
+    int       score = 0;
+    bool      isGameOver = false;
+    CoreResult result    = CoreResult::Quit;
+    sf::Clock clock;
+
+    sf::RectangleShape gridCell({static_cast<float>(CELL_PX), static_cast<float>(CELL_PX)});
+    gridCell.setFillColor(sf::Color::Transparent);
+    gridCell.setOutlineThickness(-1.f);
+    gridCell.setOutlineColor(sf::Color(255,255,255,30));
+
+    sf::RectangleShape blockCell({static_cast<float>(CELL_PX), static_cast<float>(CELL_PX)});
+    blockCell.setOutlineThickness(-2.f);
+    blockCell.setOutlineColor(sf::Color(255,255,255,80));
 
     // =========================
-    // gamecore-xu-ly-phim-04
-    // Điều khiển khối bằng mũi tên và WASD
+    // Vòng lặp chính — VRSFML SFML_GAME_LOOP
     // =========================
-    while (window.isOpen()) {
-        float time = clock.restart().asSeconds();
-        timer += time;
-        sf::Event event{};
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) window.close();
-            if (event.type == sf::Event::KeyPressed) {
-                if (isGameOver && event.key.code == sf::KeyboardKey::R) {
-                    for (int i = 0; i < M; i++) for (int j = 0; j < N; j++) field[i][j] = 0;
-                    score = 0; isGameOver = false; spawnNewBlock();
+    SFML_GAME_LOOP(window) {
+        const float dt = clock.restart().asSeconds();
+        timer += dt;
+
+        int  dx = 0;
+        bool rotate = false;
+
+        // =========================
+        // gamecore-xu-ly-phim-04
+        // Xử lý bàn phím — VRSFML: sf::base::Optional từ pollEvent
+        // =========================
+        while (const sf::base::Optional ev = window.pollEvent()) {
+            if (ev->is<sf::Event::Closed>()) { window.close(); return CoreResult::Quit; }
+
+            if (const auto* kp = ev->getIf<sf::Event::KeyPressed>()) {
+                if (kp->code == sf::Keyboard::Key::Escape) {
+                    result = CoreResult::BackToConsole;
+                    window.close();
+                    return result;
+                }
+                if (isGameOver && kp->code == sf::Keyboard::Key::R) {
+                    for (int i=0;i<BOARD_ROWS;++i) for(int j=0;j<BOARD_COLS;++j) board[i][j]=0;
+                    score=0; isGameOver=false;
+                    curType=rType(); curColor=rColor(curType); spawnBlock(curType,cur);
+                    nextType=rType(); nextColor=rColor(nextType);
                 }
                 if (!isGameOver) {
-                    if (event.key.code == sf::KeyboardKey::Up || event.key.code == sf::KeyboardKey::W) rotate = true;
-                    else if (event.key.code == sf::KeyboardKey::Left || event.key.code == sf::KeyboardKey::A) dx = -1;
-                    else if (event.key.code == sf::KeyboardKey::Right || event.key.code == sf::KeyboardKey::D) dx = 1;
+                    if (kp->code==sf::Keyboard::Key::Up  ||kp->code==sf::Keyboard::Key::W) rotate=true;
+                    if (kp->code==sf::Keyboard::Key::Left||kp->code==sf::Keyboard::Key::A) dx=-1;
+                    if (kp->code==sf::Keyboard::Key::Right||kp->code==sf::Keyboard::Key::D) dx=1;
                 }
             }
         }
-        if (sf::Keyboard::isKeyPressed(sf::KeyboardKey::Down) || sf::Keyboard::isKeyPressed(sf::KeyboardKey::S)) delay = 0.05f;
+
+        // Phím giữ để tăng tốc rơi
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) ||
+            sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
+            delay = 0.05f;
         else delay = 0.3f;
 
         if (!isGameOver) {
             // Di chuyển ngang
-            if (dx != 0) {
-                for (int i = 0; i < 4; i++) { b[i] = a[i]; a[i].x += dx; }
-                if (!check()) for (int i = 0; i < 4; i++) a[i] = b[i];
-                dx = 0;
-            }
-            // Xử lý xoay
+            if (dx) { auto t=cur; for(auto&p:t)p.x+=dx; if(checkValid(t,board))cur=t; }
+
+            // Xoay khối theo chiều kim đồng hồ
             if (rotate) {
-                Point p = a[1];
-                for (int i = 0; i < 4; i++) {
-                    b[i] = a[i];
-                    int deltaX = a[i].y - p.y;
-                    int deltaY = a[i].x - p.x;
-                    a[i].x = p.x - deltaX;
-                    a[i].y = p.y + deltaY;
-                }
-                if (!check()) for (int i = 0; i < 4; i++) a[i] = b[i];
-                rotate = false;
+                auto t=cur; Point piv=cur[1];
+                for(auto&p:t){int ddx=p.y-piv.y,ddy=p.x-piv.x;p.x=piv.x-ddx;p.y=piv.y+ddy;}
+                if(checkValid(t,board))cur=t;
             }
+
             // =========================
             // gamecore-xu-ly-cham-05
-            // Hiệu ứng chạm và dừng rơi khối
+            // Chạm đất — gắn khối vào lưới
             // =========================
             if (timer > delay) {
-                for (int i = 0; i < 4; i++) { b[i] = a[i]; a[i].y += 1; }
-                if (!check()) {
-                    for (int i = 0; i < 4; i++) {
-                        if (b[i].y >= 0) field[b[i].y][b[i].x] = colorNum;
-                        else isGameOver = true;
+                auto t=cur; for(auto&p:t)p.y+=1;
+                if (checkValid(t,board)) { cur=t; }
+                else {
+                    for(const auto&p:cur) { if(p.y<0){isGameOver=true;break;} board[p.y][p.x]=curColor; }
+                    if (!isGameOver) {
+                        // =========================
+                        // gamecore-xu-ly-xoa-dong-06
+                        // Xoá hàng đầy
+                        // =========================
+                        int lines = clearLines(board);
+                        // =========================
+                        // gamecore-tinh-diem-07
+                        // Tính điểm
+                        // =========================
+                        if (lines > 0) score += lines * 100;
+                        curType=nextType; curColor=nextColor; spawnBlock(curType,cur);
+                        if (!checkValid(cur,board)) isGameOver=true;
+                        nextType=rType(); nextColor=rColor(nextType);
                     }
-                    if (!isGameOver) spawnNewBlock();
                 }
-                timer = 0;
+                timer=0.f;
             }
-            // =========================
-            // gamecore-xu-ly-xoa-dong-06
-            // Hiệu ứng xóa dòng
-            // =========================
-            int linesCleared = 0;
-            int k = M - 1;
-            for (int i = M - 1; i > 0; i--) {
-                int count = 0;
-                for (int j = 0; j < N; j++) {
-                    if (field[i][j]) count++;
-                    field[k][j] = field[i][j];
-                }
-                if (count < N) k--;
-                else linesCleared++;
-            }
-            // =========================
-            // gamecore-tinh-diem-07
-            // Tính điểm
-            // =========================
-            if (linesCleared >= 1) score += linesCleared * 100;
         }
 
         // =========================
-        // Vẽ giao diện
+        // Vẽ giao diện (View)
         // =========================
-        window.clear(sf::Color(40,40,40));
-        // Vẽ lưới
-        for (int i = 0; i < M; i++) for (int j = 0; j < N; j++) {
-            gridCell.setPosition(offsetX + j * BLOCK_SIZE, offsetY + i * BLOCK_SIZE);
+        window.clear(sf::Color(28,28,36));
+
+        // Lưới nền
+        for(int i=0;i<BOARD_ROWS;++i) for(int j=0;j<BOARD_COLS;++j) {
+            gridCell.setPosition({offX+j*CELL_PX, offY+i*CELL_PX});
             window.draw(gridCell);
         }
-        // Vẽ các khối đã chốt
-        for (int i = 0; i < M; i++) for (int j = 0; j < N; j++) {
-            if (field[i][j] == 0) continue;
-            blockCell.setFillColor(colors[field[i][j]]);
-            blockCell.setPosition(offsetX + j * BLOCK_SIZE, offsetY + i * BLOCK_SIZE);
+        // Ô đã chốt
+        for(int i=0;i<BOARD_ROWS;++i) for(int j=0;j<BOARD_COLS;++j) {
+            if(!board[i][j]) continue;
+            blockCell.setFillColor(BLOCK_COLORS[board[i][j]]);
+            blockCell.setPosition({offX+j*CELL_PX, offY+i*CELL_PX});
             window.draw(blockCell);
         }
-        // Vẽ khối đang rơi
-        for (int i = 0; i < 4; i++) {
-            blockCell.setFillColor(colors[colorNum]);
-            blockCell.setPosition(offsetX + a[i].x * BLOCK_SIZE, offsetY + a[i].y * BLOCK_SIZE);
+        // Khối đang rơi
+        for(const auto&p:cur) {
+            if(p.y<0) continue;
+            blockCell.setFillColor(BLOCK_COLORS[curColor]);
+            blockCell.setPosition({offX+p.x*CELL_PX, offY+p.y*CELL_PX});
             window.draw(blockCell);
         }
-        // Vẽ chữ GAME OVER
-        if (isGameOver) {
-            sf::Font font;
-            if (font.loadFromFile("/System/Library/Fonts/Supplemental/Arial.ttf")) {
-                sf::Text gameOverText;
-                gameOverText.setFont(font);
-                gameOverText.setString("GAME OVER\nPress R to Restart");
-                gameOverText.setCharacterSize(48);
-                gameOverText.setFillColor(sf::Color::Red);
-                gameOverText.setPosition(offsetX + 20, offsetY + 200);
-                window.draw(gameOverText);
-            }
+
+        if (hasFont) {
+            // VRSFML: sf::Text(font, string, charSize) — constructor tường minh
+            sf::Text scoreT(font, "Score: "+std::to_string(score),
+                            static_cast<unsigned>(22.f*uiScale));
+            scoreT.setFillColor(sf::Color(220,240,255));
+            scoreT.setPosition({offX, offY-32.f*uiScale});
+            window.draw(scoreT);
+
+            sf::Text escT(font, "ESC: Ve Console",
+                          static_cast<unsigned>(16.f*uiScale));
+            escT.setFillColor(sf::Color(180,190,210));
+            escT.setPosition({offX, offY+BOARD_ROWS*CELL_PX+6.f});
+            window.draw(escT);
+        }
+
+        // Màn hình Game Over
+        if (isGameOver && hasFont) {
+            sf::RectangleShape dark({static_cast<float>(wSize.x),static_cast<float>(wSize.y)});
+            dark.setFillColor(sf::Color(0,0,0,160));
+            window.draw(dark);
+            sf::Text goT(font,
+                "GAME OVER\nDiem: "+std::to_string(score)+"\n\n[R] Choi lai   [ESC] Ve Console",
+                static_cast<unsigned>(36.f*uiScale));
+            goT.setFillColor(sf::Color(255,80,80));
+            const sf::FloatRect gb = goT.getLocalBounds();
+            goT.setOrigin({gb.position.x+gb.size.x/2.f, gb.position.y+gb.size.y/2.f});
+            goT.setPosition({static_cast<float>(wSize.x)/2.f,
+                             static_cast<float>(wSize.y)/2.f});
+            window.draw(goT);
         }
         window.display();
     }
+    return result;
+}
+
+// =========================
+// Điểm vào standalone
+// =========================
+#ifdef STANDALONE_GAMECORE
+int main() {
+    auto gCtx = sf::GraphicsContext::create().value();
+    runGameCore(gCtx);
     return 0;
 }
-         {'S','S',' ',' '},
-         {' ',' ',' ',' '}},
-        {{' ',' ',' ',' '},
-         {'Z','Z',' ',' '},
-         {' ','Z','Z',' '},
-         {' ',' ',' ',' '}},
-        {{' ',' ',' ',' '},
-         {'J',' ',' ',' '},
-         {'J','J','J',' '},
-         {' ',' ',' ',' '}},
-        {{' ',' ',' ',' '},
-         {' ',' ','L',' '},
-         {'L','L','L',' '},
-         {' ',' ',' ',' '}}
-};
-bool canMove(int dx, int dy){
-    for (int i = 0; i < 4; i++ )
-        for (int j = 0; j < 4; j++ )
-            if (blocks[b][i][j] != ' ') {
-                int xt = x + j + dx;
-                int yt = y + i + dy;
-                if (xt < 1 || xt >= W-1 || yt >= H-1 ) return false;
-                if (board[yt][xt] != ' ') return false;
-            }
-    return true;
-}
-void block2Board(){
-    for (int i = 0; i < 4; i++ )
-        for (int j = 0; j < 4; j++ )
-            if (blocks[b][i][j] != ' ')
-                board[y+i][x+j] = blocks[b][i][j];
-}
-void boardDelBlock(){
-    for (int i = 0; i < 4; i++ )
-        for (int j = 0; j < 4; j++ )
-            if (blocks[b][i][j] != ' ')
-                board[y+i][x+j] = ' ';
-}
-void initBoard(){
-    for (int i = 0 ; i < H ; i++)
-        for (int j = 0 ; j < W ; j++)
-            if (i == 0 || i == H-1 || j ==0 || j == W-1) board[i][j] = '#';
-            else board[i][j] = ' ';
-}
-void draw(){
-    system("cls");
-
-    for (int i = 0 ; i < H ; i++, cout<<endl)
-        for (int j = 0 ; j < W ; j++) cout<<board[i][j];
-}
-void removeLine(){
-    int i,j;
-    for (i = H-2 ; i > 0 ; i-- ){
-        for (j = 0 ; j < W ; j++)
-            if (board[i][j] == ' ') break;
-        if (j == W){
-            for (int ii = i ; ii > 0 ; ii--)
-                for (int jj = 0; jj < W; jj++)
-                    board[ii][jj] = board[ii-1][jj];
-            i++;
-            draw();
-            _sleep(200);
-        }
-    }
-}
-
-int main()
-{
-    srand(time(0));
-    x = 5; y = 0; b = rand() % 7;
-    initBoard();
-
-    while (1) {
-        boardDelBlock();
-
-        if (kbhit()) {
-            int c = getch();
-            
-            // Xử lý phím mũi tên (thường bắt đầu bằng 0 hoặc 224)
-            if (c == 0 || c == 224) {
-                char arrow = getch(); // Lấy mã thứ hai
-                if (arrow == 75 && canMove(-1, 0)) x--;      // Mũi tên TRÁI
-                else if (arrow == 77 && canMove(1, 0)) x++; // Mũi tên PHẢI
-                else if (arrow == 80 && canMove(0, 1)) y++; // Mũi tên XUỐNG
-            } 
-            else {
-                // Xử lý các phím thường
-                if (c == 'a' && canMove(-1, 0)) x--;
-                if (c == 'd' && canMove(1, 0)) x++;
-                if (c == 's' && canMove(0, 1)) y++; // Thêm 's' cho giống game hiện đại
-                if (c == 'x' && canMove(0, 1)) y++;
-                if (c == 'q') break;
-            }
-        }
-
-        // Khối gạch tự động rơi xuống
-        if (canMove(0, 1)) {
-            y++;
-        }
-        else {
-            block2Board();
-            removeLine();
-            x = 5; y = 0; b = rand() % 7;
-            // Kiểm tra nếu khối mới sinh ra đã bị kẹt thì Game Over
-            if (!canMove(0, 0)) {
-                draw();
-                cout << "GAME OVER!" << endl;
-                break;
-            }
-        }
-
-        block2Board();
-        draw();
-        _sleep(300); // Giảm xuống 300ms để game mượt hơn một chút
-    }
-    return 0;
-}
+#endif

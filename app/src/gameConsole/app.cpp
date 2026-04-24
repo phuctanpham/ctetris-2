@@ -1,3 +1,15 @@
+// phucpt: app/src/gameConsole/app.cpp
+
+// =========================
+// integration/v1
+// Điểm tích hợp: hàm runGameConsole() dùng khi tích hợp với main.cpp
+// Ported sang VRSFML:
+// - sf::GraphicsContext + sf::AudioContext nhận từ main()
+// - SFML_GAME_LOOP(window) thay while(window.isOpen())
+// - sf::base::Optional cho pollEvent
+// - sf::Font::openFromFile().value() thay loadFromFile
+// - sf::SoundBuffer::loadFromSamples() API giữ tương tự SFML 3
+// =========================
 #include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
 
@@ -18,513 +30,430 @@
 
 namespace fs = std::filesystem;
 
+// =========================
+// Mô hình dữ liệu (Model)
+// =========================
+
+// Một mục trong bảng điểm
 struct BoardEntry {
     std::string user;
-    int score = 0;
+    int         score = 0;
     std::string time;
 };
 
+// Nút bấm UI
 struct Button {
     sf::FloatRect bounds;
-    std::string label;
+    std::string   label;
 };
 
-enum class PopupMode {
-    None,
-    Guide,
-    Board,
-};
+// Trạng thái popup
+enum class PopupMode { None, Guide, Board };
 
-bool loadFirstAvailableFont(sf::Font& font, fs::path& loadedPath) {
-    const std::array<fs::path, 6> candidates = {
-        fs::path{"/System/Library/Fonts/Supplemental/Arial Unicode.ttf"},
-        fs::path{"/System/Library/Fonts/Supplemental/Arial.ttf"},
-        fs::path{"/System/Library/Fonts/Supplemental/Verdana.ttf"},
-        fs::path{"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"},
-        fs::path{"/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"},
-        fs::path{"/usr/share/fonts/truetype/freefont/FreeSans.ttf"},
+// Kết quả trả về sau gameConsole
+enum class ConsoleResult { StartGame, Quit };
+
+// =========================
+// Cấu hình (Configuration)
+// =========================
+static constexpr int CONSOLE_WINDOW_HEIGHT = 720;
+
+// =========================
+// Khối tiện ích môi trường (Environment Helpers)
+// =========================
+
+// Tải font hệ thống — VRSFML: sf::Font::openFromFile trả sf::base::Optional
+static bool loadSystemFont(sf::Font& font) {
+    const std::array<const char*, 6> paths = {
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Verdana.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
     };
-
-    for (const auto& candidate : candidates) {
-        if (fs::exists(candidate) && font.openFromFile(candidate)) {
-            loadedPath = candidate;
-            return true;
-        }
+    for (const char* p : paths) {
+        // VRSFML: openFromFile trả base::Optional<sf::Font>
+        auto opt = sf::Font::openFromFile(p);
+        if (opt.hasValue()) { font = std::move(opt.value()); return true; }
     }
     return false;
 }
 
-sf::Texture buildBackgroundTexture() {
-    constexpr unsigned int width = 540;
-    constexpr unsigned int height = 960;
-    std::vector<std::uint8_t> pixels(width * height * 4, 255);
-
-    for (unsigned int y = 0; y < height; ++y) {
-        float fy = static_cast<float>(y) / static_cast<float>(height - 1);
-        for (unsigned int x = 0; x < width; ++x) {
-            float fx = static_cast<float>(x) / static_cast<float>(width - 1);
-            std::size_t index = (static_cast<std::size_t>(y) * width + x) * 4;
-
-            float wave = 0.5f + 0.5f * std::sin(fx * 9.0f + fy * 5.0f);
-            float glow = 0.5f + 0.5f * std::cos((fx - 0.3f) * 8.0f + (fy - 0.45f) * 6.0f);
-
-            std::uint8_t red = static_cast<std::uint8_t>(18 + 20 * fy + 65 * wave + 25 * glow);
-            std::uint8_t green = static_cast<std::uint8_t>(30 + 28 * fy + 45 * wave + 18 * glow);
-            std::uint8_t blue = static_cast<std::uint8_t>(55 + 42 * fy + 95 * wave + 75 * glow);
-
-            if (((x * 17 + y * 13) % 211) == 0 || ((x * 11 + y * 19) % 317) == 0) {
-                red = 250;
-                green = 250;
-                blue = 255;
-            }
-
-            pixels[index + 0] = red;
-            pixels[index + 1] = green;
-            pixels[index + 2] = blue;
-            pixels[index + 3] = 255;
-        }
-    }
-
-    sf::Image image(sf::Vector2u(width, height), pixels.data());
-    sf::Texture texture(sf::Vector2u(width, height));
-    texture.update(image);
-    return texture;
-}
-
-std::vector<BoardEntry> loadBoardEntries(const fs::path& path) {
+// Tải dữ liệu bảng điểm từ file JSON đơn giản
+static std::vector<BoardEntry> loadBoardEntries(const fs::path& path) {
     std::vector<BoardEntry> entries;
-    std::ifstream input(path);
-    if (!input) {
-        std::cerr << "Cannot open board data: " << path << '\n';
-        return entries;
+    std::ifstream           in(path);
+    if (!in) { std::cerr << "[gameConsole] Không mở được: " << path << '\n'; return entries; }
+    std::ostringstream buf; buf << in.rdbuf();
+    const std::string  content = buf.str();
+    const std::regex   pat(
+        "\\{\\s*\"user\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"score\"\\s*:\\s*(\\d+)"
+        "\\s*,\\s*\"time\"\\s*:\\s*\"([^\"]+)\"\\s*\\}");
+    for (std::sregex_iterator it(content.begin(), content.end(), pat), end; it != end; ++it) {
+        BoardEntry e; e.user  = (*it)[1]; e.score = std::stoi((*it)[2]); e.time = (*it)[3];
+        entries.push_back(std::move(e));
     }
-
-    std::ostringstream buffer;
-    buffer << input.rdbuf();
-    const std::string content = buffer.str();
-
-    const std::regex entryPattern(
-        "\\{\\s*\"user\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"score\"\\s*:\\s*(\\d+)\\s*,\\s*\"time\"\\s*:\\s*\"([^\"]+)\"\\s*\\}");
-
-    for (std::sregex_iterator it(content.begin(), content.end(), entryPattern), end; it != end; ++it) {
-        BoardEntry entry;
-        entry.user = (*it)[1].str();
-        entry.score = std::stoi((*it)[2].str());
-        entry.time = (*it)[3].str();
-        entries.push_back(std::move(entry));
-    }
-
     return entries;
 }
 
-bool buildAmbientBuffer(sf::SoundBuffer& buffer) {
-    constexpr unsigned sampleRate = 44100;
-    constexpr float durationSeconds = 4.0f;
-    constexpr std::size_t channelCount = 2;
-    constexpr std::size_t sampleCount = static_cast<std::size_t>(sampleRate * durationSeconds * channelCount);
-
-    std::vector<std::int16_t> samples(sampleCount, 0);
+// Xây dựng âm thanh nền loop từ mẫu tổng hợp — không cần file ngoài
+static bool buildAmbientBuffer(sf::SoundBuffer& buf) {
+    constexpr unsigned  sr  = 44100;
+    constexpr float     dur = 4.f;
+    constexpr std::size_t ch = 2;
+    const std::size_t   n   = static_cast<std::size_t>(sr * dur * ch);
+    std::vector<std::int16_t> s(n, 0);
     const float pi = 3.14159265358979323846f;
-
-    for (std::size_t frame = 0; frame < sampleCount / channelCount; ++frame) {
-        float t = static_cast<float>(frame) / static_cast<float>(sampleRate);
-        float pulse = 0.42f + 0.18f * std::sin(t * 0.85f * 2.0f * pi);
-        float tone =
-            0.55f * std::sin(t * 110.0f * 2.0f * pi) +
-            0.28f * std::sin(t * 146.83f * 2.0f * pi) +
-            0.18f * std::sin(t * 220.0f * 2.0f * pi);
-        float value = std::clamp(tone * pulse, -1.0f, 1.0f);
-        std::int16_t sample = static_cast<std::int16_t>(value * 2400.0f);
-        samples[frame * 2 + 0] = sample;
-        samples[frame * 2 + 1] = sample;
+    for (std::size_t f = 0; f < n / ch; ++f) {
+        float t  = static_cast<float>(f) / static_cast<float>(sr);
+        float p  = 0.42f + 0.18f * std::sin(t * 0.85f * 2.f * pi);
+        float v  = std::clamp(
+            (0.55f * std::sin(t*110.f*2.f*pi) + 0.28f * std::sin(t*146.83f*2.f*pi)
+             + 0.18f * std::sin(t*220.f*2.f*pi)) * p, -1.f, 1.f);
+        std::int16_t sample = static_cast<std::int16_t>(v * 2400.f);
+        s[f*2]=s[f*2+1]=sample;
     }
-
-    const std::vector<sf::SoundChannel> channelMap = {sf::SoundChannel::FrontLeft, sf::SoundChannel::FrontRight};
-    return buffer.loadFromSamples(samples.data(), static_cast<std::uint64_t>(samples.size()), 2, sampleRate, channelMap);
+    const std::vector<sf::SoundChannel> chMap =
+        {sf::SoundChannel::FrontLeft, sf::SoundChannel::FrontRight};
+    return buf.loadFromSamples(s.data(), static_cast<std::uint64_t>(n), 2, sr, chMap);
 }
 
-void drawTextCentered(sf::RenderTarget& target, sf::Text text, const sf::Vector2f& position) {
-    const sf::FloatRect bounds = text.getLocalBounds();
-    text.setOrigin(sf::Vector2f(bounds.position.x + bounds.size.x / 2.f, bounds.position.y + bounds.size.y / 2.f));
-    text.setPosition(position);
-    target.draw(text);
+// =========================
+// Khối view (View Helpers)
+// =========================
+
+// Texture nền sinh từ pixel — không cần file ảnh
+static sf::Texture buildBackgroundTexture() {
+    constexpr unsigned W = 540, H = 960;
+    std::vector<std::uint8_t> px(W * H * 4, 255);
+    for (unsigned y = 0; y < H; ++y) {
+        float fy = static_cast<float>(y) / (H - 1);
+        for (unsigned x = 0; x < W; ++x) {
+            float fx  = static_cast<float>(x) / (W - 1);
+            auto  idx = (static_cast<std::size_t>(y) * W + x) * 4;
+            float wv  = 0.5f + 0.5f * std::sin(fx*9.f+fy*5.f);
+            float gl  = 0.5f + 0.5f * std::cos((fx-.3f)*8.f+(fy-.45f)*6.f);
+            px[idx]   = static_cast<std::uint8_t>(18+20*fy+65*wv+25*gl);
+            px[idx+1] = static_cast<std::uint8_t>(30+28*fy+45*wv+18*gl);
+            px[idx+2] = static_cast<std::uint8_t>(55+42*fy+95*wv+75*gl);
+            if (((x*17+y*13)%211)==0||((x*11+y*19)%317)==0) px[idx]=px[idx+1]=px[idx+2]=250;
+            px[idx+3]=255;
+        }
+    }
+    sf::Image img(sf::Vector2u(W, H), px.data());
+    sf::Texture tex(sf::Vector2u(W, H));
+    tex.update(img);
+    return tex;
 }
 
-void drawButton(sf::RenderTarget& target, const sf::Font& font, const Button& button, bool hovered, float scale) {
-    sf::RectangleShape shape(sf::Vector2f(button.bounds.size.x, button.bounds.size.y));
-    shape.setPosition(button.bounds.position);
-    shape.setFillColor(hovered ? sf::Color(50, 104, 180, 235) : sf::Color(26, 35, 58, 228));
-    shape.setOutlineColor(hovered ? sf::Color(255, 255, 255, 220) : sf::Color(190, 214, 255, 145));
-    shape.setOutlineThickness(2.f * scale);
-    target.draw(shape);
-
-    sf::Text label(font);
-    label.setString(button.label);
-    label.setCharacterSize(static_cast<unsigned int>(28.f * scale));
-    label.setFillColor(sf::Color::White);
-    drawTextCentered(target,
-                     label,
-                     sf::Vector2f(button.bounds.position.x + button.bounds.size.x / 2.f,
-                                  button.bounds.position.y + button.bounds.size.y / 2.f - 2.f * scale));
+// Vẽ văn bản căn giữa
+static void drawTextCentered(sf::RenderTarget& rt, sf::Text t, const sf::Vector2f& pos) {
+    const sf::FloatRect b = t.getLocalBounds();
+    t.setOrigin({b.position.x + b.size.x/2.f, b.position.y + b.size.y/2.f});
+    t.setPosition(pos);
+    rt.draw(t);
 }
 
-void drawOverlayPanel(sf::RenderTarget& target, const sf::Vector2u& windowSize, float alpha) {
-    sf::RectangleShape overlay(sf::Vector2f(static_cast<float>(windowSize.x), static_cast<float>(windowSize.y)));
-    overlay.setFillColor(sf::Color(0, 0, 0, static_cast<std::uint8_t>(alpha)));
-    target.draw(overlay);
+// Vẽ nút bấm với hiệu ứng hover
+static void drawButton(sf::RenderTarget& rt, const sf::Font& font,
+                        const Button& btn, bool hovered, float scale) {
+    sf::RectangleShape sh(btn.bounds.size);
+    sh.setPosition(btn.bounds.position);
+    sh.setFillColor(hovered ? sf::Color(50,104,180,235) : sf::Color(26,35,58,228));
+    sh.setOutlineColor(hovered ? sf::Color(255,255,255,220) : sf::Color(190,214,255,145));
+    sh.setOutlineThickness(2.f*scale);
+    rt.draw(sh);
+    sf::Text lbl(font, btn.label, static_cast<unsigned>(28.f*scale));
+    lbl.setFillColor(sf::Color::White);
+    drawTextCentered(rt, lbl,
+        {btn.bounds.position.x+btn.bounds.size.x/2.f,
+         btn.bounds.position.y+btn.bounds.size.y/2.f - 2.f*scale});
 }
 
-int clampBoardScroll(int desiredScroll, int itemCount, int visibleRows) {
-    const int maxScroll = std::max(0, itemCount - visibleRows);
-    return std::clamp(desiredScroll, 0, maxScroll);
+// Lớp phủ tối lightbox
+static void drawOverlayPanel(sf::RenderTarget& rt, sf::Vector2u ws, float alpha) {
+    sf::RectangleShape ov({static_cast<float>(ws.x), static_cast<float>(ws.y)});
+    ov.setFillColor(sf::Color(0,0,0,static_cast<std::uint8_t>(alpha)));
+    rt.draw(ov);
 }
 
-void drawGuidePopup(sf::RenderTarget& target,
-                    const sf::Font& font,
-                    const sf::Vector2u& windowSize,
-                    const Button& closeButton,
-                    float scale,
-                    bool closeHovered) {
-    const float panelWidth = static_cast<float>(windowSize.x) * 0.74f;
-    const float panelHeight = static_cast<float>(windowSize.y) * 0.70f;
-    const float panelX = (static_cast<float>(windowSize.x) - panelWidth) / 2.f;
-    const float panelY = (static_cast<float>(windowSize.y) - panelHeight) / 2.f;
+// =========================
+// Khối logic scroll bảng điểm (Logic)
+// =========================
+static int clampBoardScroll(int d, int n, int vis) {
+    return std::clamp(d, 0, std::max(0, n - vis));
+}
 
-    sf::RectangleShape panel(sf::Vector2f(panelWidth, panelHeight));
-    panel.setPosition(sf::Vector2f(panelX, panelY));
-    panel.setFillColor(sf::Color(18, 23, 44, 245));
-    panel.setOutlineColor(sf::Color(110, 163, 255, 210));
-    panel.setOutlineThickness(3.f * scale);
-    target.draw(panel);
-
-    sf::Text title(font);
-    title.setString("GUIDE");
-    title.setCharacterSize(static_cast<unsigned int>(36.f * scale));
-    title.setFillColor(sf::Color(255, 243, 194));
-    drawTextCentered(target, title, sf::Vector2f(panelX + panelWidth / 2.f, panelY + 48.f * scale));
-
-    const std::array<std::string, 4> lines = {
+// =========================
+// Khối vẽ popup Guide (View)
+// =========================
+static void drawGuidePopup(sf::RenderTarget& rt, const sf::Font& font,
+                            sf::Vector2u ws, const Button& closeBtn,
+                            float scale, bool closeHov) {
+    const float pw=ws.x*.74f, ph=ws.y*.70f, px=(ws.x-pw)/2.f, py=(ws.y-ph)/2.f;
+    sf::RectangleShape panel({pw,ph});
+    panel.setPosition({px,py});
+    panel.setFillColor(sf::Color(18,23,44,245));
+    panel.setOutlineColor(sf::Color(110,163,255,210));
+    panel.setOutlineThickness(3.f*scale);
+    rt.draw(panel);
+    sf::Text title(font, "GUIDE", static_cast<unsigned>(36.f*scale));
+    title.setFillColor(sf::Color(255,243,194));
+    drawTextCentered(rt, title, {px+pw/2.f, py+48.f*scale});
+    const std::array<const char*,4> lines = {
         "Rotate clockwise   : Up arrow or W",
         "Move left          : Left arrow or A",
         "Move right         : Right arrow or D",
         "Rotate counterwise : Down arrow or S",
     };
-
-    float lineY = panelY + 115.f * scale;
-    for (const auto& line : lines) {
-        sf::Text text(font);
-        text.setString(line);
-        text.setCharacterSize(static_cast<unsigned int>(24.f * scale));
-        text.setFillColor(sf::Color::White);
-        text.setPosition(sf::Vector2f(panelX + 40.f * scale, lineY));
-        target.draw(text);
-        lineY += 56.f * scale;
+    float ly = py+115.f*scale;
+    for (const char* ln : lines) {
+        sf::Text t(font, ln, static_cast<unsigned>(24.f*scale));
+        t.setFillColor(sf::Color::White);
+        t.setPosition({px+40.f*scale, ly});
+        rt.draw(t); ly += 56.f*scale;
     }
-
-    drawButton(target, font, closeButton, closeHovered, scale);
+    drawButton(rt, font, closeBtn, closeHov, scale);
 }
 
-void drawBoardPopup(sf::RenderTarget& target,
-                   const sf::Font& font,
-                   const sf::Vector2u& windowSize,
-                   const std::vector<BoardEntry>& entries,
-                   int scrollIndex,
-                   const Button& closeButton,
-                   float scale,
-                   bool closeHovered) {
-    const float panelWidth = static_cast<float>(windowSize.x) * 0.84f;
-    const float panelHeight = static_cast<float>(windowSize.y) * 0.80f;
-    const float panelX = (static_cast<float>(windowSize.x) - panelWidth) / 2.f;
-    const float panelY = (static_cast<float>(windowSize.y) - panelHeight) / 2.f;
-
-    sf::RectangleShape panel(sf::Vector2f(panelWidth, panelHeight));
-    panel.setPosition(sf::Vector2f(panelX, panelY));
-    panel.setFillColor(sf::Color(16, 20, 36, 245));
-    panel.setOutlineColor(sf::Color(120, 180, 255, 220));
-    panel.setOutlineThickness(3.f * scale);
-    target.draw(panel);
-
-    sf::Text title(font);
-    title.setString("BOARD");
-    title.setCharacterSize(static_cast<unsigned int>(36.f * scale));
-    title.setFillColor(sf::Color(255, 243, 194));
-    drawTextCentered(target, title, sf::Vector2f(panelX + panelWidth / 2.f, panelY + 44.f * scale));
-
-    sf::Text hint(font);
-    hint.setString("Scroll with mouse wheel or Up / Down to move one row at a time");
-    hint.setCharacterSize(static_cast<unsigned int>(18.f * scale));
-    hint.setFillColor(sf::Color(195, 210, 236));
-    hint.setPosition(sf::Vector2f(panelX + 34.f * scale, panelY + 82.f * scale));
-    target.draw(hint);
-
-    const int visibleRows = 7;
-    const float listTop = panelY + 126.f * scale;
-    const float rowHeight = 58.f * scale;
-    const float rowGap = 6.f * scale;
-    const float leftPadding = panelX + 28.f * scale;
-    const float rightPadding = panelX + panelWidth - 28.f * scale;
-
-    for (int row = 0; row < visibleRows; ++row) {
-        const int entryIndex = scrollIndex + row;
-        if (entryIndex >= static_cast<int>(entries.size())) {
-            break;
-        }
-
-        const float rowY = listTop + row * (rowHeight + rowGap);
-        sf::RectangleShape rowShape(sf::Vector2f(panelWidth - 56.f * scale, rowHeight));
-        rowShape.setPosition(sf::Vector2f(leftPadding, rowY));
-        rowShape.setFillColor(row % 2 == 0 ? sf::Color(37, 47, 75, 240) : sf::Color(28, 37, 60, 240));
-        rowShape.setOutlineColor(sf::Color(110, 155, 226, 150));
-        rowShape.setOutlineThickness(1.5f * scale);
-        target.draw(rowShape);
-
-        const BoardEntry& entry = entries[entryIndex];
-
-        sf::Text rankText(font);
-        rankText.setString(std::to_string(entryIndex + 1));
-        rankText.setCharacterSize(static_cast<unsigned int>(22.f * scale));
-        rankText.setFillColor(sf::Color(255, 230, 160));
-        rankText.setPosition(sf::Vector2f(leftPadding + 16.f * scale, rowY + 15.f * scale));
-        target.draw(rankText);
-
-        sf::Text userText(font);
-        userText.setString(entry.user);
-        userText.setCharacterSize(static_cast<unsigned int>(22.f * scale));
-        userText.setFillColor(sf::Color::White);
-        userText.setPosition(sf::Vector2f(leftPadding + 72.f * scale, rowY + 15.f * scale));
-        target.draw(userText);
-
-        sf::Text scoreText(font);
-        scoreText.setString(std::to_string(entry.score));
-        scoreText.setCharacterSize(static_cast<unsigned int>(22.f * scale));
-        scoreText.setFillColor(sf::Color(120, 255, 180));
-        const sf::FloatRect scoreBounds = scoreText.getLocalBounds();
-        scoreText.setPosition(sf::Vector2f(rightPadding - scoreBounds.size.x - 8.f * scale, rowY + 15.f * scale));
-        target.draw(scoreText);
-
-        sf::Text timeText(font);
-        timeText.setString(entry.time);
-        timeText.setCharacterSize(static_cast<unsigned int>(18.f * scale));
-        timeText.setFillColor(sf::Color(190, 205, 230));
-        const sf::FloatRect timeBounds = timeText.getLocalBounds();
-        timeText.setPosition(sf::Vector2f(rightPadding - timeBounds.size.x - 8.f * scale, rowY + 35.f * scale));
-        target.draw(timeText);
+// =========================
+// Khối vẽ popup Board (View)
+// =========================
+static void drawBoardPopup(sf::RenderTarget& rt, const sf::Font& font,
+                            sf::Vector2u ws, const std::vector<BoardEntry>& entries,
+                            int scroll, const Button& closeBtn,
+                            float scale, bool closeHov) {
+    const float pw=ws.x*.84f, ph=ws.y*.80f, px=(ws.x-pw)/2.f, py=(ws.y-ph)/2.f;
+    sf::RectangleShape panel({pw,ph});
+    panel.setPosition({px,py});
+    panel.setFillColor(sf::Color(16,20,36,245));
+    panel.setOutlineColor(sf::Color(120,180,255,220));
+    panel.setOutlineThickness(3.f*scale);
+    rt.draw(panel);
+    sf::Text title(font, "BOARD", static_cast<unsigned>(36.f*scale));
+    title.setFillColor(sf::Color(255,243,194));
+    drawTextCentered(rt, title, {px+pw/2.f, py+44.f*scale});
+    sf::Text hint(font, "Scroll: mouse wheel / Up Down keys",
+                  static_cast<unsigned>(18.f*scale));
+    hint.setFillColor(sf::Color(195,210,236));
+    hint.setPosition({px+34.f*scale, py+82.f*scale});
+    rt.draw(hint);
+    constexpr int vis   = 7;
+    const float listTop = py+126.f*scale, rowH=58.f*scale, rowGap=6.f*scale;
+    const float lp=px+28.f*scale, rp=px+pw-28.f*scale;
+    for (int row=0; row<vis; ++row) {
+        const int idx = scroll+row;
+        if (idx >= static_cast<int>(entries.size())) break;
+        const float rowY = listTop + row*(rowH+rowGap);
+        sf::RectangleShape rs({pw-56.f*scale, rowH});
+        rs.setPosition({lp,rowY});
+        rs.setFillColor(row%2==0?sf::Color(37,47,75,240):sf::Color(28,37,60,240));
+        rs.setOutlineColor(sf::Color(110,155,226,150));
+        rs.setOutlineThickness(1.5f*scale);
+        rt.draw(rs);
+        const BoardEntry& e = entries[idx];
+        auto makeT = [&](const std::string& s, unsigned sz) {
+            sf::Text t(font, s, sz); return t; };
+        auto rankT  = makeT(std::to_string(idx+1), static_cast<unsigned>(22.f*scale));
+        rankT.setFillColor(sf::Color(255,230,160));
+        rankT.setPosition({lp+16.f*scale, rowY+15.f*scale});
+        rt.draw(rankT);
+        auto userT  = makeT(e.user, static_cast<unsigned>(22.f*scale));
+        userT.setFillColor(sf::Color::White);
+        userT.setPosition({lp+72.f*scale, rowY+15.f*scale});
+        rt.draw(userT);
+        auto scoreT = makeT(std::to_string(e.score), static_cast<unsigned>(22.f*scale));
+        scoreT.setFillColor(sf::Color(120,255,180));
+        const sf::FloatRect sb = scoreT.getLocalBounds();
+        scoreT.setPosition({rp-sb.size.x-8.f*scale, rowY+15.f*scale});
+        rt.draw(scoreT);
+        auto timeT  = makeT(e.time, static_cast<unsigned>(18.f*scale));
+        timeT.setFillColor(sf::Color(190,205,230));
+        const sf::FloatRect tb = timeT.getLocalBounds();
+        timeT.setPosition({rp-tb.size.x-8.f*scale, rowY+35.f*scale});
+        rt.draw(timeT);
     }
-
-    sf::Text footer(font);
-    footer.setString("Showing up to 7 rows; use row-by-row scroll");
-    footer.setCharacterSize(static_cast<unsigned int>(18.f * scale));
-    footer.setFillColor(sf::Color(190, 205, 230));
-    footer.setPosition(sf::Vector2f(panelX + 28.f * scale, panelY + panelHeight - 62.f * scale));
-    target.draw(footer);
-
-    drawButton(target, font, closeButton, closeHovered, scale);
+    sf::Text footer(font, "Showing up to 7 rows; use row-by-row scroll",
+                    static_cast<unsigned>(18.f*scale));
+    footer.setFillColor(sf::Color(190,205,230));
+    footer.setPosition({px+28.f*scale, py+ph-62.f*scale});
+    rt.draw(footer);
+    drawButton(rt, font, closeBtn, closeHov, scale);
 }
 
-int main() {
+// =========================
+// Hàm chạy gameConsole (Logic chính / Integration Entry Point)
+// =========================
+ConsoleResult runGameConsole(sf::GraphicsContext& gCtx, sf::AudioContext& aCtx) {
+    (void)gCtx; (void)aCtx;
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
 #endif
 
     // =========================
     // gameconsole-tao-giao-dien-169-00
-    // Tạo cửa sổ tỷ lệ 9:16 để dùng cho menu console
+    // Tạo cửa sổ tỷ lệ 9:16
     // =========================
-    const int windowHeight = 720;
-    auto window = layout::create916Window(windowHeight);
+    auto window = layout::create916Window(CONSOLE_WINDOW_HEIGHT, "ctetris — Console");
     window.setFramerateLimit(60);
-    window.setVerticalSyncEnabled(true);
 
-    const sf::Vector2u windowSize = window.getSize();
-    const float uiScale = static_cast<float>(windowSize.y) / 720.f;
+    const sf::Vector2u wSize   = window.getSize();
+    const float        uiScale = static_cast<float>(wSize.y) / 720.f;
 
+    // VRSFML: sf::Font dùng factory openFromFile trả base::Optional
     sf::Font font;
-    fs::path fontPath;
-    const bool hasFont = loadFirstAvailableFont(font, fontPath);
-    if (!hasFont) {
-        std::cerr << "No system font found; UI labels will be skipped.\n";
-    }
+    const bool hasFont = loadSystemFont(font);
+    if (!hasFont) std::cerr << "[gameConsole] Không tìm thấy font hệ thống.\n";
 
     // =========================
     // gameconsole-chen-backgound-01
-    // Tạo background có texture và full-fit theo tỷ lệ cửa sổ
+    // Background texture full-fit
     // =========================
-    sf::Texture backgroundTexture = buildBackgroundTexture();
-    sf::Sprite backgroundSprite(backgroundTexture);
-    const sf::Vector2f backgroundSize = sf::Vector2f(backgroundTexture.getSize());
-    const float backgroundScaleX = static_cast<float>(windowSize.x) / backgroundSize.x;
-    const float backgroundScaleY = static_cast<float>(windowSize.y) / backgroundSize.y;
-    const float backgroundScale = std::max(backgroundScaleX, backgroundScaleY);
-    backgroundSprite.setScale(sf::Vector2f(backgroundScale, backgroundScale));
-    backgroundSprite.setPosition(sf::Vector2f((windowSize.x - backgroundSize.x * backgroundScale) / 2.f,
-                                              (windowSize.y - backgroundSize.y * backgroundScale) / 2.f));
-
-    sf::RectangleShape vignette(sf::Vector2f(static_cast<float>(windowSize.x), static_cast<float>(windowSize.y)));
-    vignette.setFillColor(sf::Color(0, 0, 0, 55));
+    sf::Texture bgTex = buildBackgroundTexture();
+    sf::Sprite  bgSpr(bgTex);
+    const sf::Vector2f bgSz = sf::Vector2f(bgTex.getSize());
+    const float bgSc = std::max(static_cast<float>(wSize.x)/bgSz.x,
+                                 static_cast<float>(wSize.y)/bgSz.y);
+    bgSpr.setScale({bgSc,bgSc});
+    bgSpr.setPosition({(wSize.x-bgSz.x*bgSc)/2.f,(wSize.y-bgSz.y*bgSc)/2.f});
+    sf::RectangleShape vignette({static_cast<float>(wSize.x),static_cast<float>(wSize.y)});
+    vignette.setFillColor(sf::Color(0,0,0,55));
 
     // =========================
     // gameconsole-chen-nhac-05
-    // Tạo nhạc nền loop nhẹ bằng buffer để menu chạy được mà không cần file ngoài
+    // Nhạc nền loop — VRSFML: sf::Sound API giữ tương tự
     // =========================
-    sf::SoundBuffer ambientBuffer;
-    std::optional<sf::Sound> ambientSound;
-    if (buildAmbientBuffer(ambientBuffer)) {
-        ambientSound.emplace(ambientBuffer);
-        ambientSound->setLooping(true);
-        ambientSound->setVolume(18.f);
-        ambientSound->play();
+    sf::SoundBuffer        ambBuf;
+    std::optional<sf::Sound> ambSound;
+    if (buildAmbientBuffer(ambBuf)) {
+        ambSound.emplace(ambBuf);
+        ambSound->setLooping(true);
+        ambSound->setVolume(18.f);
+        ambSound->play();
     }
 
-    const std::vector<BoardEntry> boardEntries = loadBoardEntries("gameConsole_board.json");
-    if (boardEntries.empty()) {
-        std::cerr << "Board data is empty; popup will show no entries.\n";
-    }
+    const std::vector<BoardEntry> board = loadBoardEntries("gameConsole_board.json");
 
-    Button guideButton{sf::FloatRect(sf::Vector2f(windowSize.x * 0.12f, windowSize.y * 0.70f),
-                                     sf::Vector2f(windowSize.x * 0.32f, 64.f)),
-                       "GUIDE"};
-    Button boardButton{sf::FloatRect(sf::Vector2f(windowSize.x * 0.56f, windowSize.y * 0.70f),
-                                     sf::Vector2f(windowSize.x * 0.32f, 64.f)),
-                       "BOARD"};
-    Button closeButton{sf::FloatRect(sf::Vector2f(windowSize.x * 0.5f - 86.f, windowSize.y * 0.82f),
-                                     sf::Vector2f(172.f, 52.f)),
-                       "CLOSE"};
+    // =========================
+    // gameconsole-nut-guide-02  gameconsole-nut-board-03
+    // Định nghĩa các nút GUIDE, BOARD, START, CLOSE
+    // =========================
+    const float bw = wSize.x*0.24f, bh = 64.f;
+    const float by = wSize.y*0.68f;
+    Button guideBtn{{sf::Vector2f(wSize.x*0.06f, by), sf::Vector2f(bw,bh)}, "GUIDE"};
+    Button boardBtn{{sf::Vector2f(wSize.x*0.38f, by), sf::Vector2f(bw,bh)}, "BOARD"};
+    Button startBtn{{sf::Vector2f(wSize.x*0.70f, by), sf::Vector2f(bw,bh)}, "START"};
+    Button closeBtn{{sf::Vector2f(wSize.x*.5f-86.f, wSize.y*.82f), sf::Vector2f(172.f,52.f)}, "CLOSE"};
 
-    PopupMode popupMode = PopupMode::None;
-    int boardScroll = 0;
+    PopupMode popupMode   = PopupMode::None;
+    int       boardScroll = 0;
+    ConsoleResult result  = ConsoleResult::Quit;
 
-    while (window.isOpen()) {
-        bool openGuide = false;
-        bool openBoard = false;
-        bool closePopup = false;
-        int scrollDelta = 0;
-        bool clicked = false;
+    // =========================
+    // Vòng lặp chính — VRSFML SFML_GAME_LOOP
+    // =========================
+    SFML_GAME_LOOP(window) {
+        bool openGuide=false, openBoard=false, closePopup=false, startGame=false;
+        int  scrollDelta=0;
+        bool clicked=false;
 
-        while (const std::optional<sf::Event> event = window.pollEvent()) {
-            if (event->is<sf::Event::Closed>()) {
-                window.close();
-            }
+        while (const sf::base::Optional ev = window.pollEvent()) {
+            if (ev->is<sf::Event::Closed>()) window.close();
 
-            if (const auto* mouseWheel = event->getIf<sf::Event::MouseWheelScrolled>()) {
-                if (popupMode == PopupMode::Board) {
-                    scrollDelta += (mouseWheel->delta > 0.f) ? -1 : 1;
+            if (const auto* mw = ev->getIf<sf::Event::MouseWheelScrolled>())
+                if (popupMode==PopupMode::Board)
+                    scrollDelta += (mw->delta>0.f)?-1:1;
+
+            if (const auto* kp = ev->getIf<sf::Event::KeyPressed>()) {
+                if (kp->code==sf::Keyboard::Key::Escape) {
+                    if (popupMode==PopupMode::None) window.close();
+                    else closePopup=true;
+                }
+                if (popupMode==PopupMode::Guide &&
+                    (kp->code==sf::Keyboard::Key::Enter||kp->code==sf::Keyboard::Key::Space))
+                    closePopup=true;
+                if (popupMode==PopupMode::Board) {
+                    if (kp->code==sf::Keyboard::Key::Up)   scrollDelta-=1;
+                    else if (kp->code==sf::Keyboard::Key::Down) scrollDelta+=1;
+                    else if (kp->code==sf::Keyboard::Key::Enter||kp->code==sf::Keyboard::Key::Space)
+                        closePopup=true;
                 }
             }
-
-            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-                if (keyPressed->code == sf::Keyboard::Key::Escape) {
-                    if (popupMode == PopupMode::None) {
-                        window.close();
-                    } else {
-                        closePopup = true;
-                    }
-                }
-
-                if (popupMode == PopupMode::Guide && (keyPressed->code == sf::Keyboard::Key::Enter ||
-                                                      keyPressed->code == sf::Keyboard::Key::Space)) {
-                    closePopup = true;
-                }
-
-                if (popupMode == PopupMode::Board) {
-                    if (keyPressed->code == sf::Keyboard::Key::Up) {
-                        scrollDelta -= 1;
-                    } else if (keyPressed->code == sf::Keyboard::Key::Down) {
-                        scrollDelta += 1;
-                    } else if (keyPressed->code == sf::Keyboard::Key::Enter ||
-                               keyPressed->code == sf::Keyboard::Key::Space) {
-                        closePopup = true;
-                    }
-                }
-            }
-
-            if (const auto* mouseButton = event->getIf<sf::Event::MouseButtonPressed>()) {
-                if (mouseButton->button == sf::Mouse::Button::Left) {
-                    clicked = true;
-                }
-            }
+            if (const auto* mb = ev->getIf<sf::Event::MouseButtonPressed>())
+                if (mb->button==sf::Mouse::Button::Left) clicked=true;
         }
 
-        if (scrollDelta != 0 && popupMode == PopupMode::Board) {
-            boardScroll = clampBoardScroll(boardScroll + scrollDelta, static_cast<int>(boardEntries.size()), 7);
+        if (scrollDelta && popupMode==PopupMode::Board)
+            boardScroll = clampBoardScroll(boardScroll+scrollDelta,
+                                           static_cast<int>(board.size()), 7);
+        if (closePopup) popupMode=PopupMode::None;
+
+        const sf::Vector2f mp = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+
+        if (clicked && popupMode==PopupMode::None) {
+            if      (guideBtn.bounds.contains(mp)) openGuide=true;
+            else if (boardBtn.bounds.contains(mp)) openBoard=true;
+            else if (startBtn.bounds.contains(mp)) startGame=true;
+        } else if (clicked && popupMode!=PopupMode::None && closeBtn.bounds.contains(mp)) {
+            closePopup=true;
         }
 
-        if (closePopup) {
-            popupMode = PopupMode::None;
-        }
+        if (openGuide)  popupMode=PopupMode::Guide;
+        if (openBoard)  popupMode=PopupMode::Board;
+        if (closePopup) popupMode=PopupMode::None;
+        if (startGame)  { result=ConsoleResult::StartGame; window.close(); return result; }
 
-        const sf::Vector2f mousePosition = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+        const bool gHov = (popupMode==PopupMode::None)&&guideBtn.bounds.contains(mp);
+        const bool bHov = (popupMode==PopupMode::None)&&boardBtn.bounds.contains(mp);
+        const bool sHov = (popupMode==PopupMode::None)&&startBtn.bounds.contains(mp);
+        const bool cHov = (popupMode!=PopupMode::None)&&closeBtn.bounds.contains(mp);
 
-        if (clicked && popupMode == PopupMode::None) {
-            if (guideButton.bounds.contains(mousePosition)) {
-                openGuide = true;
-            } else if (boardButton.bounds.contains(mousePosition)) {
-                openBoard = true;
-            }
-        } else if (clicked && popupMode != PopupMode::None && closeButton.bounds.contains(mousePosition)) {
-            closePopup = true;
-        }
-
-        if (openGuide) {
-            popupMode = PopupMode::Guide;
-        }
-        if (openBoard) {
-            popupMode = PopupMode::Board;
-        }
-        if (closePopup) {
-            popupMode = PopupMode::None;
-        }
-
-        const bool guideHovered = popupMode == PopupMode::None && guideButton.bounds.contains(mousePosition);
-        const bool boardHovered = popupMode == PopupMode::None && boardButton.bounds.contains(mousePosition);
-        const bool closeHovered = popupMode != PopupMode::None && closeButton.bounds.contains(mousePosition);
-
+        // Vẽ (View)
         window.clear(sf::Color::Black);
-        window.draw(backgroundSprite);
+        window.draw(bgSpr);
         window.draw(vignette);
-
-        sf::RectangleShape topGlow(sf::Vector2f(static_cast<float>(windowSize.x), 190.f * uiScale));
-        topGlow.setFillColor(sf::Color(130, 180, 255, 35));
+        sf::RectangleShape topGlow({static_cast<float>(wSize.x),190.f*uiScale});
+        topGlow.setFillColor(sf::Color(130,180,255,35));
         window.draw(topGlow);
 
         if (hasFont) {
-            sf::Text title(font);
-            title.setString("ctetris");
-            title.setCharacterSize(static_cast<unsigned int>(56.f * uiScale));
+            // VRSFML: sf::Text(font, string, size) — constructor tham số tường minh
+            sf::Text title(font, "ctetris", static_cast<unsigned>(56.f*uiScale));
             title.setFillColor(sf::Color::White);
-            drawTextCentered(window, title, sf::Vector2f(windowSize.x / 2.f, 120.f * uiScale));
+            drawTextCentered(window, title, {static_cast<float>(wSize.x)/2.f, 120.f*uiScale});
 
-            sf::Text subtitle(font);
-            subtitle.setString("SFML 3 menu console");
-            subtitle.setCharacterSize(static_cast<unsigned int>(20.f * uiScale));
-            subtitle.setFillColor(sf::Color(210, 225, 255));
-            drawTextCentered(window, subtitle, sf::Vector2f(windowSize.x / 2.f, 170.f * uiScale));
+            sf::Text sub(font, "SFML via VRSFML — Guide  Board  Start",
+                         static_cast<unsigned>(20.f*uiScale));
+            sub.setFillColor(sf::Color(210,225,255));
+            drawTextCentered(window, sub, {static_cast<float>(wSize.x)/2.f, 170.f*uiScale});
 
-            sf::Text note(font);
-            note.setString("Guide and board popups are available in task 1.1-1.5 only");
-            note.setCharacterSize(static_cast<unsigned int>(16.f * uiScale));
-            note.setFillColor(sf::Color(180, 196, 226));
-            drawTextCentered(window, note, sf::Vector2f(windowSize.x / 2.f, 206.f * uiScale));
-
-            sf::Text musicLabel(font);
-            musicLabel.setString("Ambient menu music: on");
-            musicLabel.setCharacterSize(static_cast<unsigned int>(16.f * uiScale));
-            musicLabel.setFillColor(sf::Color(198, 235, 202));
-            drawTextCentered(window, musicLabel, sf::Vector2f(windowSize.x / 2.f, 238.f * uiScale));
-
-            if (popupMode == PopupMode::None) {
-                drawButton(window, font, guideButton, guideHovered, uiScale);
-                drawButton(window, font, boardButton, boardHovered, uiScale);
-            } else if (popupMode == PopupMode::Guide) {
-                drawOverlayPanel(window, windowSize, 145.f);
-                drawGuidePopup(window, font, windowSize, closeButton, uiScale, closeHovered);
-            } else if (popupMode == PopupMode::Board) {
-                drawOverlayPanel(window, windowSize, 145.f);
-                drawBoardPopup(window, font, windowSize, boardEntries, boardScroll, closeButton, uiScale, closeHovered);
+            if (popupMode==PopupMode::None) {
+                drawButton(window, font, guideBtn, gHov, uiScale);
+                drawButton(window, font, boardBtn, bHov, uiScale);
+                drawButton(window, font, startBtn, sHov, uiScale);
+            } else if (popupMode==PopupMode::Guide) {
+                drawOverlayPanel(window, wSize, 145.f);
+                drawGuidePopup(window, font, wSize, closeBtn, uiScale, cHov);
+            } else if (popupMode==PopupMode::Board) {
+                drawOverlayPanel(window, wSize, 145.f);
+                drawBoardPopup(window, font, wSize, board,
+                               boardScroll, closeBtn, uiScale, cHov);
             }
         }
-
         window.display();
     }
+    return result;
+}
 
+// =========================
+// Điểm vào standalone
+// =========================
+#ifdef STANDALONE_GAMECONSOLE
+int main() {
+    auto gCtx = sf::GraphicsContext::create().value();
+    auto aCtx = sf::AudioContext::create().value();
+    runGameConsole(gCtx, aCtx);
     return 0;
 }
+#endif

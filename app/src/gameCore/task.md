@@ -27,10 +27,10 @@
 [x] Task 1.9: viết v1 gameCore/app.cpp - tính điểm
     - Comment codeblock này trong gameCore/app.cpp là:  gamecore-tinh-diem-07
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 06 và trên 08
-[ ] Task 1.10: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
+[x] Task 1.10: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameCore/app.cpp là:  integration/v1
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí trên 00
-    - Khơi động chương trình luôn bắt đầu bằng màn hình của gameStory.
+    - Khởi động chương trình luôn bắt đầu bằng màn hình của gameStory.
     - Sau khi kết thúc màn hình của phần gameStory sẽ chuyển tiếp qua khởi động màn hình gameConsole
     - Sau khi bấm nút start bên màn hình gameConsole chuyển tiếp qua khởi động màn hình gameCore
         - Đưa về các file CMakeLists.txt trong các modules về 1 một file duy nhất đặt ở app/ để hỗ trợ build chương trình chạy độc lập từng module hoặc tích hợp toàn bộ modules. Kiểm tra tính tồn tại của thư mục build trong thư mục app. Hỗ trợ build chương trình chạy trên các platfom: macos, windown, linux, ios và android, mỗi platform là 1 tên thư mục chứa các file build trong thư mục app/build. Ví dụ: build file cài đặt exe chạy trên windown thì là app/build/windown/ctetris.msi. File exe sẽ cần kiểm tra thư viện và môi trường windown để tiến hành cài đặt thư viện cần thiết rồi cài đặt game trước khởi động trò chơi. Macos các cũng tương tự các file như ctetris.app (macos). Nếu build riêng lẻ từng module để kiểm thử thì moduldeName.platformTailName, ví dụ: gameStory.exe
