@@ -4,7 +4,7 @@
 # Chạy từ thư mục app/: sh build.sh
 set -e
 
-BUILD_SCRIPT_VERSION="1.8.0"
+BUILD_SCRIPT_VERSION="1.9.0"
 
 # =========================
 # Tiện ích
@@ -36,14 +36,12 @@ IS_WASM=0
 
 # =========================
 # Kiểm tra CMake >= 3.16
-# Dùng awk để parse version — tương thích BSD sed (macOS) và GNU sed (Linux)
 # =========================
 check_cmake() {
     if command_exists cmake; then
         CMAKE_VER=$(cmake --version 2>/dev/null | head -1 | awk '{print $3}')
         CMAKE_MAJ=$(echo "$CMAKE_VER" | awk -F. '{print $1}' | tr -dc '0-9')
         CMAKE_MIN=$(echo "$CMAKE_VER" | awk -F. '{print $2}' | tr -dc '0-9')
-
         if [ -n "$CMAKE_MAJ" ] && [ -n "$CMAKE_MIN" ]; then
             if [ "$CMAKE_MAJ" -gt 3 ] || \
                ([ "$CMAKE_MAJ" -eq 3 ] && [ "$CMAKE_MIN" -ge 16 ]); then
@@ -57,10 +55,8 @@ check_cmake() {
     else
         echo "[INFO] CMake chưa được cài đặt."
     fi
-
     printf "Cài/nâng cấp CMake không? [y/N]: "; read ans
     case "$ans" in [Yy]*) ;; *) echo "Huỷ."; exit 1 ;; esac
-
     if   [ "$CURRENT_OS" = "macos" ]; then brew install cmake || brew upgrade cmake
     elif [ "$CURRENT_OS" = "linux" ]; then sudo apt-get update && sudo apt-get install -y cmake
     else echo "[ERROR] Cài CMake thủ công: https://cmake.org/download/"; exit 1
@@ -79,7 +75,6 @@ check_ninja() {
     printf "Cài Ninja không? [y/N]: "; read ans
     case "$ans" in
         [Yy]*)
-            # Chỉ update khi thực sự cài — tắt auto-update khi chỉ kiểm tra
             [ "$CURRENT_OS" = "macos" ] && HOMEBREW_NO_AUTO_UPDATE=1 brew install ninja
             [ "$CURRENT_OS" = "linux" ] && sudo apt-get install -y ninja-build
             ;;
@@ -94,20 +89,12 @@ check_giflib() {
         echo "[INFO] WASM build: giflib không cần (GIF được bundle qua --preload-file)."
         return 0
     fi
-
     local found=0
-    if command_exists pkg-config && pkg-config --exists giflib 2>/dev/null; then
-        found=1
-    fi
+    if command_exists pkg-config && pkg-config --exists giflib 2>/dev/null; then found=1; fi
     [ "$found" = "0" ] && [ -f /opt/homebrew/include/gif_lib.h ] && found=1
     [ "$found" = "0" ] && [ -f /usr/local/include/gif_lib.h    ] && found=1
     [ "$found" = "0" ] && [ -f /usr/include/gif_lib.h          ] && found=1
-
-    if [ "$found" = "1" ]; then
-        echo "[OK] giflib đã cài đặt."
-        return 0
-    fi
-
+    if [ "$found" = "1" ]; then echo "[OK] giflib đã cài đặt."; return 0; fi
     echo "[INFO] giflib chưa cài (cần cho gameStory intro GIF decode)."
     printf "Cài giflib không? [y/N]: "; read ans
     case "$ans" in
@@ -146,22 +133,15 @@ install_macos_deps() {
             eval "$(/usr/local/bin/brew shellenv)"
         fi
     fi
-
     brew update
-
-    # pkg-config và pkgconf là cùng một công cụ, tên formula khác nhau
-    # Homebrew hiện dùng pkgconf; kiểm tra cả hai trước khi kết luận thiếu
     DEPS="cmake ninja giflib"
     MISSING=""
     for d in $DEPS; do
         brew list --formula 2>/dev/null | grep -q "^${d}$" || MISSING="$MISSING $d"
     done
-
-    # Kiểm tra pkg-config / pkgconf riêng (chấp nhận một trong hai)
     if ! brew list --formula 2>/dev/null | grep -qE "^pkg-config$|^pkgconf$"; then
         MISSING="$MISSING pkgconf"
     fi
-
     if [ -n "$MISSING" ]; then
         echo "[INFO] Các gói chưa cài:$MISSING"
         printf "Cài không? [y/N]: "; read ans
@@ -176,145 +156,141 @@ install_macos_deps() {
 
 # =========================
 # Kiểm tra và cài emsdk cho WASM
-# VRSFML tương thích xác nhận với emsdk 3.1.72
-# emsdk 4.x có lỗi wasm-ld link với VRSFML
 # =========================
 check_emsdk() {
-    # Bước 1: Nếu emsdk đã cài ở ~/emsdk nhưng chưa source vào shell hiện tại,
-    # tự động source trước khi kiểm tra emcc — tránh hỏi cài lại không cần thiết
     if [ -f "$EMSDK_DIR/emsdk_env.sh" ]; then
-        # shellcheck disable=SC1090
         . "$EMSDK_DIR/emsdk_env.sh" > /dev/null 2>&1 || true
     fi
-
-    # Bước 2: Kiểm tra emcc sau khi source
     if command_exists emcc; then
         EMCC_VER=$(emcc --version 2>/dev/null | head -1 \
                    | grep -o '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*' | head -1)
         EMCC_MAJ=$(echo "$EMCC_VER" | awk -F. '{print $1}' | tr -dc '0-9')
         EMCC_MIN=$(echo "$EMCC_VER" | awk -F. '{print $2}' | tr -dc '0-9')
-
         if [ -n "$EMCC_MAJ" ] && [ "$EMCC_MAJ" -eq 3 ] && [ "$EMCC_MIN" -eq 1 ]; then
             echo "[OK] Emscripten $EMCC_VER (3.1.x) đã kích hoạt — tương thích tốt với VRSFML."
             return 0
         fi
-
         if [ -n "$EMCC_MAJ" ] && [ "$EMCC_MAJ" -ge 4 ]; then
             echo "[WARN] Emscripten $EMCC_VER (4.x) — VRSFML có thể lỗi wasm-ld."
-            echo "       Khuyến nghị dùng emsdk $EMSDK_VERSION."
             printf "Tiếp tục với $EMCC_VER? [y/N]: "; read ans
             case "$ans" in [Yy]*) return 0 ;; esac
         fi
-
         echo "[INFO] emcc $EMCC_VER — không đủ điều kiện, sẽ cài lại."
     else
         echo "[INFO] emcc không tìm thấy trong PATH sau khi source emsdk_env.sh."
     fi
-
-    # Bước 3: Cài hoặc kích hoạt lại emsdk
     printf "Cài/kích hoạt emsdk $EMSDK_VERSION không? [y/N]: "; read ans
     case "$ans" in [Yy]*) ;; *) echo "Huỷ."; exit 1 ;; esac
-
     if [ ! -d "$EMSDK_DIR" ]; then
         echo "[INFO] Clone emsdk vào $EMSDK_DIR ..."
         git clone https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
     fi
-
     cd "$EMSDK_DIR"
     git pull
     ./emsdk install  "$EMSDK_VERSION"
     ./emsdk activate "$EMSDK_VERSION"
-    # shellcheck disable=SC1090
     . "$EMSDK_DIR/emsdk_env.sh"
     cd -
-
     echo "[OK] Emscripten $EMSDK_VERSION đã kích hoạt."
 }
 
 # =========================
 # Tạo app/emscripten/shell.html nếu chưa có
-# VRSFML hardcode --shell-file trỏ đến file này khi compile WASM.
-# File phải tồn tại tại đúng đường dẫn trước khi ninja chạy.
 # =========================
 ensure_shell_html() {
     SHELL_DIR="$(pwd)/emscripten"
     SHELL_FILE="$SHELL_DIR/shell.html"
-
-    # Chỉ tạo nếu file thực sự chưa tồn tại — không bao giờ ghi đè
     if [ -f "$SHELL_FILE" ]; then
         echo "[OK] emscripten/shell.html đã tồn tại — giữ nguyên."
         return 0
     fi
-
     echo "[INFO] emscripten/shell.html chưa có — đang tạo..."
     mkdir -p "$SHELL_DIR"
-
-    printf '%s\n' '<!doctype html>' > "$SHELL_FILE"
-    printf '%s\n' '<!-- phucpt: app/emscripten/shell.html' >> "$SHELL_FILE"
-    printf '%s\n' '     Emscripten shell template required by VRSFML for WASM builds.' >> "$SHELL_FILE"
-    printf '%s\n' '     {{{ SCRIPT }}} is replaced by Emscripten with the loader <script> tag. -->' >> "$SHELL_FILE"
-    printf '%s\n' '<html lang="en">' >> "$SHELL_FILE"
-    printf '%s\n' '<head>' >> "$SHELL_FILE"
-    printf '%s\n' '  <meta charset="utf-8">' >> "$SHELL_FILE"
-    printf '%s\n' '  <meta name="viewport" content="width=device-width, initial-scale=1">' >> "$SHELL_FILE"
-    printf '%s\n' '  <title>ctetris</title>' >> "$SHELL_FILE"
-    printf '%s\n' '  <style>' >> "$SHELL_FILE"
-    printf '%s\n' '    * { margin: 0; padding: 0; box-sizing: border-box; }' >> "$SHELL_FILE"
-    printf '%s\n' '    body { background: #0d0d1a; display: flex; flex-direction: column;' >> "$SHELL_FILE"
-    printf '%s\n' '           align-items: center; justify-content: center; min-height: 100vh;' >> "$SHELL_FILE"
-    printf '%s\n' '           font-family: sans-serif; color: #ccc; }' >> "$SHELL_FILE"
-    printf '%s\n' '    #canvas { display: block; max-height: 100vh; aspect-ratio: 9/16;' >> "$SHELL_FILE"
-    printf '%s\n' '              background: #000; cursor: default; user-select: none; }' >> "$SHELL_FILE"
-    printf '%s\n' '    #status { margin-top: 8px; font-size: 13px; color: #666; min-height: 18px; }' >> "$SHELL_FILE"
-    printf '%s\n' '    #progress-bar { width: 300px; height: 6px; background: #222;' >> "$SHELL_FILE"
-    printf '%s\n' '                    border-radius: 3px; margin-top: 6px; overflow: hidden; }' >> "$SHELL_FILE"
-    printf '%s\n' '    #progress-inner { height: 100%; width: 0%; background: #4a9eff;' >> "$SHELL_FILE"
-    printf '%s\n' '                      border-radius: 3px; transition: width 0.1s; }' >> "$SHELL_FILE"
-    printf '%s\n' '  </style>' >> "$SHELL_FILE"
-    printf '%s\n' '</head>' >> "$SHELL_FILE"
-    printf '%s\n' '<body>' >> "$SHELL_FILE"
-    printf '%s\n' '  <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>' >> "$SHELL_FILE"
-    printf '%s\n' '  <div id="status">Đang tải...</div>' >> "$SHELL_FILE"
-    printf '%s\n' '  <div id="progress-bar"><div id="progress-inner"></div></div>' >> "$SHELL_FILE"
-    printf '%s\n' '  <script>' >> "$SHELL_FILE"
-    printf '%s\n' '    var Module = {' >> "$SHELL_FILE"
-    printf '%s\n' '      canvas: document.getElementById("canvas"),' >> "$SHELL_FILE"
-    printf '%s\n' '      setStatus: function(t) {' >> "$SHELL_FILE"
-    printf '%s\n' '        var s = document.getElementById("status");' >> "$SHELL_FILE"
-    printf '%s\n' '        var p = document.getElementById("progress-inner");' >> "$SHELL_FILE"
-    printf '%s\n' '        if (!t) { s.textContent = ""; return; }' >> "$SHELL_FILE"
-    printf '%s\n' '        var m = t.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);' >> "$SHELL_FILE"
-    printf '%s\n' '        if (m) { p.style.width=(parseFloat(m[2])/parseFloat(m[4])*100)+"%"; s.textContent=m[1].trim(); }' >> "$SHELL_FILE"
-    printf '%s\n' '        else { p.style.width=t?"100%":"0%"; s.textContent=t; }' >> "$SHELL_FILE"
-    printf '%s\n' '      },' >> "$SHELL_FILE"
-    printf '%s\n' '      onRuntimeInitialized: function() {' >> "$SHELL_FILE"
-    printf '%s\n' '        document.getElementById("status").textContent = "";' >> "$SHELL_FILE"
-    printf '%s\n' '        document.getElementById("progress-bar").style.display = "none";' >> "$SHELL_FILE"
-    printf '%s\n' '      },' >> "$SHELL_FILE"
-    printf '%s\n' '      print:    function(t) { console.log(t); },' >> "$SHELL_FILE"
-    printf '%s\n' '      printErr: function(t) { console.error(t); },' >> "$SHELL_FILE"
-    printf '%s\n' '    };' >> "$SHELL_FILE"
-    printf '%s\n' '  </script>' >> "$SHELL_FILE"
-    printf '%s\n' '  {{{ SCRIPT }}}' >> "$SHELL_FILE"
-    printf '%s\n' '</body>' >> "$SHELL_FILE"
-    printf '%s\n' '</html>' >> "$SHELL_FILE"
-
+    cat > "$SHELL_FILE" << 'SHELL_EOF'
+<!doctype html>
+<!-- phucpt: app/emscripten/shell.html -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ctetris</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0d0d1a; display: flex; flex-direction: column;
+           align-items: center; justify-content: center; min-height: 100vh;
+           font-family: sans-serif; color: #ccc; }
+    #canvas { display: block; max-height: 100vh; aspect-ratio: 9/16;
+              background: #000; cursor: default; user-select: none; }
+    #status { margin-top: 8px; font-size: 13px; color: #666; min-height: 18px; }
+    #progress-bar { width: 300px; height: 6px; background: #222;
+                    border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    #progress-inner { height: 100%; width: 0%; background: #4a9eff;
+                      border-radius: 3px; transition: width 0.1s; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+  <div id="status">Đang tải...</div>
+  <div id="progress-bar"><div id="progress-inner"></div></div>
+  <script>
+    var Module = {
+      canvas: document.getElementById("canvas"),
+      setStatus: function(t) {
+        var s = document.getElementById("status");
+        var p = document.getElementById("progress-inner");
+        if (!t) { s.textContent = ""; return; }
+        var m = t.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+        if (m) { p.style.width=(parseFloat(m[2])/parseFloat(m[4])*100)+"%"; s.textContent=m[1].trim(); }
+        else { p.style.width=t?"100%":"0%"; s.textContent=t; }
+      },
+      onRuntimeInitialized: function() {
+        document.getElementById("status").textContent = "";
+        document.getElementById("progress-bar").style.display = "none";
+      },
+      print:    function(t) { console.log(t); },
+      printErr: function(t) { console.error(t); },
+    };
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>
+SHELL_EOF
     echo "[OK] Đã tạo emscripten/shell.html."
 }
 
-
+# =========================
+# phucpt: prepare_build_dir — phân biệt 3 chế độ
+# skip   : giữ nguyên → chỉ chạy cmake --build (nhanh nhất, không check gì)
+# reconf : xoá CMakeCache.txt → configure lại, tái dùng object files (trung bình)
+# clean  : xoá toàn bộ build dir → configure lại từ đầu (chậm, chạy hết check)
+# =========================
 prepare_build_dir() {
     dir="$1"
-    if [ -d "$dir" ]; then
-        printf "Thư mục '$dir' đã tồn tại. Xoá để build lại? [y/N]: "; read ans
-        case "$ans" in
-            [Yy]*)
-                echo "Đang xoá $dir ..."
-                rm -rf "$dir"
-                ;;
-        esac
+    if [ ! -d "$dir" ]; then
+        mkdir -p "$dir"
+        return
     fi
-    mkdir -p "$dir"
+    echo ""
+    echo "Thư mục '$dir' đã tồn tại. Chọn chế độ build:"
+    echo "  1) Giữ nguyên    — chỉ build file thay đổi      (nhanh nhất)"
+    echo "  2) Reconfigure   — xoá cache, giữ object files  (trung bình)"
+    echo "  3) Clean build   — xoá toàn bộ, build từ đầu   (chậm nhất)"
+    printf "Lựa chọn [1-3, mặc định 1]: "; read mode_choice
+    case "$mode_choice" in
+        2)
+            echo "[INFO] Xoá CMakeCache.txt để reconfigure..."
+            rm -f "$dir/CMakeCache.txt"
+            rm -rf "$dir/CMakeFiles"
+            ;;
+        3)
+            echo "[INFO] Xoá toàn bộ $dir ..."
+            rm -rf "$dir"
+            mkdir -p "$dir"
+            ;;
+        *)
+            echo "[INFO] Giữ nguyên build dir — build incremental."
+            ;;
+    esac
 }
 
 # ===========================================================
@@ -353,7 +329,7 @@ case "$platform_choice" in
     *) echo "Lựa chọn không hợp lệ."; exit 1 ;;
 esac
 
-# Cảnh báo nếu OS thực tế khác với lựa chọn (chỉ cho Desktop)
+# Cảnh báo nếu OS thực tế khác lựa chọn (chỉ cho Desktop)
 if [ "$IS_WASM" = "0" ] && \
    [ "$CURRENT_OS" != "unknown" ] && \
    [ "$CURRENT_OS" != "$TARGET_OS" ]; then
@@ -370,18 +346,13 @@ check_cmake
 check_ninja
 
 if [ "$IS_WASM" = "1" ]; then
-    # WASM cần native compiler để FetchContent build host tools của VRSFML
     if [ "$CURRENT_OS" = "linux" ]; then install_linux_deps; fi
     if [ "$CURRENT_OS" = "macos" ]; then install_macos_deps; fi
     check_emsdk
 else
     check_giflib
-    if [ "$TARGET_OS" = "linux" ] && [ "$CURRENT_OS" = "linux" ]; then
-        install_linux_deps
-    fi
-    if [ "$TARGET_OS" = "macos" ] && [ "$CURRENT_OS" = "macos" ]; then
-        install_macos_deps
-    fi
+    if [ "$TARGET_OS" = "linux" ] && [ "$CURRENT_OS" = "linux" ]; then install_linux_deps; fi
+    if [ "$TARGET_OS" = "macos" ] && [ "$CURRENT_OS" = "macos" ]; then install_macos_deps; fi
 fi
 
 # --- Bước 4: Chọn generator ---
@@ -394,21 +365,17 @@ else
 fi
 
 # --- Bước 5: Tạo shell.html nếu build WASM ---
-if [ "$IS_WASM" = "1" ]; then
-    ensure_shell_html
-fi
+if [ "$IS_WASM" = "1" ]; then ensure_shell_html; fi
 
 # --- Bước 6: Chuẩn bị thư mục build ---
 BUILD_DIR="build/${TARGET_OS}/${MODULE}"
 prepare_build_dir "$BUILD_DIR"
 
-# --- Bước 6: CMake configure ---
+# --- Bước 7: CMake configure ---
 echo ""
 echo "[BUILD] Đang chạy CMake configure cho $MODULE / $TARGET_OS ..."
 
 if [ "$IS_WASM" = "1" ]; then
-    # Tắt clang-scan-deps — macOS 11 và emsdk không có tool này
-    # CMAKE_CXX_SCAN_FOR_MODULES=OFF ngăn CMake 4.x tìm clang-scan-deps
     emcmake cmake -S . -B "$BUILD_DIR" $GENERATOR \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_MODULE="$MODULE" \
@@ -420,7 +387,7 @@ else
         -DBUILD_MODULE="$MODULE"
 fi
 
-# --- Bước 7: Build ---
+# --- Bước 8: Build ---
 echo "[BUILD] Đang biên dịch..."
 cmake --build "$BUILD_DIR" --parallel
 
@@ -435,7 +402,7 @@ if [ "$IS_WASM" = "1" ]; then
     echo "    $BUILD_DIR/$EXE.wasm"
     echo "    $BUILD_DIR/$EXE.js"
     echo ""
-    echo "  Chạy thử (cần web server, không mở file.html trực tiếp):"
+    echo "  Chạy thử (cần web server):"
     echo "    cd $BUILD_DIR && python3 -m http.server 8080"
     echo "    Truy cập: http://localhost:8080/$EXE.html"
 elif [ "$TARGET_OS" = "macos" ] && [ "$MODULE" = "ALL" ]; then

@@ -22,18 +22,28 @@ Lựa chọn [1-3]: 3
 [OK] CMake 4.3.2 đã cài đặt và đủ phiên bản.
 [OK] Ninja 1.13.2 đã cài đặt.
 ==> Updating Homebrew...
-Updated 1 tap (homebrew/core).
+Already up-to-date.
 [OK] Tất cả dependencies macOS đã có.
 [OK] Emscripten 3.1.72 (3.1.x) đã kích hoạt — tương thích tốt với VRSFML.
 [INFO] Dùng Ninja generator.
 [OK] emscripten/shell.html đã tồn tại — giữ nguyên.
+Thư mục 'build/wasm/ALL' đã tồn tại. Xoá để build lại? [y/N]: y
+Đang xoá build/wasm/ALL ...
 
 [BUILD] Đang chạy CMake configure cho ALL / wasm ...
 configure: cmake -S . -B build/wasm/ALL -GNinja -DCMAKE_BUILD_TYPE=Release
  -DBUILD_MODULE=ALL -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=OFF -DCMAKE_TOOLCHAIN_FILE=/Users/macos/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_CROSSCOMPILING_EMULATOR=/Users/macos/emsdk/node/22.16.0_64bit/bin/node                      -- BUILD_MODULE = ALL
 -- Target: WebAssembly / Emscripten
-CMake Deprecation Warning at build/wasm/ALL/_deps/sdl-src/CMakeLists.txt:8
- (cmake_minimum_required):                                                  Compatibility with CMake < 3.10 will be removed from a future version of
+-- [WASM FIX] Đã tạo stub SDL_uclibc (libs/sdl không tạo target này)
+-- Detected Emscripten
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Found EGL: EGL
+-- Found GLES: GL
+-- CPM: Adding package sdl@ (/Users/macos/Desktop/projects/ctetris-2/app/l
+ibs/sdl)                                                                  CMake Deprecation Warning at libs/sdl/CMakeLists.txt:8 (cmake_minimum_requ
+ired):                                                                      Compatibility with CMake < 3.10 will be removed from a future version of
   CMake.
 
   Update the VERSION argument <min> value.  Or, use the <min>...<max> synt
@@ -371,8 +381,8 @@ ted                                                                         to w
 -- Looking for samplerate.h
 -- Looking for samplerate.h - not found
 -- Found Git: /usr/bin/git (found version "2.32.0 (Apple Git-132)")
-CMake Deprecation Warning at build/wasm/ALL/_deps/sdl-src/CMakeLists.txt:3
-215 (cmake_minimum_required):                                               Compatibility with CMake < 3.10 will be removed from a future version of
+CMake Deprecation Warning at libs/sdl/CMakeLists.txt:3215 (cmake_minimum_r
+equired):                                                                   Compatibility with CMake < 3.10 will be removed from a future version of
   CMake.
 
   Update the VERSION argument <min> value.  Or, use the <min>...<max> synt
@@ -386,27 +396,27 @@ ted                                                                         to w
 -- Platform: Emscripten-1
 -- 64-bit:   FALSE
 -- Compiler: /Users/macos/emsdk/upstream/emscripten/emcc
--- Revision: SDL-release-2.28.5-0-g15ead9a40
+-- Revision: SDL-2.28.5-gebc6fb6
 -- 
 -- Subsystems:
 --   Atomic:    OFF
---   Audio:     ON
+--   Audio:     OFF
 --   Video:     ON
---   Render:    ON
+--   Render:    OFF
 --   Events:    ON
 --   Joystick:  ON
 --   Haptic:    ON
---   Hidapi:    ON
---   Power:     ON
+--   Hidapi:    OFF
+--   Power:     OFF
 --   Threads:   ON
 --   Timers:    ON
 --   File:      ON
 --   Loadso:    OFF
 --   CPUinfo:   OFF
---   Filesystem:        ON
---   Sensor:    ON
---   Locale:    ON
---   Misc:      ON
+--   Filesystem:        OFF
+--   Sensor:    OFF
+--   Locale:    OFF
+--   Misc:      OFF
 -- 
 -- Options:
 --   SDL2_DISABLE_INSTALL        (Wanted: ON): OFF
@@ -431,8 +441,8 @@ ted                                                                         to w
 --   SDL_DIRECTFB                (Wanted: OFF): OFF
 --   SDL_DIRECTFB_SHARED         (Wanted: OFF): OFF
 --   SDL_DIRECTX                 (Wanted: OFF): OFF
---   SDL_DISKAUDIO               (Wanted: ON): ON
---   SDL_DUMMYAUDIO              (Wanted: ON): ON
+--   SDL_DISKAUDIO               (Wanted: ON): OFF
+--   SDL_DUMMYAUDIO              (Wanted: ON): OFF
 --   SDL_DUMMYVIDEO              (Wanted: ON): ON
 --   SDL_ESD                     (Wanted: ON): OFF
 --   SDL_ESD_SHARED              (Wanted: ON): OFF
@@ -440,8 +450,8 @@ ted                                                                         to w
 --   SDL_FUSIONSOUND             (Wanted: OFF): OFF
 --   SDL_FUSIONSOUND_SHARED      (Wanted: OFF): OFF
 --   SDL_GCC_ATOMICS             (Wanted: ON): ON
---   SDL_HIDAPI                  (Wanted: ON): OFF
---   SDL_HIDAPI_JOYSTICK         (Wanted: ON): OFF
+--   SDL_HIDAPI                  (Wanted: OFF): OFF
+--   SDL_HIDAPI_JOYSTICK         (Wanted: OFF): OFF
 --   SDL_HIDAPI_LIBUSB           (Wanted: OFF): OFF
 --   SDL_IBUS                    (Wanted: ON): OFF
 --   SDL_INSTALL_TESTS           (Wanted: OFF): OFF
@@ -483,7 +493,7 @@ ted                                                                         to w
 --   SDL_SYSTEM_ICONV            (Wanted: ON): ON
 --   SDL_TESTS                   (Wanted: OFF): OFF
 --   SDL_VENDOR_INFO             (Wanted: ): OFF
---   SDL_VIRTUAL_JOYSTICK        (Wanted: ON): ON
+--   SDL_VIRTUAL_JOYSTICK        (Wanted: OFF): OFF
 --   SDL_VIVANTE                 (Wanted: ON): OFF
 --   SDL_VULKAN                  (Wanted: OFF): OFF
 --   SDL_WASAPI                  (Wanted: OFF): OFF
@@ -504,7 +514,7 @@ ted                                                                         to w
 --   SDL_XINPUT                  (Wanted: OFF): OFF
 -- 
 --  CFLAGS:         -idirafter "/Users/macos/Desktop/projects/ctetris-2/ap
-p/build/wasm/ALL/_deps/sdl-src/src/video/khronos"                         --  EXTRA_CFLAGS:   -Wall -fno-strict-aliasing -Wdeclaration-after-stateme
+p/libs/sdl/src/video/khronos"                                             --  EXTRA_CFLAGS:   -Wall -fno-strict-aliasing -Wdeclaration-after-stateme
 nt -fvisibility=hidden -Wshadow -Wno-unused-local-typedefs -fdiagnostics-color=always                                                               --  EXTRA_LDFLAGS:  
 --  EXTRA_LIBS:    m
 -- 
@@ -516,39 +526,119 @@ nt -fvisibility=hidden -Wshadow -Wno-unused-local-typedefs -fdiagnostics-color=a
 -- were installed, then make sure you have set the
 -- CFLAGS and LDFLAGS environment variables correctly.
 -- 
+-- CPM: Adding package freetype@ (VER-2-13-3)
+CMake Deprecation Warning at build/wasm/ALL/_deps/freetype-src/CMakeLists.
+txt:113 (cmake_minimum_required):                                           Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> synt
+ax                                                                          to tell CMake that the project requires at least <min> but has been upda
+ted                                                                         to work with policies introduced by <max> or earlier.
 
 
--- Detected Emscripten
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
--- Found Threads: TRUE
--- Found EGL: EGL
--- Found GLES: GL
--- CPM: Adding package sdl@0 (7dc1c88a71b83ec12bb738db2f53b9956282ab05)
-CMake Error at build/wasm/ALL/_deps/vrsfml-src/src/SFML/Window/CMakeLists.
-txt:40 (get_property):                                                      get_property could not find TARGET SDL_uclibc.  Perhaps it has not yet b
-een                                                                         created.
+-- Looking for unistd.h
+-- Looking for unistd.h - found
+-- Looking for fcntl.h
+-- Looking for fcntl.h - found
+-- CPM: Adding package ogg@1.3.5 (v1.3.5)
+-- Configuring libogg 1.3.5
+-- Looking for include file inttypes.h
+-- Looking for include file inttypes.h - found
+-- Looking for include file stdint.h
+-- Looking for include file stdint.h - found
+-- Looking for include file sys/types.h
+-- Looking for include file sys/types.h - found
+-- Check size of int16_t
+-- Check size of int16_t - done
+-- Check size of uint16_t
+-- Check size of uint16_t - done
+-- Check size of u_int16_t
+-- Check size of u_int16_t - done
+-- Check size of int32_t
+-- Check size of int32_t - done
+-- Check size of uint32_t
+-- Check size of uint32_t - done
+-- Check size of u_int32_t
+-- Check size of u_int32_t - done
+-- Check size of int64_t
+-- Check size of int64_t - done
+-- Check size of short
+-- Check size of short - done
+-- Check size of int
+-- Check size of int - done
+-- Check size of long
+-- Check size of long - done
+-- Check size of long long
+-- Check size of long long - done
+-- CPM: Adding package flac@1.4.3 (1.4.3)
+-- Performing Test Iconv_IS_BUILT_IN
+-- Performing Test Iconv_IS_BUILT_IN - Success
+-- Found Iconv: built in to C library
+-- Performing Test HAVE_MBSTATE
+-- Performing Test HAVE_MBSTATE - Success
+-- Performing Test DODEFINE_EXTENSIONS
+-- Performing Test DODEFINE_EXTENSIONS - Success
+-- Looking for byteswap.h
+-- Looking for byteswap.h - found
+-- Looking for stdbool.h
+-- Looking for stdbool.h - found
+-- Looking for arm_neon.h
+-- Looking for arm_neon.h - found
+-- Looking for x86intrin.h
+-- Looking for x86intrin.h - not found
+-- Performing Test HAVE_BSWAP16
+-- Performing Test HAVE_BSWAP16 - Success
+-- Performing Test HAVE_BSWAP32
+-- Performing Test HAVE_BSWAP32 - Success
+-- Performing Test HAVE_LANGINFO_CODESET
+-- Performing Test HAVE_LANGINFO_CODESET - Success
+-- Performing Test HAVE_WERROR_FLAG
+-- Performing Test HAVE_WERROR_FLAG - Success
+-- Performing Test HAVE_DECL_AFTER_STMT_FLAG
+-- Performing Test HAVE_DECL_AFTER_STMT_FLAG - Success
+-- Performing Test HAVE_STACKREALIGN_FLAG
+-- Performing Test HAVE_STACKREALIGN_FLAG - Success
+-- Performing Test HAVE_WEFFCXX_FLAG
+-- Performing Test HAVE_WEFFCXX_FLAG - Success
+-- Looking for cpuid.h
+-- Looking for cpuid.h - not found
+-- Looking for sys/param.h
+-- Looking for sys/param.h - found
+-- Check CPU architecture is x64
+-- Check CPU architecture is x64 - no
+-- Check CPU architecture is x86
+-- Check CPU architecture is x86 - no
+-- Check CPU architecture is arm64
+-- Check CPU architecture is arm64 - no
+-- Performing Test HAVE_ASSOC_MATH
+-- Performing Test HAVE_ASSOC_MATH - Success
+-- CPM: Adding package vorbis@1.3.7 (v1.3.7)
+-- Configuring vorbis 1.3.7
+-- Target tích hợp: ctetris
+-- Configuring done (300.8s)
+CMake Error: Error required internal CMake variable not set, cmake may not
+ be built correctly.                                                      Missing variable is:
+CMAKE_C_COMPILE_OBJECT
+CMake Error: Error required internal CMake variable not set, cmake may not
+ be built correctly.                                                      Missing variable is:
+CMAKE_C_ARCHIVE_CREATE
+CMake Error: Error required internal CMake variable not set, cmake may not
+ be built correctly.                                                      Missing variable is:
+CMAKE_C_ARCHIVE_FINISH
+CMake Error at libs/VRSFML/src/SFML/Window/CMakeLists.txt:155 (target_link
+_libraries):                                                                Target "sfml-window" links to:
+
+    SDL3::SDL3
+
+  but the target was not found.  Possible reasons include:
+
+    * There is a typo in the target name.
+    * A find_package call is missing for an IMPORTED target.
+    * An ALIAS target is missing.
 
 
-CMake Error at build/wasm/ALL/_deps/vrsfml-src/src/SFML/Window/CMakeLists.
-txt:41 (set_property):                                                      set_property could not find TARGET SDL_uclibc.  Perhaps it has not yet b
-een                                                                         created.
 
-
-CMake Error at build/wasm/ALL/_deps/vrsfml-src/src/SFML/Window/CMakeLists.
-txt:42 (target_compile_options):                                            Cannot specify compile options for target "SDL_uclibc" which is not buil
-t                                                                           by this project.
-
-
-CMake Error at build/wasm/ALL/_deps/vrsfml-src/src/SFML/Window/CMakeLists.
-txt:43 (set_target_properties):                                             set_target_properties Can not find target to add properties to: SDL_ucli
-bc                                                                        
-
-CMake Error at build/wasm/ALL/_deps/vrsfml-src/src/SFML/Window/CMakeLists.
-txt:44 (target_link_libraries):                                             Cannot specify link libraries for target "SDL_uclibc" which is not built
- by                                                                         this project.
-
-
--- Configuring incomplete, errors occurred!
+-- Generating done (0.2s)
+CMake Generate step failed.  Build files cannot be regenerated correctly.
 emcmake: error: 'cmake -S . -B build/wasm/ALL -GNinja -DCMAKE_BUILD_TYPE=R
 elease -DBUILD_MODULE=ALL -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=OFF -DCMAKE_TOOLCHAIN_FILE=/Users/macos/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_CROSSCOMPILING_EMULATOR=/Users/macos/emsdk/node/22.16.0_64bit/bin/node' failed (returned 1)                                                                     

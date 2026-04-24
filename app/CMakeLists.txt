@@ -34,7 +34,6 @@ message(STATUS "BUILD_MODULE = ${BUILD_MODULE}")
 # Emscripten toolchain cũng không cần C++20 module scanning
 # =========================
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF CACHE BOOL "" FORCE)
-# Đặt thành giá trị trống để tránh lỗi NOTFOUND khi CMake tìm không thấy
 set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "" CACHE FILEPATH "" FORCE)
 
 # =========================
@@ -56,27 +55,67 @@ else()
 endif()
 
 # =========================
-# VRSFML qua FetchContent
-# Khoá tại commit ổn định trên nhánh master (Emscripten 3.1.x-compatible)
+# FetchContent setup
 # =========================
 include(FetchContent)
 
 # =========================
-# SDL — libs locally at the exact SHA VRSFML/CPM requires
-# (7dc1c88...) instead of fetching from git at build time
-# CPM_sdl_SOURCE must be set BEFORE FetchContent_MakeAvailable(VRSFML)
-# so that VRSFML's internal CPM finds SDL already populated here.
+# SDL — chỉ set CPM_sdl_SOURCE để VRSFML's CPM dùng local source.
+# KHÔNG gọi FetchContent_MakeAvailable(sdl) thủ công (gây lỗi log 1).
+# Với WASM: libs/sdl (SDL2) vẫn được CPM configure nhưng chỉ tạo SDL2::SDL2,
+# không ảnh hưởng đến SDL3::SDL3 mà ta tạo riêng bên dưới.
+# =========================
+# =========================
+# SDL — trỏ CPM của VRSFML vào libs/sdl (SDL3 main branch ~ 3.5.0).
+#
+# Lịch sử fix:
+#   log 1: xoá FetchContent_MakeAvailable(sdl) thủ công → fix wrong context
+#   log 2: SDL 3.2.14 tạo SDL_uclibc natively → stub cần guard
+#   log 3: SDL 3.2.14 tạo SDL_uclibc và SDL3::SDL3 → xoá stub để tránh conflict
+#   log 4: SDL main (3.5.0) KHÔNG tạo SDL_uclibc nữa → thêm lại stub có guard
+#          VRSFML bubble_idle vẫn tham chiếu SDL_uclibc (được viết thời SDL cũ)
+#          SDL3::SDL3 vẫn được SDL main tạo → không cần stub cho target này.
 # =========================
 set(CPM_sdl_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/libs/sdl" CACHE STRING "" FORCE)
 
-FetchContent_Declare(
-    sdl
-    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/sdl"
-)
-FetchContent_MakeAvailable(sdl)
+# =========================
+# [WASM FIX] Stub SDL_uclibc — tương thích VRSFML bubble_idle với SDL3 main
+#
+# SDL3 main (3.5.0) đã xoá target SDL_uclibc (trước đây là OBJECT library
+# chứa C stdlib nội bộ của SDL). VRSFML bubble_idle chưa cập nhật theo,
+# vẫn gọi get_property(TARGET SDL_uclibc) ở Window/CMakeLists.txt:40-44.
+#
+# Tạo stub STATIC (không phải INTERFACE vì VRSFML dùng PRIVATE keyword).
+# Dùng CXX stub vì project() chỉ khai báo LANGUAGES CXX.
+# Guard NOT TARGET đảm bảo không xung đột nếu user chuyển về SDL cũ hơn.
+# =========================
+if(EMSCRIPTEN AND NOT TARGET SDL_uclibc)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/sdl_uclibc_stub.cpp"
+        "// phucpt: stub rỗng — SDL_uclibc cho VRSFML bubble_idle + SDL3 main\n"
+        "// SDL >= 3.5.0 không tạo target này; VRSFML bubble_idle vẫn tham chiếu.\n")
+    add_library(SDL_uclibc STATIC
+        "${CMAKE_CURRENT_BINARY_DIR}/sdl_uclibc_stub.cpp")
+    set_target_properties(SDL_uclibc PROPERTIES LINKER_LANGUAGE CXX)
+    message(STATUS "[WASM FIX] Stub SDL_uclibc (SDL3 main không tạo target này)")
+endif()
 
 # =========================
-# VRSFML — libs locally, no git needed at build time
+# VRSFML — libs locally. FetchContent_MakeAvailable sẽ:
+#   1. Gọi CPM configure libs/sdl (SDL3 main) → tạo SDL3::SDL3 natively
+#   2. Chạy Window/CMakeLists.txt:40 → SDL_uclibc có stub ✓
+#   3. Chạy Window/CMakeLists.txt:155 → SDL3::SDL3 có natively ✓
+# =========================
+FetchContent_Declare(
+    VRSFML
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/VRSFML"
+)
+
+# =========================
+# VRSFML — libs locally, no git needed at build time.
+# Khi FetchContent_MakeAvailable(VRSFML) chạy:
+#   1. CPM configure libs/sdl (SDL2) → tạo SDL2::SDL2
+#   2. Window/CMakeLists.txt:40  → SDL_uclibc  đã có (stub B) ✓
+#   3. Window/CMakeLists.txt:155 → SDL3::SDL3  đã có (stub A) ✓
 # =========================
 FetchContent_Declare(
     VRSFML
@@ -226,10 +265,9 @@ if(BUILD_MODULE STREQUAL "ALL")
         target_link_options(ctetris PRIVATE
             -sUSE_WEBGL2=1
             -sALLOW_MEMORY_GROWTH=1
-            -sASYNCIFY=1                         # Cho phép blocking IO giả lập
+            -sASYNCIFY=1
             -sEXPORTED_RUNTIME_METHODS=['ccall']
-            -sINITIAL_MEMORY=67108864            # 64 MB ban đầu
-            # Đóng gói assets vào WASM bundle
+            -sINITIAL_MEMORY=67108864
             --preload-file ${CMAKE_SOURCE_DIR}/src/gameConsole/gameConsole_board.json@/gameConsole_board.json
             --preload-file ${CMAKE_SOURCE_DIR}/src/gameStory/gameStory_intro.gif@/gameStory_intro.gif
         )
