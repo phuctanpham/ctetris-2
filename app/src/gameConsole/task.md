@@ -34,7 +34,7 @@
     - làm tạm nút play ở task 2.4 
     - Sau khi kết thúc màn hình của phần gameStory sẽ chuyển tiếp qua khởi động màn hình gameConsole
     - Sau khi bấm nút start bên màn hình gameConsole chuyển tiếp qua khởi động màn hình gameCore
-    - Đưa về các file CMakeLists.txt để hỗ trợ build wasm từ macOS / Ubuntu / Window. 
+    - Đưa về 1 file CMakeLists.txt để hỗ trợ build wasm từ macOS / Ubuntu / Window. 
      - viết và kiểm tra build.sh và build.ps1 để:
         + hỏi build đơn lẻ từng module hay tích hợp toàn bộ.
         + với build.sh tự xác định hệ điều hành  (macos hay ubuntu) , build.ps1 thì mặc định là windown rồi chạy chạy các cài đặt tiếp 
