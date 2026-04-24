@@ -62,33 +62,25 @@ endif()
 include(FetchContent)
 
 # =========================
-# Pre-declare SDL3 TRƯỚC khi VRSFML được fetch
-# Vấn đề: VRSFML bubble_idle dùng CPM để fetch SDL tại SHA cụ thể
-#          CPM mặc định dùng GIT_SHALLOW TRUE → không resolve được SHA dài
-# Fix:     CMake FetchContent giữ declaration ĐẦU TIÊN, bỏ qua các lần sau
-#          Khai báo SDL ở đây với GIT_SHALLOW FALSE trước khi CPM trong VRSFML
-#          cố gắng khai báo lại → CPM sẽ thấy SDL đã populated, dùng luôn
-# SHA này là commit mà bubble_idle branch của VRSFML yêu cầu:
-# xem: build/wasm/ALL/_deps/vrsfml-src/src/SFML/Window/CMakeLists.txt
+# SDL — libs locally at the exact SHA VRSFML/CPM requires
+# (7dc1c88...) instead of fetching from git at build time
+# CPM_sdl_SOURCE must be set BEFORE FetchContent_MakeAvailable(VRSFML)
+# so that VRSFML's internal CPM finds SDL already populated here.
 # =========================
+set(CPM_sdl_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/libs/sdl" CACHE STRING "" FORCE)
+
 FetchContent_Declare(
     sdl
-    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG        release-2.28.5
-    GIT_SHALLOW    FALSE   # Bắt buộc: shallow clone không resolve SHA này
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/sdl"
 )
 FetchContent_MakeAvailable(sdl)
 
 # =========================
-# VRSFML qua FetchContent — sau khi SDL đã được pre-populated ở trên
-# bubble_idle = nhánh production của tác giả (dùng cho game BubbleByte)
-# GIT_SHALLOW FALSE: bubble_idle dùng CPM với nhiều SHA cụ thể của sub-deps
+# VRSFML — libs locally, no git needed at build time
 # =========================
 FetchContent_Declare(
     VRSFML
-    GIT_REPOSITORY https://github.com/vittorioromeo/VRSFML.git
-    GIT_TAG        bubble_idle
-    GIT_SHALLOW    FALSE
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/VRSFML"
 )
 
 set(SFML_BUILD_AUDIO      ON  CACHE BOOL "" FORCE)
