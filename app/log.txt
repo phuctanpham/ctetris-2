@@ -1,8 +1,10 @@
-bash build.sh
+macos@phucpt app % ls src/shared/include/SFML/
+Audio.hpp       Graphics.hpp
+macos@phucpt app % bash build.sh              
 
 =================================================
   ctetris — Build Script (VRSFML + WASM)
-  Version: 1.8.0
+  Version: 1.9.0
 =================================================
 
 Bạn muốn build gì?
@@ -27,513 +29,182 @@ Already up-to-date.
 [OK] Emscripten 3.1.72 (3.1.x) đã kích hoạt — tương thích tốt với VRSFML.
 [INFO] Dùng Ninja generator.
 [OK] emscripten/shell.html đã tồn tại — giữ nguyên.
-Thư mục 'build/wasm/ALL' đã tồn tại. Xoá để build lại? [y/N]: y
-Đang xoá build/wasm/ALL ...
+
+Thư mục 'build/wasm/ALL' đã tồn tại. Chọn chế độ build:
+  1) Giữ nguyên    — chỉ build file thay đổi      (nhanh nhất)
+  2) Reconfigure   — xoá cache, giữ object files  (trung bình)
+  3) Clean build   — xoá toàn bộ, build từ đầu   (chậm nhất)
+Lựa chọn [1-3, mặc định 1]: 3
+[INFO] Xoá toàn bộ build/wasm/ALL ...
 
 [BUILD] Đang chạy CMake configure cho ALL / wasm ...
-configure: cmake -S . -B build/wasm/ALL -GNinja -DCMAKE_BUILD_TYPE=Release
- -DBUILD_MODULE=ALL -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=OFF -DCMAKE_TOOLCHAIN_FILE=/Users/macos/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_CROSSCOMPILING_EMULATOR=/Users/macos/emsdk/node/22.16.0_64bit/bin/node                      -- BUILD_MODULE = ALL
+configure: cmake -S . -B build/wasm/ALL -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_MODULE=ALL -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=OFF -DCMAKE_TOOLCHAIN_FILE=/Users/macos/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_CROSSCOMPILING_EMULATOR=/Users/macos/emsdk/node/22.16.0_64bit/bin/node
+-- BUILD_MODULE = ALL
 -- Target: WebAssembly / Emscripten
--- [WASM FIX] Đã tạo stub SDL_uclibc (libs/sdl không tạo target này)
+-- [WASM FIX] Stub SDL_uclibc (SDL3 main không tạo target này)
 -- Detected Emscripten
 -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
 -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
 -- Found Threads: TRUE
 -- Found EGL: EGL
 -- Found GLES: GL
--- CPM: Adding package sdl@ (/Users/macos/Desktop/projects/ctetris-2/app/l
-ibs/sdl)                                                                  CMake Deprecation Warning at libs/sdl/CMakeLists.txt:8 (cmake_minimum_requ
-ired):                                                                      Compatibility with CMake < 3.10 will be removed from a future version of
-  CMake.
-
-  Update the VERSION argument <min> value.  Or, use the <min>...<max> synt
-ax                                                                          to tell CMake that the project requires at least <min> but has been upda
-ted                                                                         to work with policies introduced by <max> or earlier.
-
-
+-- CPM: Adding package sdl@ (/Users/macos/Desktop/projects/ctetris-2/app/libs/sdl)
 -- Found PkgConfig: /usr/local/bin/pkg-config (found version "2.5.1")
--- Looking for __GLIBC__
--- Looking for __GLIBC__ - not found
--- Performing Test CHECK_CPU_ARCHITECTURE_X86
--- Performing Test CHECK_CPU_ARCHITECTURE_X86 - Failed
--- Performing Test CHECK_CPU_ARCHITECTURE_X64
--- Performing Test CHECK_CPU_ARCHITECTURE_X64 - Failed
--- Performing Test CHECK_CPU_ARCHITECTURE_ARM32
--- Performing Test CHECK_CPU_ARCHITECTURE_ARM32 - Failed
--- Performing Test CHECK_CPU_ARCHITECTURE_ARM64
--- Performing Test CHECK_CPU_ARCHITECTURE_ARM64 - Failed
--- Performing Test CHECK_CPU_ARCHITECTURE_LOONGARCH64
--- Performing Test CHECK_CPU_ARCHITECTURE_LOONGARCH64 - Failed
--- Performing Test HAVE_GCC_WALL
--- Performing Test HAVE_GCC_WALL - Success
--- Performing Test HAVE_GCC_NO_STRICT_ALIASING
--- Performing Test HAVE_GCC_NO_STRICT_ALIASING - Success
--- Performing Test HAVE_GCC_WDECLARATION_AFTER_STATEMENT
--- Performing Test HAVE_GCC_WDECLARATION_AFTER_STATEMENT - Success
--- Performing Test HAVE_GCC_ATOMICS
--- Performing Test HAVE_GCC_ATOMICS - Success
--- Performing Test HAVE_GCC_FVISIBILITY
--- Performing Test HAVE_GCC_FVISIBILITY - Success
--- Performing Test HAVE_GCC_WSHADOW
--- Performing Test HAVE_GCC_WSHADOW - Success
--- Performing Test HAVE_GCC_WUNUSED_LOCAL_TYPEDEFS
--- Performing Test HAVE_GCC_WUNUSED_LOCAL_TYPEDEFS - Success
--- Performing Test HAVE_NO_UNDEFINED
--- Performing Test HAVE_NO_UNDEFINED - Failed
--- Looking for ctype.h
--- Looking for ctype.h - found
--- Looking for float.h
--- Looking for float.h - found
--- Looking for iconv.h
--- Looking for iconv.h - found
--- Looking for inttypes.h
--- Looking for inttypes.h - found
--- Looking for limits.h
--- Looking for limits.h - found
--- Looking for malloc.h
--- Looking for malloc.h - found
--- Looking for math.h
--- Looking for math.h - found
--- Looking for memory.h
--- Looking for memory.h - found
--- Looking for signal.h
--- Looking for signal.h - found
--- Looking for stdarg.h
--- Looking for stdarg.h - found
--- Looking for stddef.h
--- Looking for stddef.h - found
--- Looking for stdint.h
--- Looking for stdint.h - found
--- Looking for stdio.h
--- Looking for stdio.h - found
--- Looking for stdlib.h
--- Looking for stdlib.h - found
--- Looking for string.h
--- Looking for string.h - found
--- Looking for strings.h
--- Looking for strings.h - found
--- Looking for sys/types.h
--- Looking for sys/types.h - found
--- Looking for wchar.h
--- Looking for wchar.h - found
--- Looking for linux/input.h
--- Looking for linux/input.h - not found
--- Looking for 7 include files stddef.h, ..., float.h
--- Looking for 7 include files stddef.h, ..., float.h - found
--- Looking for M_PI
--- Looking for M_PI - found
--- Performing Test HAVE_MPROTECT
--- Performing Test HAVE_MPROTECT - Success
--- Looking for strtod
--- Looking for strtod - found
--- Looking for malloc
--- Looking for malloc - found
--- Looking for calloc
--- Looking for calloc - found
--- Looking for realloc
--- Looking for realloc - found
--- Looking for free
--- Looking for free - found
--- Looking for getenv
--- Looking for getenv - found
--- Looking for setenv
--- Looking for setenv - found
--- Looking for putenv
--- Looking for putenv - found
--- Looking for unsetenv
--- Looking for unsetenv - found
--- Looking for bsearch
--- Looking for bsearch - found
--- Looking for qsort
--- Looking for qsort - found
--- Looking for abs
--- Looking for abs - found
--- Looking for bcopy
--- Looking for bcopy - found
--- Looking for memset
--- Looking for memset - found
--- Looking for memcpy
--- Looking for memcpy - found
--- Looking for memmove
--- Looking for memmove - found
--- Looking for memcmp
--- Looking for memcmp - found
--- Looking for strlen
--- Looking for strlen - found
--- Looking for strlcpy
--- Looking for strlcpy - found
--- Looking for strlcat
--- Looking for strlcat - found
--- Looking for _strrev
--- Looking for _strrev - not found
--- Looking for _strupr
--- Looking for _strupr - not found
--- Looking for _strlwr
--- Looking for _strlwr - not found
--- Looking for index
--- Looking for index - found
--- Looking for rindex
--- Looking for rindex - found
--- Looking for strchr
--- Looking for strchr - found
--- Looking for strrchr
--- Looking for strrchr - found
--- Looking for strstr
--- Looking for strstr - found
--- Looking for strtok_r
--- Looking for strtok_r - found
--- Looking for itoa
--- Looking for itoa - not found
--- Looking for _ltoa
--- Looking for _ltoa - not found
--- Looking for _uitoa
--- Looking for _uitoa - not found
--- Looking for _ultoa
--- Looking for _ultoa - not found
--- Looking for strtol
--- Looking for strtol - found
--- Looking for strtoul
--- Looking for strtoul - found
--- Looking for _i64toa
--- Looking for _i64toa - not found
--- Looking for _ui64toa
--- Looking for _ui64toa - not found
--- Looking for strtoll
--- Looking for strtoll - found
--- Looking for strtoull
--- Looking for strtoull - found
--- Looking for atoi
--- Looking for atoi - found
--- Looking for atof
--- Looking for atof - found
--- Looking for strcmp
--- Looking for strcmp - found
--- Looking for strncmp
--- Looking for strncmp - found
--- Looking for _stricmp
--- Looking for _stricmp - not found
--- Looking for strcasecmp
--- Looking for strcasecmp - found
--- Looking for _strnicmp
--- Looking for _strnicmp - not found
--- Looking for strncasecmp
--- Looking for strncasecmp - found
--- Looking for strcasestr
--- Looking for strcasestr - found
--- Looking for wcscmp
--- Looking for wcscmp - found
--- Looking for _wcsdup
--- Looking for _wcsdup - not found
--- Looking for wcsdup
--- Looking for wcsdup - found
--- Looking for wcslcat
--- Looking for wcslcat - not found
--- Looking for wcslcpy
--- Looking for wcslcpy - not found
--- Looking for wcslen
--- Looking for wcslen - found
--- Looking for wcsncmp
--- Looking for wcsncmp - found
--- Looking for wcsstr
--- Looking for wcsstr - found
--- Looking for wcscasecmp
--- Looking for wcscasecmp - found
--- Looking for _wcsicmp
--- Looking for _wcsicmp - not found
--- Looking for wcsncasecmp
--- Looking for wcsncasecmp - found
--- Looking for _wcsnicmp
--- Looking for _wcsnicmp - not found
--- Looking for sscanf
--- Looking for sscanf - found
--- Looking for vsscanf
--- Looking for vsscanf - found
--- Looking for vsnprintf
--- Looking for vsnprintf - found
--- Looking for fopen64
--- Looking for fopen64 - found
--- Looking for fseeko
--- Looking for fseeko - found
--- Looking for fseeko64
--- Looking for fseeko64 - found
--- Looking for _Exit
--- Looking for _Exit - found
--- Looking for sigaction
--- Looking for sigaction - found
--- Looking for setjmp
--- Looking for setjmp - found
--- Looking for nanosleep
--- Looking for nanosleep - found
--- Looking for sysconf
--- Looking for sysconf - found
--- Looking for sysctlbyname
--- Looking for sysctlbyname - not found
--- Looking for getauxval
--- Looking for getauxval - not found
--- Looking for elf_aux_info
--- Looking for elf_aux_info - not found
--- Looking for poll
--- Looking for poll - found
--- Looking for pow in m
--- Looking for pow in m - found
--- Looking for atan
--- Looking for atan - found
--- Looking for atan2
--- Looking for atan2 - found
--- Looking for atanf
--- Looking for atanf - found
--- Looking for atan2f
--- Looking for atan2f - found
--- Looking for ceil
--- Looking for ceil - found
--- Looking for ceilf
--- Looking for ceilf - found
--- Looking for copysign
--- Looking for copysign - found
--- Looking for copysignf
--- Looking for copysignf - found
--- Looking for cos
--- Looking for cos - found
--- Looking for cosf
--- Looking for cosf - found
--- Looking for exp
--- Looking for exp - found
--- Looking for expf
--- Looking for expf - found
--- Looking for fabs
--- Looking for fabs - found
--- Looking for fabsf
--- Looking for fabsf - found
--- Looking for floor
--- Looking for floor - found
--- Looking for floorf
--- Looking for floorf - found
--- Looking for fmod
--- Looking for fmod - found
--- Looking for fmodf
--- Looking for fmodf - found
--- Looking for log
--- Looking for log - found
--- Looking for logf
--- Looking for logf - found
--- Looking for log10
--- Looking for log10 - found
--- Looking for log10f
--- Looking for log10f - found
--- Looking for lround
--- Looking for lround - found
--- Looking for lroundf
--- Looking for lroundf - found
--- Looking for pow
--- Looking for pow - found
--- Looking for powf
--- Looking for powf - found
--- Looking for round
--- Looking for round - found
--- Looking for roundf
--- Looking for roundf - found
--- Looking for scalbn
--- Looking for scalbn - found
--- Looking for scalbnf
--- Looking for scalbnf - found
--- Looking for sin
--- Looking for sin - found
--- Looking for sinf
--- Looking for sinf - found
--- Looking for sqrt
--- Looking for sqrt - found
--- Looking for sqrtf
--- Looking for sqrtf - found
--- Looking for tan
--- Looking for tan - found
--- Looking for tanf
--- Looking for tanf - found
--- Looking for acos
--- Looking for acos - found
--- Looking for acosf
--- Looking for acosf - found
--- Looking for asin
--- Looking for asin - found
--- Looking for asinf
--- Looking for asinf - found
--- Looking for trunc
--- Looking for trunc - found
--- Looking for truncf
--- Looking for truncf - found
--- Looking for iconv_open in iconv
--- Looking for iconv_open in iconv - not found
--- Looking for iconv_open in c
--- Looking for iconv_open in c - found
--- Looking for alloca.h
--- Looking for alloca.h - found
--- Looking for alloca
--- Looking for alloca - found
--- Looking for alloca
--- Looking for alloca - found
--- Looking for alloca
--- Looking for alloca - not found
--- Performing Test HAVE_SA_SIGACTION
--- Performing Test HAVE_SA_SIGACTION - Success
--- Looking for dlopen
--- Looking for dlopen - found
--- Performing Test HAVE_O_CLOEXEC
--- Performing Test HAVE_O_CLOEXEC - Success
--- Looking for samplerate.h
--- Looking for samplerate.h - not found
--- Found Git: /usr/bin/git (found version "2.32.0 (Apple Git-132)")
-CMake Deprecation Warning at libs/sdl/CMakeLists.txt:3215 (cmake_minimum_r
-equired):                                                                   Compatibility with CMake < 3.10 will be removed from a future version of
-  CMake.
-
-  Update the VERSION argument <min> value.  Or, use the <min>...<max> synt
-ax                                                                          to tell CMake that the project requires at least <min> but has been upda
-ted                                                                         to work with policies introduced by <max> or earlier.
-
-
+-- Detecting Target CPU Architecture
+-- Detecting Target CPU Architecture - EMSCRIPTEN
+-- Performing Test HAVE_POSIX_SPAWN
+-- Performing Test HAVE_POSIX_SPAWN - Failed
 -- 
--- SDL2 was configured with the following options:
+-- SDL3 was configured with the following options:
 -- 
 -- Platform: Emscripten-1
 -- 64-bit:   FALSE
 -- Compiler: /Users/macos/emsdk/upstream/emscripten/emcc
--- Revision: SDL-2.28.5-gebc6fb6
+-- Revision: SDL-3.5.0-1db6d53
+-- Vendor:   
 -- 
 -- Subsystems:
---   Atomic:    OFF
---   Audio:     OFF
---   Video:     ON
---   Render:    OFF
---   Events:    ON
---   Joystick:  ON
---   Haptic:    ON
---   Hidapi:    OFF
---   Power:     OFF
---   Threads:   ON
---   Timers:    ON
---   File:      ON
---   Loadso:    OFF
---   CPUinfo:   OFF
---   Filesystem:        OFF
---   Sensor:    OFF
---   Locale:    OFF
---   Misc:      OFF
+--   Audio:    OFF
+--   Video:    ON
+--   GPU:      OFF
+--   Render:   OFF
+--   Camera:   OFF
+--   Joystick: ON
+--   Haptic:   ON
+--   Hidapi:   OFF
+--   Power:    OFF
+--   Sensor:   OFF
+--   Dialog:   OFF
+--   Tray:     OFF
 -- 
 -- Options:
---   SDL2_DISABLE_INSTALL        (Wanted: ON): OFF
---   SDL2_DISABLE_SDL2MAIN       (Wanted: OFF): OFF
---   SDL2_DISABLE_UNINSTALL      (Wanted: OFF): OFF
---   SDL_3DNOW                   (Wanted: OFF): OFF
---   SDL_ALSA                    (Wanted: ON): OFF
---   SDL_ALSA_SHARED             (Wanted: ON): OFF
---   SDL_ALTIVEC                 (Wanted: OFF): OFF
---   SDL_ARMNEON                 (Wanted: OFF): OFF
---   SDL_ARMSIMD                 (Wanted: OFF): OFF
---   SDL_ARTS                    (Wanted: ON): OFF
---   SDL_ARTS_SHARED             (Wanted: ON): OFF
---   SDL_ASAN                    (Wanted: OFF): OFF
---   SDL_ASSEMBLY                (Wanted: OFF): OFF
---   SDL_ASSERTIONS              (Wanted: auto): auto
---   SDL_BACKGROUNDING_SIGNAL    (Wanted: OFF): OFF
---   SDL_CCACHE                  (Wanted: ON): OFF
---   SDL_CLOCK_GETTIME           (Wanted: ON): ON
---   SDL_COCOA                   (Wanted: OFF): OFF
---   SDL_DBUS                    (Wanted: ON): OFF
---   SDL_DIRECTFB                (Wanted: OFF): OFF
---   SDL_DIRECTFB_SHARED         (Wanted: OFF): OFF
---   SDL_DIRECTX                 (Wanted: OFF): OFF
---   SDL_DISKAUDIO               (Wanted: ON): OFF
---   SDL_DUMMYAUDIO              (Wanted: ON): OFF
---   SDL_DUMMYVIDEO              (Wanted: ON): ON
---   SDL_ESD                     (Wanted: ON): OFF
---   SDL_ESD_SHARED              (Wanted: ON): OFF
---   SDL_FOREGROUNDING_SIGNAL    (Wanted: OFF): OFF
---   SDL_FUSIONSOUND             (Wanted: OFF): OFF
---   SDL_FUSIONSOUND_SHARED      (Wanted: OFF): OFF
---   SDL_GCC_ATOMICS             (Wanted: ON): ON
---   SDL_HIDAPI                  (Wanted: OFF): OFF
---   SDL_HIDAPI_JOYSTICK         (Wanted: OFF): OFF
---   SDL_HIDAPI_LIBUSB           (Wanted: OFF): OFF
---   SDL_IBUS                    (Wanted: ON): OFF
---   SDL_INSTALL_TESTS           (Wanted: OFF): OFF
---   SDL_JACK                    (Wanted: ON): OFF
---   SDL_JACK_SHARED             (Wanted: ON): OFF
---   SDL_KMSDRM                  (Wanted: ON): OFF
---   SDL_KMSDRM_SHARED           (Wanted: ON): OFF
---   SDL_LASX                    (Wanted: OFF): OFF
---   SDL_LIBC                    (Wanted: ON): ON
---   SDL_LIBSAMPLERATE           (Wanted: ON): OFF
---   SDL_LIBSAMPLERATE_SHARED    (Wanted: ON): OFF
---   SDL_LIBUDEV                 (Wanted: ON): OFF
---   SDL_LSX                     (Wanted: OFF): OFF
---   SDL_METAL                   (Wanted: OFF): OFF
---   SDL_MMX                     (Wanted: OFF): OFF
---   SDL_NAS                     (Wanted: ON): OFF
---   SDL_NAS_SHARED              (Wanted: ON): OFF
---   SDL_OFFSCREEN               (Wanted: ON): ON
---   SDL_OPENGL                  (Wanted: ON): OFF
---   SDL_OPENGLES                (Wanted: ON): ON
---   SDL_OSS                     (Wanted: ON): OFF
---   SDL_PIPEWIRE                (Wanted: ON): OFF
---   SDL_PIPEWIRE_SHARED         (Wanted: ON): OFF
---   SDL_PTHREADS                (Wanted: OFF): OFF
---   SDL_PTHREADS_SEM            (Wanted: OFF): OFF
---   SDL_PULSEAUDIO              (Wanted: ON): OFF
---   SDL_PULSEAUDIO_SHARED       (Wanted: ON): OFF
---   SDL_RENDER_D3D              (Wanted: OFF): OFF
---   SDL_RENDER_METAL            (Wanted: OFF): OFF
---   SDL_RPATH                   (Wanted: ON): OFF
---   SDL_RPI                     (Wanted: ON): OFF
---   SDL_SNDIO                   (Wanted: ON): OFF
---   SDL_SNDIO_SHARED            (Wanted: ON): OFF
---   SDL_SSE                     (Wanted: OFF): OFF
---   SDL_SSE2                    (Wanted: OFF): OFF
---   SDL_SSE3                    (Wanted: OFF): OFF
---   SDL_SSEMATH                 (Wanted: OFF): OFF
---   SDL_STATIC_PIC              (Wanted: OFF): OFF
---   SDL_SYSTEM_ICONV            (Wanted: ON): ON
---   SDL_TESTS                   (Wanted: OFF): OFF
---   SDL_VENDOR_INFO             (Wanted: ): OFF
---   SDL_VIRTUAL_JOYSTICK        (Wanted: OFF): OFF
---   SDL_VIVANTE                 (Wanted: ON): OFF
---   SDL_VULKAN                  (Wanted: OFF): OFF
---   SDL_WASAPI                  (Wanted: OFF): OFF
---   SDL_WAYLAND                 (Wanted: ON): OFF
---   SDL_WAYLAND_LIBDECOR        (Wanted: ON): OFF
---   SDL_WAYLAND_LIBDECOR_SHARED (Wanted: ON): OFF
---   SDL_WAYLAND_QT_TOUCH        (Wanted: ON): OFF
---   SDL_WAYLAND_SHARED          (Wanted: ON): OFF
---   SDL_X11                     (Wanted: ON): OFF
---   SDL_X11_SHARED              (Wanted: ON): OFF
---   SDL_X11_XCURSOR             (Wanted: ON): OFF
---   SDL_X11_XDBE                (Wanted: ON): OFF
---   SDL_X11_XFIXES              (Wanted: ON): OFF
---   SDL_X11_XINPUT              (Wanted: ON): OFF
---   SDL_X11_XRANDR              (Wanted: ON): OFF
---   SDL_X11_XSCRNSAVER          (Wanted: ON): OFF
---   SDL_X11_XSHAPE              (Wanted: ON): OFF
---   SDL_XINPUT                  (Wanted: OFF): OFF
--- 
---  CFLAGS:         -idirafter "/Users/macos/Desktop/projects/ctetris-2/ap
-p/libs/sdl/src/video/khronos"                                             --  EXTRA_CFLAGS:   -Wall -fno-strict-aliasing -Wdeclaration-after-stateme
-nt -fvisibility=hidden -Wshadow -Wno-unused-local-typedefs -fdiagnostics-color=always                                                               --  EXTRA_LDFLAGS:  
---  EXTRA_LIBS:    m
+--   SDL_ALSA                       (Wanted: OFF): OFF
+--   SDL_ALSA_SHARED                (Wanted: OFF): OFF
+--   SDL_ALTIVEC                    (Wanted: OFF): OFF
+--   SDL_ARMNEON                    (Wanted: OFF): OFF
+--   SDL_ASAN                       (Wanted: OFF): OFF
+--   SDL_ASSEMBLY                   (Wanted: OFF): OFF
+--   SDL_ASSERTIONS                 (Wanted: auto): auto
+--   SDL_AVX                        (Wanted: OFF): OFF
+--   SDL_AVX2                       (Wanted: OFF): OFF
+--   SDL_AVX512F                    (Wanted: OFF): OFF
+--   SDL_BACKGROUNDING_SIGNAL       (Wanted: OFF): OFF
+--   SDL_CCACHE                     (Wanted: ON): OFF
+--   SDL_CLANG_TIDY                 (Wanted: OFF): OFF
+--   SDL_CLOCK_GETTIME              (Wanted: ON): ON
+--   SDL_COCOA                      (Wanted: OFF): OFF
+--   SDL_DBUS                       (Wanted: ON): OFF
+--   SDL_DEPS_SHARED                (Wanted: OFF): OFF
+--   SDL_DIRECTX                    (Wanted: OFF): OFF
+--   SDL_DISKAUDIO                  (Wanted: OFF): OFF
+--   SDL_DLOPEN_NOTES               (Wanted: ON): OFF
+--   SDL_DUMMYAUDIO                 (Wanted: OFF): OFF
+--   SDL_DUMMYCAMERA                (Wanted: OFF): OFF
+--   SDL_DUMMYVIDEO                 (Wanted: ON): ON
+--   SDL_EMSCRIPTEN_PERSISTENT_PATH (Wanted: ): OFF
+--   SDL_EXAMPLES                   (Wanted: OFF): OFF
+--   SDL_EXAMPLES_LINK_SHARED       (Wanted: OFF): OFF
+--   SDL_FOREGROUNDING_SIGNAL       (Wanted: OFF): OFF
+--   SDL_FRIBIDI                    (Wanted: ON): OFF
+--   SDL_FRIBIDI_SHARED             (Wanted: OFF): OFF
+--   SDL_GCC_ATOMICS                (Wanted: ON): ON
+--   SDL_GPU_OPENXR                 (Wanted: OFF): OFF
+--   SDL_HIDAPI                     (Wanted: OFF): OFF
+--   SDL_HIDAPI_JOYSTICK            (Wanted: OFF): OFF
+--   SDL_HIDAPI_LIBUSB              (Wanted: OFF): OFF
+--   SDL_HIDAPI_LIBUSB_SHARED       (Wanted: OFF): OFF
+--   SDL_IBUS                       (Wanted: ON): OFF
+--   SDL_INSTALL                    (Wanted: OFF): OFF
+--   SDL_INSTALL_TESTS              (Wanted: OFF): OFF
+--   SDL_JACK                       (Wanted: OFF): OFF
+--   SDL_JACK_SHARED                (Wanted: OFF): OFF
+--   SDL_KMSDRM                     (Wanted: ON): OFF
+--   SDL_KMSDRM_SHARED              (Wanted: OFF): OFF
+--   SDL_LASX                       (Wanted: OFF): OFF
+--   SDL_LIBC                       (Wanted: ON): ON
+--   SDL_LIBICONV                   (Wanted: OFF): OFF
+--   SDL_LIBTHAI                    (Wanted: ON): OFF
+--   SDL_LIBTHAI_SHARED             (Wanted: OFF): OFF
+--   SDL_LIBUDEV                    (Wanted: ON): OFF
+--   SDL_LIBURING                   (Wanted: ON): OFF
+--   SDL_LSX                        (Wanted: OFF): OFF
+--   SDL_METAL                      (Wanted: OFF): OFF
+--   SDL_MMX                        (Wanted: OFF): OFF
+--   SDL_OFFSCREEN                  (Wanted: ON): ON
+--   SDL_OPENGL                     (Wanted: ON): OFF
+--   SDL_OPENGLES                   (Wanted: ON): ON
+--   SDL_OPENVR                     (Wanted: OFF): OFF
+--   SDL_OSS                        (Wanted: OFF): OFF
+--   SDL_PIPEWIRE                   (Wanted: ON): OFF
+--   SDL_PIPEWIRE_SHARED            (Wanted: OFF): OFF
+--   SDL_PTHREADS                   (Wanted: OFF): OFF
+--   SDL_PTHREADS_SEM               (Wanted: OFF): OFF
+--   SDL_PULSEAUDIO                 (Wanted: OFF): OFF
+--   SDL_PULSEAUDIO_SHARED          (Wanted: OFF): OFF
+--   SDL_RENDER_D3D                 (Wanted: OFF): OFF
+--   SDL_RENDER_D3D11               (Wanted: OFF): OFF
+--   SDL_RENDER_D3D12               (Wanted: OFF): OFF
+--   SDL_RENDER_GPU                 (Wanted: OFF): OFF
+--   SDL_RENDER_METAL               (Wanted: OFF): OFF
+--   SDL_RENDER_VULKAN              (Wanted: OFF): OFF
+--   SDL_ROCKCHIP                   (Wanted: OFF): OFF
+--   SDL_RPATH                      (Wanted: ON): OFF
+--   SDL_RPI                        (Wanted: OFF): OFF
+--   SDL_SNDIO                      (Wanted: OFF): OFF
+--   SDL_SNDIO_SHARED               (Wanted: OFF): OFF
+--   SDL_SSE                        (Wanted: OFF): OFF
+--   SDL_SSE2                       (Wanted: OFF): OFF
+--   SDL_SSE3                       (Wanted: OFF): OFF
+--   SDL_SSE4_1                     (Wanted: OFF): OFF
+--   SDL_SSE4_2                     (Wanted: OFF): OFF
+--   SDL_SYSTEM_ICONV               (Wanted: ON): ON
+--   SDL_TESTS                      (Wanted: OFF): OFF
+--   SDL_TESTS_LINK_SHARED          (Wanted: OFF): OFF
+--   SDL_UNINSTALL                  (Wanted: OFF): OFF
+--   SDL_VIRTUAL_JOYSTICK           (Wanted: OFF): OFF
+--   SDL_VIVANTE                    (Wanted: OFF): OFF
+--   SDL_VULKAN                     (Wanted: OFF): OFF
+--   SDL_WASAPI                     (Wanted: OFF): OFF
+--   SDL_WAYLAND                    (Wanted: ON): OFF
+--   SDL_WAYLAND_LIBDECOR           (Wanted: ON): OFF
+--   SDL_WAYLAND_LIBDECOR_SHARED    (Wanted: OFF): OFF
+--   SDL_WAYLAND_SHARED             (Wanted: OFF): OFF
+--   SDL_X11                        (Wanted: ON): OFF
+--   SDL_X11_SHARED                 (Wanted: OFF): OFF
+--   SDL_X11_XCURSOR                (Wanted: ON): OFF
+--   SDL_X11_XDBE                   (Wanted: ON): OFF
+--   SDL_X11_XFIXES                 (Wanted: ON): OFF
+--   SDL_X11_XINPUT                 (Wanted: ON): OFF
+--   SDL_X11_XRANDR                 (Wanted: ON): OFF
+--   SDL_X11_XSCRNSAVER             (Wanted: ON): OFF
+--   SDL_X11_XSHAPE                 (Wanted: ON): OFF
+--   SDL_X11_XSYNC                  (Wanted: ON): OFF
+--   SDL_X11_XTEST                  (Wanted: ON): OFF
+--   SDL_XINPUT                     (Wanted: OFF): OFF
 -- 
 --  Build Shared Library: OFF
 --  Build Static Library: ON
---  Build Static Library with Position Independent Code: OFF
+-- 
+-- Enabled backends:
+--   Video drivers: dummy emscripten offscreen
+--   Render drivers: ogl_es2
+--   GPU drivers: disabled openxr
+--   Audio drivers: dummy
+--   Joystick drivers: emscripten
+--   Camera drivers: dummy
 -- 
 -- If something was not detected, although the libraries
 -- were installed, then make sure you have set the
--- CFLAGS and LDFLAGS environment variables correctly.
+-- CMAKE_C_FLAGS and CMAKE_PREFIX_PATH CMake variables correctly.
 -- 
 -- CPM: Adding package freetype@ (VER-2-13-3)
-CMake Deprecation Warning at build/wasm/ALL/_deps/freetype-src/CMakeLists.
-txt:113 (cmake_minimum_required):                                           Compatibility with CMake < 3.10 will be removed from a future version of
+CMake Deprecation Warning at build/wasm/ALL/_deps/freetype-src/CMakeLists.txt:113 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
   CMake.
 
-  Update the VERSION argument <min> value.  Or, use the <min>...<max> synt
-ax                                                                          to tell CMake that the project requires at least <min> but has been upda
-ted                                                                         to work with policies introduced by <max> or earlier.
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
 
 
 -- Looking for unistd.h
@@ -548,6 +219,12 @@ ted                                                                         to w
 -- Looking for include file stdint.h - found
 -- Looking for include file sys/types.h
 -- Looking for include file sys/types.h - found
+-- Looking for sys/types.h
+-- Looking for sys/types.h - found
+-- Looking for stdint.h
+-- Looking for stdint.h - found
+-- Looking for stddef.h
+-- Looking for stddef.h - found
 -- Check size of int16_t
 -- Check size of int16_t - done
 -- Check size of uint16_t
@@ -580,12 +257,16 @@ ted                                                                         to w
 -- Performing Test DODEFINE_EXTENSIONS - Success
 -- Looking for byteswap.h
 -- Looking for byteswap.h - found
+-- Looking for inttypes.h
+-- Looking for inttypes.h - found
 -- Looking for stdbool.h
 -- Looking for stdbool.h - found
 -- Looking for arm_neon.h
 -- Looking for arm_neon.h - found
 -- Looking for x86intrin.h
 -- Looking for x86intrin.h - not found
+-- Looking for fseeko
+-- Looking for fseeko - found
 -- Performing Test HAVE_BSWAP16
 -- Performing Test HAVE_BSWAP16 - Success
 -- Performing Test HAVE_BSWAP32
@@ -604,6 +285,8 @@ ted                                                                         to w
 -- Looking for cpuid.h - not found
 -- Looking for sys/param.h
 -- Looking for sys/param.h - found
+-- Looking for lround
+-- Looking for lround - found
 -- Check CPU architecture is x64
 -- Check CPU architecture is x64 - no
 -- Check CPU architecture is x86
@@ -615,30 +298,400 @@ ted                                                                         to w
 -- CPM: Adding package vorbis@1.3.7 (v1.3.7)
 -- Configuring vorbis 1.3.7
 -- Target tích hợp: ctetris
--- Configuring done (300.8s)
-CMake Error: Error required internal CMake variable not set, cmake may not
- be built correctly.                                                      Missing variable is:
-CMAKE_C_COMPILE_OBJECT
-CMake Error: Error required internal CMake variable not set, cmake may not
- be built correctly.                                                      Missing variable is:
-CMAKE_C_ARCHIVE_CREATE
-CMake Error: Error required internal CMake variable not set, cmake may not
- be built correctly.                                                      Missing variable is:
-CMAKE_C_ARCHIVE_FINISH
-CMake Error at libs/VRSFML/src/SFML/Window/CMakeLists.txt:155 (target_link
-_libraries):                                                                Target "sfml-window" links to:
-
-    SDL3::SDL3
-
-  but the target was not found.  Possible reasons include:
-
-    * There is a typo in the target name.
-    * A find_package call is missing for an IMPORTED target.
-    * An ALIAS target is missing.
-
-
-
--- Generating done (0.2s)
-CMake Generate step failed.  Build files cannot be regenerated correctly.
-emcmake: error: 'cmake -S . -B build/wasm/ALL -GNinja -DCMAKE_BUILD_TYPE=R
-elease -DBUILD_MODULE=ALL -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=OFF -DCMAKE_TOOLCHAIN_FILE=/Users/macos/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_CROSSCOMPILING_EMULATOR=/Users/macos/emsdk/node/22.16.0_64bit/bin/node' failed (returned 1)                                                                     
+-- Configuring done (96.2s)
+-- Generating done (0.3s)
+-- Build files have been written to: /Users/macos/Desktop/projects/ctetris-2/app/build/wasm/ALL
+[BUILD] Đang biên dịch...
+[0/2] Re-checking globbed directories...
+[40/414] Building CXX object _deps/...fml-glutils.dir/EGL/EGLContext.cpp.o
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/src/SFML/GLUtils/EGL/EGLContext.cpp:93:5: warning: unused function 'evaluateFormat' [-Wunused-function]
+   93 | int evaluateFormat(unsigned int               bitsPerPixel,
+      |     ^~~~~~~~~~~~~~
+1 warning generated.
+[268/414] Building CXX object _deps...Files/sfml-window.dir/Keyboard.cpp.o
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/src/SFML/Window/Keyboard.cpp:57:43: warning: unused parameter 'visible' [-Wunused-parameter]
+   57 | void setVirtualKeyboardVisible(const bool visible)
+      |                                           ^
+1 warning generated.
+[278/414] Building CXX object _deps...akeFiles/sfml-window.dir/Touch.cpp.o
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/src/SFML/Window/Touch.cpp:16:26: warning: unused parameter 'finger' [-Wunused-parameter]
+   16 | bool isDown(unsigned int finger)
+      |                          ^
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/src/SFML/Window/Touch.cpp:24:35: warning: unused parameter 'finger' [-Wunused-parameter]
+   24 | Vector2i getPosition(unsigned int finger)
+      |                                   ^
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/src/SFML/Window/Touch.cpp:32:35: warning: unused parameter 'finger' [-Wunused-parameter]
+   32 | Vector2i getPosition(unsigned int finger, const WindowBase& relativeTo)
+      |                                   ^
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/src/SFML/Window/Touch.cpp:32:61: warning: unused parameter 'relativeTo' [-Wunused-parameter]
+   32 | Vector2i getPosition(unsigned int finger, const WindowBase& relativeTo)
+      |                                                             ^
+4 warnings generated.
+[310/414] Building CXX object _deps.../sfml-window.dir/WindowContext.cpp.o
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/src/SFML/Window/WindowContext.cpp:270:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+  270 |     priv::getSDLLayerSingleton(); // TODO P0:
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[336/414] Building CXX object _deps...les/sfml-window.dir/WindowImpl.cpp.o
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/src/SFML/Window/WindowImpl.cpp:188:13: warning: 6 enumeration values not handled in switch: 'SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED', 'SDL_EVENT_SCREEN_KEYBOARD_SHOWN', 'SDL_EVENT_SCREEN_KEYBOARD_HIDDEN'... [-Wswitch]
+  188 |     switch (et)
+      |             ^~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/src/SFML/Window/WindowImpl.cpp:1001:17: warning: 6 enumeration values not handled in switch: 'SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED', 'SDL_EVENT_SCREEN_KEYBOARD_SHOWN', 'SDL_EVENT_SCREEN_KEYBOARD_HIDDEN'... [-Wswitch]
+ 1001 |         switch (et)
+      |                 ^~
+2 warnings generated.
+[407/414] Building CXX object CMake...s/ctetris.dir/src/gameCore/app.cpp.o
+FAILED: [code=1] CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o 
+/Users/macos/emsdk/upstream/emscripten/em++ -DSFML_ENABLE_LIFETIME_TRACKING -DSFML_ENABLE_STACK_TRACES -DSFML_OPENGL_ES -DSFML_STATIC -I/Users/macos/Desktop/projects/ctetris-2/app/src/shared/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/include -I/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include -O3 -DNDEBUG -std=gnu++20 -MD -MT CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o -MF CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o.d -o CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:13:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/src/shared/include/SFML/Graphics.hpp:14:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RenderWindow.hpp:13:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/Window.hpp:9:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/WindowBase.hpp:10:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/Event.hpp:15:
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Base/Variant.hpp:483:32: warning: unknown warning group '-Wmaybe-uninitialized', ignored [-Wunknown-warning-option]
+  483 | #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+      |                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Base/Variant.hpp:511:32: warning: unknown warning group '-Wmaybe-uninitialized', ignored [-Wunknown-warning-option]
+  511 | #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+      |                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:14:10: fatal error: 'SFML/Window.hpp' file not found
+   14 | #include <SFML/Window.hpp>
+      |          ^~~~~~~~~~~~~~~~~
+2 warnings and 1 error generated.
+[408/414] Building CXX object CMakeFiles/ctetris.dir/main.cpp.o
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/main.cpp:11:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/src/shared/include/SFML/Graphics.hpp:14:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RenderWindow.hpp:13:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/Window.hpp:9:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/WindowBase.hpp:10:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/Event.hpp:15:
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Base/Variant.hpp:483:32: warning: unknown warning group '-Wmaybe-uninitialized', ignored [-Wunknown-warning-option]
+  483 | #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+      |                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Base/Variant.hpp:511:32: warning: unknown warning group '-Wmaybe-uninitialized', ignored [-Wunknown-warning-option]
+  511 | #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+      |                                ^
+2 warnings generated.
+[409/414] Building CXX object CMake.../ctetris.dir/src/gameStory/app.cpp.o
+FAILED: [code=1] CMakeFiles/ctetris.dir/src/gameStory/app.cpp.o 
+/Users/macos/emsdk/upstream/emscripten/em++ -DSFML_ENABLE_LIFETIME_TRACKING -DSFML_ENABLE_STACK_TRACES -DSFML_OPENGL_ES -DSFML_STATIC -I/Users/macos/Desktop/projects/ctetris-2/app/src/shared/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/include -I/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include -O3 -DNDEBUG -std=gnu++20 -MD -MT CMakeFiles/ctetris.dir/src/gameStory/app.cpp.o -MF CMakeFiles/ctetris.dir/src/gameStory/app.cpp.o.d -o CMakeFiles/ctetris.dir/src/gameStory/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:17:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/src/shared/include/SFML/Graphics.hpp:14:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RenderWindow.hpp:13:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/Window.hpp:9:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/WindowBase.hpp:10:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/Event.hpp:15:
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Base/Variant.hpp:483:32: warning: unknown warning group '-Wmaybe-uninitialized', ignored [-Wunknown-warning-option]
+  483 | #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+      |                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Base/Variant.hpp:511:32: warning: unknown warning group '-Wmaybe-uninitialized', ignored [-Wunknown-warning-option]
+  511 | #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+      |                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:34:6: error: "gif_lib.h not found — cần cài giflib (apt: libgif-dev / brew: giflib)"
+   34 | #    error "gif_lib.h not found — cần cài giflib (apt: libgif-dev / brew: giflib)"
+      |      ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:62:5: error: unknown type name 'GifFileType'
+   62 |     GifFileType* gif = DGifOpenFileName(path.c_str(), &err);
+      |     ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:62:24: error: use of undeclared identifier 'DGifOpenFileName'
+   62 |     GifFileType* gif = DGifOpenFileName(path.c_str(), &err);
+      |                        ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:67:27: error: use of undeclared identifier 'GIF_OK'
+   67 |     if (DGifSlurp(gif) != GIF_OK) {
+      |                           ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:84:9: error: unknown type name 'SavedImage'
+   84 |         SavedImage&     img  = gif->SavedImages[f];
+      |         ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:85:9: error: unknown type name 'ColorMapObject'
+   85 |         ColorMapObject* cmap = img.ImageDesc.ColorMap
+      |         ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:91:13: error: unknown type name 'ExtensionBlock'
+   91 |             ExtensionBlock& eb = img.ExtensionBlocks[e];
+      |             ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:92:32: error: use of undeclared identifier 'GRAPHICS_EXT_FUNC_CODE'
+   92 |             if (eb.Function == GRAPHICS_EXT_FUNC_CODE && eb.ByteCount >= 4) {
+      |                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:102:13: error: unknown type name 'ExtensionBlock'
+  102 |             ExtensionBlock& eb = img.ExtensionBlocks[e];
+      |             ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:103:32: error: use of undeclared identifier 'GRAPHICS_EXT_FUNC_CODE'
+  103 |             if (eb.Function == GRAPHICS_EXT_FUNC_CODE && eb.ByteCount >= 4)
+      |                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:114:17: error: unknown type name 'GifColorType'
+  114 |                 GifColorType&  c   = cmap->Colors[ci];
+      |                 ^
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:20:
+In file included from /Users/macos/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/iostream:43:
+In file included from /Users/macos/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/ios:223:
+In file included from /Users/macos/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/__locale:15:
+In file included from /Users/macos/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/__memory/shared_ptr.h:24:
+In file included from /Users/macos/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/__memory/allocation_guard.h:15:
+/Users/macos/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/__memory/allocator_traits.h:305:5: error: no matching function for call to '__construct_at'
+  305 |     std::__construct_at(__p, std::forward<_Args>(__args)...);
+      |     ^~~~~~~~~~~~~~~~~~~
+/Users/macos/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/vector:902:21: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<sf::Image>>::construct<sf::Image, sf::Vector2<unsigned int>, unsigned char *, void, void>' requested here
+  902 |     __alloc_traits::construct(this->__alloc(), std::__to_address(__tx.__pos_), std::forward<_Args>(__args)...);
+      |                     ^
+/Users/macos/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/vector:1508:5: note: in instantiation of function template specialization 'std::vector<sf::Image>::__construct_one_at_end<sf::Vector2<unsigned int>, unsigned char *>' requested here
+ 1508 |     __construct_one_at_end(std::forward<_Args>(__args)...);
+      |     ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:122:16: note: in instantiation of function template specialization 'std::vector<sf::Image>::emplace_back<sf::Vector2<unsigned int>, unsigned char *>' requested here
+  122 |         frames.emplace_back(sf::Vector2u(static_cast<unsigned>(w),
+      |                ^
+/Users/macos/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/__memory/construct_at.h:47:46: note: candidate template ignored: substitution failure [with _Tp = sf::Image, _Args = <sf::Vector2<unsigned int>, unsigned char *>]: no matching constructor for initialization of 'sf::Image'
+   46 | template <class _Tp, class... _Args, class = decltype(::new(std::declval<void*>()) _Tp(std::declval<_Args>()...))>
+      |                                                                                    ~~~
+   47 | _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR _Tp* __construct_at(_Tp* __location, _Args&&... __args) {
+      |                                              ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:173:17: error: no matching constructor for initialization of 'sf::Texture'
+  173 |     sf::Texture tex(frames[0].getSize());
+      |                 ^   ~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Texture.hpp:76:5: note: candidate constructor not viable: no known conversion from 'Vector2u' (aka 'Vector2<unsigned int>') to 'const Texture' for 1st argument
+   76 |     Texture(const Texture& rhs);
+      |     ^       ~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Texture.hpp:88:5: note: candidate constructor not viable: no known conversion from 'Vector2u' (aka 'Vector2<unsigned int>') to 'Texture' for 1st argument
+   88 |     Texture(Texture&&) noexcept;
+      |     ^       ~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Texture.hpp:499:19: note: candidate constructor not viable: requires 4 arguments, but 1 was provided
+  499 |     [[nodiscard]] Texture(base::PassKey<Texture>&&, Vector2u size, unsigned int texture, bool sRgb);
+      |                   ^       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:175:24: error: no viable conversion from 'sf::Texture' to 'TransformableMixin<Sprite>'
+  175 |     sf::Sprite  sprite(tex);
+      |                        ^~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/TransformableMixin.hpp:45:26: note: candidate constructor (the implicit copy constructor) not viable: no known conversion from 'sf::Texture' to 'const TransformableMixin<Sprite> &' for 1st argument
+   45 | struct SFML_GRAPHICS_API TransformableMixin : TransformableMixinBase
+      |                          ^~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/TransformableMixin.hpp:45:26: note: candidate constructor (the implicit move constructor) not viable: no known conversion from 'sf::Texture' to 'TransformableMixin<Sprite> &&' for 1st argument
+   45 | struct SFML_GRAPHICS_API TransformableMixin : TransformableMixinBase
+      |                          ^~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:182:12: error: no member named 'setScale' in 'sf::Sprite'
+  182 |     sprite.setScale(sf::Vector2f(scale, scale));
+      |     ~~~~~~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:183:12: error: no member named 'setPosition' in 'sf::Sprite'
+  183 |     sprite.setPosition(sf::Vector2f(offX, offY));
+      |     ~~~~~~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:193:24: error: no matching constructor for initialization of 'sf::RectangleShape'
+  193 |     sf::RectangleShape barBgRect(sf::Vector2f(barW - barH, barH));
+      |                        ^         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RectangleShape.hpp:23:25: note: candidate constructor (the implicit copy constructor) not viable: no known conversion from 'sf::Vector2f' (aka 'Vector2<float>') to 'const RectangleShape' for 1st argument
+   23 | class SFML_GRAPHICS_API RectangleShape : public Shape
+      |                         ^~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RectangleShape.hpp:23:25: note: candidate constructor (the implicit move constructor) not viable: no known conversion from 'sf::Vector2f' (aka 'Vector2<float>') to 'RectangleShape' for 1st argument
+   23 | class SFML_GRAPHICS_API RectangleShape : public Shape
+      |                         ^~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RectangleShape.hpp:38:28: note: candidate constructor not viable: no known conversion from 'sf::Vector2f' (aka 'Vector2<float>') to 'const Settings' (aka 'const sf::RectangleShapeData') for 1st argument
+   38 |     [[nodiscard]] explicit RectangleShape(const Settings& settings);
+      |                            ^              ~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:195:15: error: no member named 'setPosition' in 'sf::RectangleShape'
+  195 |     barBgRect.setPosition(sf::Vector2f(barX + radius, barY));
+      |     ~~~~~~~~~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:197:21: error: no matching constructor for initialization of 'sf::CircleShape'
+  197 |     sf::CircleShape barBgCapL(radius), barBgCapR(radius);
+      |                     ^         ~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/CircleShape.hpp:24:25: note: candidate constructor (the implicit copy constructor) not viable: no known conversion from 'const float' to 'const CircleShape' for 1st argument
+   24 | class SFML_GRAPHICS_API CircleShape : public Shape
+      |                         ^~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/CircleShape.hpp:24:25: note: candidate constructor (the implicit move constructor) not viable: no known conversion from 'const float' to 'CircleShape' for 1st argument
+   24 | class SFML_GRAPHICS_API CircleShape : public Shape
+      |                         ^~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/CircleShape.hpp:39:28: note: candidate constructor not viable: no known conversion from 'const float' to 'const Settings' (aka 'const sf::CircleShapeData') for 1st argument
+   39 |     [[nodiscard]] explicit CircleShape(const Settings& settings);
+      |                            ^           ~~~~~~~~~~~~~~~~~~~~~~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+2 warnings and 20 errors generated.
+[410/414] Building CXX object CMake...tetris.dir/src/gameConsole/app.cpp.o
+FAILED: [code=1] CMakeFiles/ctetris.dir/src/gameConsole/app.cpp.o 
+/Users/macos/emsdk/upstream/emscripten/em++ -DSFML_ENABLE_LIFETIME_TRACKING -DSFML_ENABLE_STACK_TRACES -DSFML_OPENGL_ES -DSFML_STATIC -I/Users/macos/Desktop/projects/ctetris-2/app/src/shared/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/include -I/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include -O3 -DNDEBUG -std=gnu++20 -MD -MT CMakeFiles/ctetris.dir/src/gameConsole/app.cpp.o -MF CMakeFiles/ctetris.dir/src/gameConsole/app.cpp.o.d -o CMakeFiles/ctetris.dir/src/gameConsole/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:14:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/src/shared/include/SFML/Graphics.hpp:14:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RenderWindow.hpp:13:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/Window.hpp:9:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/WindowBase.hpp:10:
+In file included from /Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Window/Event.hpp:15:
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Base/Variant.hpp:483:32: warning: unknown warning group '-Wmaybe-uninitialized', ignored [-Wunknown-warning-option]
+  483 | #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+      |                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Base/Variant.hpp:511:32: warning: unknown warning group '-Wmaybe-uninitialized', ignored [-Wunknown-warning-option]
+  511 | #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+      |                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:77:43: error: reference to incomplete type 'const Path' could not bind to an lvalue of type 'const char *'
+   77 |         auto opt = sf::Font::openFromFile(p);
+      |                                           ^
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Font.hpp:99:72: note: passing argument to parameter 'filename' here
+   99 |     [[nodiscard]] static base::Optional<Font> openFromFile(const Path& filename, TextureAtlas* textureAtlas = nullptr);
+      |                                                                        ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:119:80: error: no viable conversion from 'const std::vector<sf::SoundChannel>' to 'const ChannelMap'
+  119 |     return buf.loadFromSamples(s.data(), static_cast<std::uint64_t>(n), 2, sr, chMap);
+      |                                                                                ^~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Audio/ChannelMap.hpp:23:22: note: candidate constructor (the implicit copy constructor) not viable: no known conversion from 'const std::vector<sf::SoundChannel>' to 'const ChannelMap &' for 1st argument
+   23 | class SFML_AUDIO_API ChannelMap
+      |                      ^~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Audio/ChannelMap.hpp:23:22: note: candidate constructor (the implicit move constructor) not viable: no known conversion from 'const std::vector<sf::SoundChannel>' to 'ChannelMap &&' for 1st argument
+   23 | class SFML_AUDIO_API ChannelMap
+      |                      ^~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Audio/ChannelMap.hpp:36:5: note: candidate constructor not viable: no known conversion from 'const std::vector<sf::SoundChannel>' to 'std::initializer_list<SoundChannel>' for 1st argument
+   36 |     ChannelMap(std::initializer_list<SoundChannel> channels);
+      |     ^          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Audio/SoundBuffer.hpp:124:27: note: passing argument to parameter 'channelMap' here
+  124 |         const ChannelMap& channelMap);
+      |                           ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:144:15: error: no matching constructor for initialization of 'sf::Image'
+  144 |     sf::Image img(sf::Vector2u(W, H), px.data());
+      |               ^   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Image.hpp:31:25: note: candidate constructor (the implicit copy constructor) not viable: requires 1 argument, but 2 were provided
+   31 | class SFML_GRAPHICS_API Image
+      |                         ^~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Image.hpp:31:25: note: candidate constructor (the implicit move constructor) not viable: requires 1 argument, but 2 were provided
+   31 | class SFML_GRAPHICS_API Image
+      |                         ^~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Image.hpp:241:28: note: candidate constructor not viable: requires 3 arguments, but 2 were provided
+  241 |     [[nodiscard]] explicit Image(base::PassKey<Image>&&, Vector2u size, base::SizeT pixelCount);
+      |                            ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Image.hpp:242:28: note: candidate constructor not viable: requires 4 arguments, but 2 were provided
+  242 |     [[nodiscard]] explicit Image(base::PassKey<Image>&&, Vector2u size, const base::U8* itBegin, const base::U8* itEnd);
+      |                            ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:145:17: error: no matching constructor for initialization of 'sf::Texture'
+  145 |     sf::Texture tex(sf::Vector2u(W, H));
+      |                 ^   ~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Texture.hpp:76:5: note: candidate constructor not viable: no known conversion from 'sf::Vector2u' (aka 'Vector2<unsigned int>') to 'const Texture' for 1st argument
+   76 |     Texture(const Texture& rhs);
+      |     ^       ~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Texture.hpp:88:5: note: candidate constructor not viable: no known conversion from 'sf::Vector2u' (aka 'Vector2<unsigned int>') to 'Texture' for 1st argument
+   88 |     Texture(Texture&&) noexcept;
+      |     ^       ~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Texture.hpp:499:19: note: candidate constructor not viable: requires 4 arguments, but 1 was provided
+  499 |     [[nodiscard]] Texture(base::PassKey<Texture>&&, Vector2u size, unsigned int texture, bool sRgb);
+      |                   ^       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:153:7: error: no member named 'setOrigin' in 'sf::Text'
+  153 |     t.setOrigin({b.position.x + b.size.x/2.f, b.position.y + b.size.y/2.f});
+      |     ~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:154:7: error: no member named 'setPosition' in 'sf::Text'
+  154 |     t.setPosition(pos);
+      |     ~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:161:24: error: no matching constructor for initialization of 'sf::RectangleShape'
+  161 |     sf::RectangleShape sh(btn.bounds.size);
+      |                        ^  ~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RectangleShape.hpp:23:25: note: candidate constructor (the implicit copy constructor) not viable: no known conversion from 'const Vector2<float>' to 'const RectangleShape' for 1st argument
+   23 | class SFML_GRAPHICS_API RectangleShape : public Shape
+      |                         ^~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RectangleShape.hpp:23:25: note: candidate constructor (the implicit move constructor) not viable: no known conversion from 'const Vector2<float>' to 'RectangleShape' for 1st argument
+   23 | class SFML_GRAPHICS_API RectangleShape : public Shape
+      |                         ^~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/RectangleShape.hpp:38:28: note: candidate constructor not viable: no known conversion from 'const Vector2<float>' to 'const Settings' (aka 'const sf::RectangleShapeData') for 1st argument
+   38 |     [[nodiscard]] explicit RectangleShape(const Settings& settings);
+      |                            ^              ~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:162:8: error: no member named 'setPosition' in 'sf::RectangleShape'
+  162 |     sh.setPosition(btn.bounds.position);
+      |     ~~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:167:14: error: no matching constructor for initialization of 'sf::Text'
+  167 |     sf::Text lbl(font, btn.label, static_cast<unsigned>(28.f*scale));
+      |              ^   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:73:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   73 |     [[nodiscard]] Text(const Font& font, const Settings& settings);
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:79:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   79 |     [[nodiscard]] Text(const Font&& font, const Settings& settings) = delete;
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:91:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+   91 |     Text(const Text&);
+      |     ^    ~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:103:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+  103 |     Text(Text&&) noexcept;
+      |     ^    ~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:196:11: error: no member named 'setPosition' in 'sf::RectangleShape'
+  196 |     panel.setPosition({px,py});
+      |     ~~~~~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:201:14: error: no matching constructor for initialization of 'sf::Text'
+  201 |     sf::Text title(font, "GUIDE", static_cast<unsigned>(36.f*scale));
+      |              ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:73:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   73 |     [[nodiscard]] Text(const Font& font, const Settings& settings);
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:79:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   79 |     [[nodiscard]] Text(const Font&& font, const Settings& settings) = delete;
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:91:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+   91 |     Text(const Text&);
+      |     ^    ~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:103:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+  103 |     Text(Text&&) noexcept;
+      |     ^    ~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:212:18: error: no matching constructor for initialization of 'sf::Text'
+  212 |         sf::Text t(font, ln, static_cast<unsigned>(24.f*scale));
+      |                  ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:73:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   73 |     [[nodiscard]] Text(const Font& font, const Settings& settings);
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:79:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   79 |     [[nodiscard]] Text(const Font&& font, const Settings& settings) = delete;
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:91:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+   91 |     Text(const Text&);
+      |     ^    ~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:103:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+  103 |     Text(Text&&) noexcept;
+      |     ^    ~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:214:11: error: no member named 'setPosition' in 'sf::Text'
+  214 |         t.setPosition({px+40.f*scale, ly});
+      |         ~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:229:11: error: no member named 'setPosition' in 'sf::RectangleShape'
+  229 |     panel.setPosition({px,py});
+      |     ~~~~~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:234:14: error: no matching constructor for initialization of 'sf::Text'
+  234 |     sf::Text title(font, "BOARD", static_cast<unsigned>(36.f*scale));
+      |              ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:73:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   73 |     [[nodiscard]] Text(const Font& font, const Settings& settings);
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:79:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   79 |     [[nodiscard]] Text(const Font&& font, const Settings& settings) = delete;
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:91:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+   91 |     Text(const Text&);
+      |     ^    ~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:103:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+  103 |     Text(Text&&) noexcept;
+      |     ^    ~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:237:14: error: no matching constructor for initialization of 'sf::Text'
+  237 |     sf::Text hint(font, "Scroll: mouse wheel / Up Down keys",
+      |              ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  238 |                   static_cast<unsigned>(18.f*scale));
+      |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:73:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   73 |     [[nodiscard]] Text(const Font& font, const Settings& settings);
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:79:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   79 |     [[nodiscard]] Text(const Font&& font, const Settings& settings) = delete;
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:91:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+   91 |     Text(const Text&);
+      |     ^    ~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:103:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+  103 |     Text(Text&&) noexcept;
+      |     ^    ~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:240:10: error: no member named 'setPosition' in 'sf::Text'
+  240 |     hint.setPosition({px+34.f*scale, py+82.f*scale});
+      |     ~~~~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:250:12: error: no member named 'setPosition' in 'sf::RectangleShape'
+  250 |         rs.setPosition({lp,rowY});
+      |         ~~ ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:257:22: error: no matching constructor for initialization of 'sf::Text'
+  257 |             sf::Text t(font, s, sz); return t; };
+      |                      ^ ~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:73:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   73 |     [[nodiscard]] Text(const Font& font, const Settings& settings);
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:79:19: note: candidate constructor not viable: requires 2 arguments, but 3 were provided
+   79 |     [[nodiscard]] Text(const Font&& font, const Settings& settings) = delete;
+      |                   ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:91:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+   91 |     Text(const Text&);
+      |     ^    ~~~~~~~~~~~
+/Users/macos/Desktop/projects/ctetris-2/app/libs/VRSFML/include/SFML/Graphics/Text.hpp:103:5: note: candidate constructor not viable: requires 1 argument, but 3 were provided
+  103 |     Text(Text&&) noexcept;
+      |     ^    ~~~~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+2 warnings and 20 errors generated.
+[411/414] Building CXX object _deps.../sfml-audio.dir/MiniaudioUnity.cpp.o
+ninja: build stopped: subcommand failed.
