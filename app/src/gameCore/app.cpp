@@ -3,6 +3,7 @@
 #include "gameCore_layout.h"
 #include <SDL3/SDL.h>
 #include <cstdlib>
+#include <ctime>
 
 // Bang mau theo colorID (1..6); index 0 la o trong
 const SDL_Color COLORS[] = {
@@ -16,21 +17,33 @@ const SDL_Color COLORS[] = {
 };
 
 // gamecore-tao-cac-khoi-xep-hinh-LITZO-01
-// Hinh L co ban (v1 chi 1 shape, v2 mo rong I/T/Z/O)
-const Point SHAPE_L[4] = {{0,0}, {0,1}, {0,2}, {1,2}};
+// Dinh nghia 6 shape co ban cua Tetris (L, I, T, S, Z, O)
+// Toa do trong he local cua piece, cac offset duoc cong vao (t.x, t.y)
+const Point SHAPE_L[4] = {{0,0}, {0,1}, {0,2}, {1,2}}; // L
+const Point SHAPE_I[4] = {{0,0}, {1,0}, {2,0}, {3,0}}; // I
+const Point SHAPE_T[4] = {{0,0}, {1,0}, {2,0}, {1,1}}; // T
+const Point SHAPE_S[4] = {{1,0}, {2,0}, {0,1}, {1,1}}; // S (Z trai)
+const Point SHAPE_Z[4] = {{0,0}, {1,0}, {1,1}, {2,1}}; // Z (Z phai)
+const Point SHAPE_O[4] = {{0,0}, {1,0}, {0,1}, {1,1}}; // O
+
+// Pool de random pick 1 shape moi khi spawn
+const Point* const SHAPES[] = { SHAPE_L, SHAPE_I, SHAPE_T, SHAPE_S, SHAPE_Z, SHAPE_O };
+const int NUM_SHAPES = (int)(sizeof(SHAPES) / sizeof(SHAPES[0]));
 
 // gamecore-do-mau-02
-// Sinh khoi moi voi mau ngau nhien (1..6)
+// Sinh khoi moi: random shape (1/6) + random mau (1..6)
 Tetromino spawnBlock() {
     Tetromino t;
-    for (int i = 0; i < 4; i++) t.blocks[i] = SHAPE_L[i];
-    t.colorID = rand() % 6 + 1;
+    int idx = std::rand() % NUM_SHAPES;
+    for (int i = 0; i < 4; i++) t.blocks[i] = SHAPES[idx][i];
+    t.colorID = std::rand() % 6 + 1;
     t.x = BOARD_COLS / 2 - 1;
     t.y = 0;
     return t;
 }
 
 // Kiem tra va cham voi tuong / san / khoi da co
+// Cho phep ny < 0 (piece dang spawn phia tren ban) - khong tinh la va cham
 bool checkCollision(const GameState& state, const Tetromino& t) {
     for (int i = 0; i < 4; i++) {
         int nx = t.x + t.blocks[i].x;
@@ -41,8 +54,35 @@ bool checkCollision(const GameState& state, const Tetromino& t) {
     return false;
 }
 
+// Helper xoay piece quanh pivot (1,1) - hop voi shape 3x3 va O
+// clockwise = true  -> xoay theo chieu kim dong ho 90 do
+// clockwise = false -> xoay nguoc chieu kim dong ho 90 do
+// Cong thuc trong screen coords (y huong xuong):
+//   CW : (x, y) -> (-y,  x)
+//   CCW: (x, y) -> ( y, -x)
+Tetromino rotated(const Tetromino& t, bool clockwise) {
+    Tetromino r = t;
+    const int px = 1, py = 1;
+    for (int i = 0; i < 4; i++) {
+        int relX = t.blocks[i].x - px;
+        int relY = t.blocks[i].y - py;
+        if (clockwise) {
+            r.blocks[i].x = -relY + px;
+            r.blocks[i].y =  relX + py;
+        } else {
+            r.blocks[i].x =  relY + px;
+            r.blocks[i].y = -relX + py;
+        }
+    }
+    return r;
+}
+
 // gamecore-xu-ly-phim-04
-// Xu ly phim mui ten + WASD (chua co rotation o v1)
+// Mapping theo yeu cau user:
+//   LEFT  / A : sang trai
+//   RIGHT / D : sang phai
+//   UP    / W : xoay nguoc chieu kim dong ho (CCW)
+//   DOWN  / S : xoay theo chieu kim dong ho  (CW)
 void handleInput(GameState& state, SDL_Event& event) {
     if (event.type == SDL_EVENT_KEY_DOWN) {
         Tetromino nextT = state.currentBlock;
@@ -51,9 +91,13 @@ void handleInput(GameState& state, SDL_Event& event) {
             case SDLK_A: nextT.x -= 1; break;
             case SDLK_RIGHT:
             case SDLK_D: nextT.x += 1; break;
+            case SDLK_UP:
+            case SDLK_W: nextT = rotated(state.currentBlock, false); break; // CCW
             case SDLK_DOWN:
-            case SDLK_S: nextT.y += 1; break;
+            case SDLK_S: nextT = rotated(state.currentBlock, true);  break; // CW
+            default: return;
         }
+        // Chi commit neu khong va cham; neu va cham thi bo qua (khong wall-kick o v1)
         if (!checkCollision(state, nextT)) state.currentBlock = nextT;
     }
 }
@@ -86,7 +130,9 @@ void lockBlock(GameState& state) {
     for (int i = 0; i < 4; i++) {
         int nx = state.currentBlock.x + state.currentBlock.blocks[i].x;
         int ny = state.currentBlock.y + state.currentBlock.blocks[i].y;
-        if (ny >= 0) state.board[ny][nx] = state.currentBlock.colorID;
+        if (ny >= 0 && ny < BOARD_ROWS && nx >= 0 && nx < BOARD_COLS) {
+            state.board[ny][nx] = state.currentBlock.colorID;
+        }
     }
     clearLines(state);
     state.currentBlock = spawnBlock();
@@ -131,6 +177,9 @@ void renderGame(SDL_Renderer* renderer, const GameState& state) {
 // Vong lap chinh: tu dong roi moi 500ms
 int runGameCore(SDL_Window* window, SDL_Renderer* renderer) {
     (void)window;
+    // Seed RNG mot lan duy nhat de moi run ra dau khac nhau
+    std::srand((unsigned)std::time(nullptr));
+
     GameState state;
     state.currentBlock = spawnBlock();
     SDL_Event event;
