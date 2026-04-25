@@ -1,5 +1,4 @@
 #pragma once
 // gameconsole-tao-giao-dien-169-00
-// Khung hinh chuan ty le 9:16 cho gameConsole
-const int CONSOLE_SCREEN_WIDTH = 360;
-const int CONSOLE_SCREEN_HEIGHT = 960;
+const int CONSOLE_SCREEN_WIDTH  = 270;
+const int CONSOLE_SCREEN_HEIGHT = 480;

@@ -35,6 +35,11 @@
         + Phím right arrow và phím up arrow để dịch chuyển focus lùi giữa các nút. Nếu kết hợp phím shift và phím tab thì cũng dịch chuyển lùi.
         + Phím enter hoặc phím space để kích hoạt nút đang được focus.
         + Phím esc để đóng lightbox guide/board (thay vì chỉ click nút close); khi ở màn hình chính nhảy focus về nút quit.
+        + Phím W hoạt động như phím arrow up (dịch chuyển focus lùi).
+        + Phím S hoạt động như phím arrow down (dịch chuyển focus tiến).
+        + Phím A hoạt động như phím arrow left (dịch chuyển focus tiến).
+        + Phím D hoạt động như phím arrow right (dịch chuyển focus lùi).
+        + Trong lightbox board, các phím W/S đồng thời cũng dùng để scroll danh sách như UP/DOWN.
     - Bổ sung nút quit để thoát toàn bộ chương trình từ màn hình game console.
     - Trạng thái nút đang focus phải được hiển thị rõ ràng (ví dụ khung viền vàng) để người chơi nhận biết.
 [x] Task 1.7: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
