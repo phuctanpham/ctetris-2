@@ -1,0 +1,360 @@
+macos@phucpt app % bash build.sh 
+=================================================
+  ctetris — Build Script (SDL3 Native)
+=================================================
+Cài đặt dependencies cho macOS (SDL3)...
+==> Auto-updating Homebrew...
+Adjust how often this is run with `$HOMEBREW_AUTO_UPDATE_SECS` or disable with
+`$HOMEBREW_NO_AUTO_UPDATE=1`. Hide these hints with `$HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+==> Auto-updated Homebrew!
+==> Updated Homebrew from 2b60713f40 to e1f10b5de3.
+No changes to formulae or casks.
+
+Warning: cmake 4.3.2 is already installed and up-to-date.
+To reinstall 4.3.2, run:
+  brew reinstall cmake
+Warning: ninja 1.13.2 is already installed and up-to-date.
+To reinstall 1.13.2, run:
+  brew reinstall ninja
+Warning: You are using macOS 11.
+We (and Apple) do not provide support for this old version.
+You may have better luck with MacPorts which supports older versions of macOS:
+  https://www.macports.org
+
+This is a Tier 3 configuration:
+  https://docs.brew.sh/Support-Tiers#tier-3
+You can report issues with Tier 3 configurations to Homebrew/* repositories!
+Read the above document before opening any issues or PRs.
+
+==> Fetching downloads for: sdl3
+✔︎ API Source sdl3.rb                           Verified      2.3KB/  2.3KB
+✔︎ Formula sdl3 (3.4.4)                         Verified     15.6MB/ 15.6MB
+Warning: A newer Command Line Tools release is available.
+Update them from Software Update in System Preferences.
+
+If that doesn't show you any updates, run:
+  sudo rm -rf /Library/Developer/CommandLineTools
+  sudo xcode-select --install
+
+Alternatively, manually download them from:
+  https://developer.apple.com/download/all/.
+You should download the Command Line Tools for Xcode 13.2.1.
+
+
+
+This is a Tier 2 configuration:
+  https://docs.brew.sh/Support-Tiers#tier-2
+You can report issues with Tier 2 configurations to Homebrew/* repositories!
+Read the above document before opening any issues or PRs.
+
+==> cmake -S . -B build -DSDL_HIDAPI=ON -DSDL_WAYLAND=OFF -DSDL_X11_XTEST=
+==> cmake --build build
+==> cmake --install build
+🍺  /usr/local/Cellar/sdl3/3.4.4: 103 files, 6.3MB, built in 2 minutes 23 seconds
+==> Running `brew cleanup sdl3`...
+Disable this behaviour by setting `HOMEBREW_NO_INSTALL_CLEANUP=1`.
+Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+Tiến hành cấu hình CMake...
+-- The CXX compiler identification is AppleClang 13.0.0.13000029
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (3.0s)
+CMake Error at CMakeLists.txt:13 (add_executable):
+  Cannot find source file:
+
+    app/src/gameStory/app.cpp
+
+  Tried extensions .c .C .c++ .cc .cpp .cxx .cu .mpp .m .M .mm .ixx .cppm
+  .ccm .cxxm .c++m .h .hh .h++ .hm .hpp .hxx .in .txx .f .F .for .f77 .f90
+  .f95 .f03 .hip .ispc
+
+
+CMake Error at CMakeLists.txt:19 (add_executable):
+  Cannot find source file:
+
+    app/src/gameConsole/app.cpp
+
+  Tried extensions .c .C .c++ .cc .cpp .cxx .cu .mpp .m .M .mm .ixx .cppm
+  .ccm .cxxm .c++m .h .hh .h++ .hm .hpp .hxx .in .txx .f .F .for .f77 .f90
+  .f95 .f03 .hip .ispc
+
+
+CMake Error at CMakeLists.txt:25 (add_executable):
+  Cannot find source file:
+
+    app/src/gameCore/app.cpp
+
+  Tried extensions .c .C .c++ .cc .cpp .cxx .cu .mpp .m .M .mm .ixx .cppm
+  .ccm .cxxm .c++m .h .hh .h++ .hm .hpp .hxx .in .txx .f .F .for .f77 .f90
+  .f95 .f03 .hip .ispc
+
+
+CMake Error at CMakeLists.txt:31 (add_executable):
+  Cannot find source file:
+
+    app/main.cpp
+
+  Tried extensions .c .C .c++ .cc .cpp .cxx .cu .mpp .m .M .mm .ixx .cppm
+  .ccm .cxxm .c++m .h .hh .h++ .hm .hpp .hxx .in .txx .f .F .for .f77 .f90
+  .f95 .f03 .hip .ispc
+
+
+CMake Error at CMakeLists.txt:13 (add_executable):
+  No SOURCES given to target: gameStory
+
+
+CMake Error at CMakeLists.txt:19 (add_executable):
+  No SOURCES given to target: gameConsole
+
+
+CMake Error at CMakeLists.txt:25 (add_executable):
+  No SOURCES given to target: gameCore
+
+
+CMake Error at CMakeLists.txt:31 (add_executable):
+  No SOURCES given to target: ctetris
+
+
+CMake Generate step failed.  Build files cannot be regenerated correctly.
+macos@phucpt app % ls
+CMakeLists.txt  build           build.sh        src
+appTree.md      build.ps1       main.cpp
+macos@phucpt app % rm -rf build
+macos@phucpt app % bash build.sh
+=================================================
+  ctetris — Build Script (SDL3 Native)
+=================================================
+Cài đặt dependencies cho macOS (SDL3)...
+Warning: cmake 4.3.2 is already installed and up-to-date.
+To reinstall 4.3.2, run:
+  brew reinstall cmake
+Warning: ninja 1.13.2 is already installed and up-to-date.
+To reinstall 1.13.2, run:
+  brew reinstall ninja
+Warning: sdl3 3.4.4 is already installed and up-to-date.
+To reinstall 3.4.4, run:
+  brew reinstall sdl3
+Tiến hành cấu hình CMake...
+-- The CXX compiler identification is AppleClang 13.0.0.13000029
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.6s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/macos/Desktop/projects/ctetris-2/app/build
+Tiến hành biên dịch bằng Ninja...
+[1/11] Building CXX object CMakeFil...ameStory.dir/src/gameStory/app.cpp.o
+FAILED: [code=1] CMakeFiles/gameStory.dir/src/gameStory/app.cpp.o 
+/usr/bin/c++ -DBUILD_STANDALONE -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include -std=gnu++17 -MD -MT CMakeFiles/gameStory.dir/src/gameStory/app.cpp.o -MF CMakeFiles/gameStory.dir/src/gameStory/app.cpp.o.d -o CMakeFiles/gameStory.dir/src/gameStory/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:43:17: error: use of undeclared identifier 'exit'
+                exit(0);
+                ^
+1 error generated.
+[2/11] Building CXX object CMakeFiles/ctetris.dir/src/gameStory/app.cpp.o
+FAILED: [code=1] CMakeFiles/ctetris.dir/src/gameStory/app.cpp.o 
+/usr/bin/c++  -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/include -std=gnu++17 -MD -MT CMakeFiles/ctetris.dir/src/gameStory/app.cpp.o -MF CMakeFiles/ctetris.dir/src/gameStory/app.cpp.o.d -o CMakeFiles/ctetris.dir/src/gameStory/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/app.cpp:43:17: error: use of undeclared identifier 'exit'
+                exit(0);
+                ^
+1 error generated.
+[3/11] Building CXX object CMakeFil...onsole.dir/src/gameConsole/app.cpp.o
+FAILED: [code=1] CMakeFiles/gameConsole.dir/src/gameConsole/app.cpp.o 
+/usr/bin/c++ -DBUILD_STANDALONE -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/include -std=gnu++17 -MD -MT CMakeFiles/gameConsole.dir/src/gameConsole/app.cpp.o -MF CMakeFiles/gameConsole.dir/src/gameConsole/app.cpp.o.d -o CMakeFiles/gameConsole.dir/src/gameConsole/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:72:17: error: use of undeclared identifier 'exit'
+                exit(0);
+                ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:74:31: error: use of undeclared identifier 'SDL_EVENT_MOUSE_BUTTONDOWN'; did you mean 'SDL_EVENT_MOUSE_BUTTON_DOWN'?
+            if (event.type == SDL_EVENT_MOUSE_BUTTONDOWN) {
+                              ^~~~~~~~~~~~~~~~~~~~~~~~~~
+                              SDL_EVENT_MOUSE_BUTTON_DOWN
+/usr/local/include/SDL3/SDL_events.h:184:5: note: 'SDL_EVENT_MOUSE_BUTTON_DOWN' declared here
+    SDL_EVENT_MOUSE_BUTTON_DOWN,       /**< Mouse button pressed */
+    ^
+2 errors generated.
+[4/11] Building CXX object CMakeFil...tetris.dir/src/gameConsole/app.cpp.o
+FAILED: [code=1] CMakeFiles/ctetris.dir/src/gameConsole/app.cpp.o 
+/usr/bin/c++  -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/include -std=gnu++17 -MD -MT CMakeFiles/ctetris.dir/src/gameConsole/app.cpp.o -MF CMakeFiles/ctetris.dir/src/gameConsole/app.cpp.o.d -o CMakeFiles/ctetris.dir/src/gameConsole/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:25:31: error: use of undeclared identifier 'CONSOLE_SCREEN_WIDTH'; did you mean 'STORY_SCREEN_WIDTH'?
+    SDL_FRect screen = {0, 0, CONSOLE_SCREEN_WIDTH, CONSOLE_SCREEN_HEIGHT};
+                              ^~~~~~~~~~~~~~~~~~~~
+                              STORY_SCREEN_WIDTH
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include/layout.h:4:11: note: 'STORY_SCREEN_WIDTH' declared here
+const int STORY_SCREEN_WIDTH = 540;
+          ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:25:53: error: use of undeclared identifier 'CONSOLE_SCREEN_HEIGHT'; did you mean 'STORY_SCREEN_HEIGHT'?
+    SDL_FRect screen = {0, 0, CONSOLE_SCREEN_WIDTH, CONSOLE_SCREEN_HEIGHT};
+                                                    ^~~~~~~~~~~~~~~~~~~~~
+                                                    STORY_SCREEN_HEIGHT
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include/layout.h:5:11: note: 'STORY_SCREEN_HEIGHT' declared here
+const int STORY_SCREEN_HEIGHT = 960;
+          ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:44:31: error: use of undeclared identifier 'CONSOLE_SCREEN_WIDTH'; did you mean 'STORY_SCREEN_WIDTH'?
+    SDL_FRect screen = {0, 0, CONSOLE_SCREEN_WIDTH, CONSOLE_SCREEN_HEIGHT};
+                              ^~~~~~~~~~~~~~~~~~~~
+                              STORY_SCREEN_WIDTH
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include/layout.h:4:11: note: 'STORY_SCREEN_WIDTH' declared here
+const int STORY_SCREEN_WIDTH = 540;
+          ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:44:53: error: use of undeclared identifier 'CONSOLE_SCREEN_HEIGHT'; did you mean 'STORY_SCREEN_HEIGHT'?
+    SDL_FRect screen = {0, 0, CONSOLE_SCREEN_WIDTH, CONSOLE_SCREEN_HEIGHT};
+                                                    ^~~~~~~~~~~~~~~~~~~~~
+                                                    STORY_SCREEN_HEIGHT
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include/layout.h:5:11: note: 'STORY_SCREEN_HEIGHT' declared here
+const int STORY_SCREEN_HEIGHT = 960;
+          ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:72:17: error: use of undeclared identifier 'exit'
+                exit(0);
+                ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/app.cpp:74:31: error: use of undeclared identifier 'SDL_EVENT_MOUSE_BUTTONDOWN'; did you mean 'SDL_EVENT_MOUSE_BUTTON_DOWN'?
+            if (event.type == SDL_EVENT_MOUSE_BUTTONDOWN) {
+                              ^~~~~~~~~~~~~~~~~~~~~~~~~~
+                              SDL_EVENT_MOUSE_BUTTON_DOWN
+/usr/local/include/SDL3/SDL_events.h:184:5: note: 'SDL_EVENT_MOUSE_BUTTON_DOWN' declared here
+    SDL_EVENT_MOUSE_BUTTON_DOWN,       /**< Mouse button pressed */
+    ^
+6 errors generated.
+[5/11] Building CXX object CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o
+FAILED: [code=1] CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o 
+/usr/bin/c++ -DBUILD_STANDALONE -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/include -std=gnu++17 -MD -MT CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o -MF CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o.d -o CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:94:23: error: use of undeclared identifier 'SDL_EVENT_KEYDOWN'; did you mean 'SDL_EVENT_KEY_DOWN'?
+    if (event.type == SDL_EVENT_KEYDOWN) {
+                      ^~~~~~~~~~~~~~~~~
+                      SDL_EVENT_KEY_DOWN
+/usr/local/include/SDL3/SDL_events.h:170:5: note: 'SDL_EVENT_KEY_DOWN' declared here
+    SDL_EVENT_KEY_DOWN        = 0x300, /**< Key pressed */
+    ^
+1 error generated.
+[6/11] Building CXX object CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o
+FAILED: [code=1] CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o 
+/usr/bin/c++  -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/include -std=gnu++17 -MD -MT CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o -MF CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o.d -o CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:17:15: error: use of undeclared identifier 'BOARD_ROWS'
+    int board[BOARD_ROWS][BOARD_COLS] = {0};
+              ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:17:27: error: use of undeclared identifier 'BOARD_COLS'
+    int board[BOARD_ROWS][BOARD_COLS] = {0};
+                          ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:45:11: error: use of undeclared identifier 'BOARD_COLS'
+    t.x = BOARD_COLS / 2 - 1; // Ở giữa
+          ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:54:29: error: use of undeclared identifier 'BOARD_COLS'
+        if (nx < 0 || nx >= BOARD_COLS || ny >= BOARD_ROWS) return true;
+                            ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:54:49: error: use of undeclared identifier 'BOARD_ROWS'
+        if (nx < 0 || nx >= BOARD_COLS || ny >= BOARD_ROWS) return true;
+                                                ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:64:18: error: use of undeclared identifier 'BOARD_ROWS'
+    for (int r = BOARD_ROWS - 1; r >= 0; r--) {
+                 ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:66:29: error: use of undeclared identifier 'BOARD_COLS'
+        for (int c = 0; c < BOARD_COLS; c++) {
+                            ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:72:37: error: use of undeclared identifier 'BOARD_COLS'
+                for (int x = 0; x < BOARD_COLS; x++) state.board[y][x] = state.board[y - 1][x];
+                                    ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:94:23: error: use of undeclared identifier 'SDL_EVENT_KEYDOWN'; did you mean 'SDL_EVENT_KEY_DOWN'?
+    if (event.type == SDL_EVENT_KEYDOWN) {
+                      ^~~~~~~~~~~~~~~~~
+                      SDL_EVENT_KEY_DOWN
+/usr/local/include/SDL3/SDL_events.h:170:5: note: 'SDL_EVENT_KEY_DOWN' declared here
+    SDL_EVENT_KEY_DOWN        = 0x300, /**< Key pressed */
+    ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:119:20: error: use of undeclared identifier 'CORE_SCREEN_WIDTH'; did you mean 'STORY_SCREEN_WIDTH'?
+    int offsetX = (CORE_SCREEN_WIDTH - BOARD_COLS * BLOCK_SIZE) / 2;
+                   ^~~~~~~~~~~~~~~~~
+                   STORY_SCREEN_WIDTH
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include/layout.h:4:11: note: 'STORY_SCREEN_WIDTH' declared here
+const int STORY_SCREEN_WIDTH = 540;
+          ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:119:40: error: use of undeclared identifier 'BOARD_COLS'
+    int offsetX = (CORE_SCREEN_WIDTH - BOARD_COLS * BLOCK_SIZE) / 2;
+                                       ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:119:53: error: use of undeclared identifier 'BLOCK_SIZE'
+    int offsetX = (CORE_SCREEN_WIDTH - BOARD_COLS * BLOCK_SIZE) / 2;
+                                                    ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:120:20: error: use of undeclared identifier 'CORE_SCREEN_HEIGHT'; did you mean 'STORY_SCREEN_HEIGHT'?
+    int offsetY = (CORE_SCREEN_HEIGHT - BOARD_ROWS * BLOCK_SIZE) / 2;
+                   ^~~~~~~~~~~~~~~~~~
+                   STORY_SCREEN_HEIGHT
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include/layout.h:5:11: note: 'STORY_SCREEN_HEIGHT' declared here
+const int STORY_SCREEN_HEIGHT = 960;
+          ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:120:41: error: use of undeclared identifier 'BOARD_ROWS'
+    int offsetY = (CORE_SCREEN_HEIGHT - BOARD_ROWS * BLOCK_SIZE) / 2;
+                                        ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:120:54: error: use of undeclared identifier 'BLOCK_SIZE'
+    int offsetY = (CORE_SCREEN_HEIGHT - BOARD_ROWS * BLOCK_SIZE) / 2;
+                                                     ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:123:25: error: use of undeclared identifier 'BOARD_ROWS'
+    for (int r = 0; r < BOARD_ROWS; r++) {
+                        ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:124:29: error: use of undeclared identifier 'BOARD_COLS'
+        for (int c = 0; c < BOARD_COLS; c++) {
+                            ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:128:58: error: use of undeclared identifier 'BLOCK_SIZE'
+                SDL_FRect rect = { (float)(offsetX + c * BLOCK_SIZE), (float)(offsetY + r * BLOCK_SIZE), (float)BLOCK_SIZE, (float)BLOCK_SIZE };
+                                                         ^
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:128:93: error: use of undeclared identifier 'BLOCK_SIZE'
+                SDL_FRect rect = { (float)(offsetX + c * BLOCK_SIZE), (float)(offsetY + r * BLOCK_SIZE), (float)BLOCK_SIZE, (float)BLOCK_SIZE };
+                                                                                            ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+[7/11] Building CXX object CMakeFiles/ctetris.dir/main.cpp.o
+/Users/macos/Desktop/projects/ctetris-2/app/main.cpp:13:51: warning: result of comparison of constant 0 with expression of type 'bool' is always false [-Wtautological-constant-compare]
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^ ~
+1 warning generated.
+ninja: build stopped: subcommand failed.
+macos@phucpt app % bash build.sh
+=================================================
+  ctetris — Build Script (SDL3 Native)
+=================================================
+Kiem tra va cai dat dependencies cho macOS (SDL3)...
+Tiến hành cấu hình CMake...
+-- The CXX compiler identification is AppleClang 13.0.0.13000029
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.6s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/macos/Desktop/projects/ctetris-2/app/build
+Tiến hành biên dịch bằng Ninja...
+[7/11] Building CXX object CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o
+FAILED: [code=1] CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o 
+/usr/bin/c++ -DBUILD_STANDALONE -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/include -std=gnu++17 -MD -MT CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o -MF CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o.d -o CMakeFiles/gameCore.dir/src/gameCore/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:2:10: fatal error: 'gameCore_layout.h' file not found
+#include "gameCore_layout.h"
+         ^~~~~~~~~~~~~~~~~~~
+1 error generated.
+[8/11] Building CXX object CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o
+FAILED: [code=1] CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o 
+/usr/bin/c++  -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameStory/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameConsole/include -I/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/include -std=gnu++17 -MD -MT CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o -MF CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o.d -o CMakeFiles/ctetris.dir/src/gameCore/app.cpp.o -c /Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp
+/Users/macos/Desktop/projects/ctetris-2/app/src/gameCore/app.cpp:2:10: fatal error: 'gameCore_layout.h' file not found
+#include "gameCore_layout.h"
+         ^~~~~~~~~~~~~~~~~~~
+1 error generated.
+[9/11] Building CXX object CMakeFiles/ctetris.dir/main.cpp.o
+ninja: build stopped: subcommand failed.
+macos@phucpt app % bash build.sh
+=================================================
+  ctetris — Build Script (SDL3)
+=================================================
+Ban muon build gi?
+  1) Toan bo chuong trinh tich hop (ctetris)
+  2) Rieng gameStory
+  3) Rieng gameConsole
+  4) Rieng gameCore
+Lua chon [1-4]: 1
+Chon nen tang build:
+  1) MacDinh (macOS/Ubuntu)
+  2) WebAssembly (WASM)
+Lua chon [1-2]: 2
+Dang chuan bi moi truong WASM (Yeu cau emscripten)...
+Chay emcmake ninja...
+build.sh: line 40: emcmake: command not found
