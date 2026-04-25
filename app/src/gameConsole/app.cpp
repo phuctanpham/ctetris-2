@@ -83,7 +83,7 @@ static const SDL_FRect BOARD_POPUP = { 10.0f, 60.0f, 250.0f, 380.0f };
 static const SDL_FRect BOARD_CLOSE = { BOARD_POPUP.x + BOARD_POPUP.w - 22.0f,
                                        BOARD_POPUP.y + 4.0f, 18.0f, 18.0f };
 
-// Noi dung guide tieng Anh (mo ta 7 component cua sidebar gameCore)
+// Noi dung guide tieng Anh - mo ta 12 component cua sidebar gameCore
 static const char* GUIDE_LINES[] = {
     "HOW TO PLAY",
     "",
@@ -92,25 +92,23 @@ static const char* GUIDE_LINES[] = {
     " - RIGHT / D : move right",
     " - UP    / W : rotate CCW",
     " - DOWN  / S : rotate CW",
-    " - SPACE     : soft drop x3",
+    " - SPACE     : speed boost x3",
     " - ENTER     : pause / resume",
     " - ESC       : open quit menu",
     "",
-    "Sidebar (right of board):",
-    " 1. QUIT  : open quit menu",
-    " 2. PAUSE : toggle stop/play",
-    " 3. SCORE : current points",
-    " 4. NEXT-1: upcoming piece",
-    " 5. NEXT-2: reserved (v2)",
-    " 6. NEXT-3: reserved (v3)",
-    " 7. KEYPAD: tap to control",
-    "",
-    "Keypad mapping:",
-    " - up cell    = arrow up / W",
-    " - down cell  = arrow down/S",
-    " - left cell  = arrow left/A",
-    " - right cell = arrow right/D",
-    " - center     = SPACE",
+    "Sidebar (12 components):",
+    "  1. QUIT  : open quit menu",
+    "  2. PAUSE : stop / play toggle",
+    "  3. SCORE : current points",
+    "  4. SPEED : drop speed level",
+    "  5. NEXT-1: upcoming piece",
+    "  6. NEXT-2: reserved (v2)",
+    "  7. NEXT-3: reserved (v3)",
+    "  8. ARROW UP    = key UP/W",
+    "  9. ARROW DOWN  = key DOWN/S",
+    " 10. ARROW LEFT  = key LEFT/A",
+    " 11. ARROW RIGHT = key RIGHT/D",
+    " 12. SPEED BOOST : hold = SPACE",
     "",
     "Quit popup options:",
     " - Restart : new game, score 0",
@@ -118,10 +116,13 @@ static const char* GUIDE_LINES[] = {
     " - Quit    : close app",
     " - Cancel  : keep paused",
     "",
-    "Press X or scroll for more.",
+    "Tip: hold SPEED BOOST to make",
+    "the piece drop 3x faster.",
+    "",
+    "Press X or ESC to close.",
 };
 static const int GUIDE_LINE_COUNT = (int)(sizeof(GUIDE_LINES)/sizeof(GUIDE_LINES[0]));
-static const int GUIDE_VISIBLE_LINES = 24; // so dong hien thi cung luc trong popup
+static const int GUIDE_VISIBLE_LINES = 24;
 
 static void drawBackground(SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 40, 44, 52, 255);
