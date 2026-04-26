@@ -6,6 +6,77 @@ echo "================================================="
 echo "  ctetris -- Build Script (SDL3)"
 echo "================================================="
 
+# --- Tu dong dam bao nanosvg headers (single-header lib cho gameStory) ---
+# Kiem tra app/src/gameStory/include co nanosvg.h va nanosvgrast.h chua;
+# neu thieu hoac file rong (download dang do truoc do) thi tai lai tu GitHub.
+ensure_nanosvg() {
+    INCLUDE_DIR="src/gameStory/include"
+    NANOSVG_BASE_URL="https://raw.githubusercontent.com/memononen/nanosvg/master/src"
+
+    mkdir -p "$INCLUDE_DIR"
+
+    # Kiem tra cong cu curl truoc khi tai
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "[LOI] Thieu cong cu 'curl' de tai nanosvg headers."
+        echo "      macOS: curl co san  |  Ubuntu: sudo apt-get install curl"
+        exit 1
+    fi
+
+    # Tai nanosvg.h neu thieu hoac rong
+    if [ ! -s "$INCLUDE_DIR/nanosvg.h" ]; then
+        echo "Thieu nanosvg.h -- dang tai ve $INCLUDE_DIR/ ..."
+        if ! curl -fsSL -o "$INCLUDE_DIR/nanosvg.h" "$NANOSVG_BASE_URL/nanosvg.h"; then
+            echo "[LOI] Khong tai duoc nanosvg.h. Kiem tra ket noi internet roi thu lai."
+            rm -f "$INCLUDE_DIR/nanosvg.h"
+            exit 1
+        fi
+    fi
+
+    # Tai nanosvgrast.h neu thieu hoac rong
+    if [ ! -s "$INCLUDE_DIR/nanosvgrast.h" ]; then
+        echo "Thieu nanosvgrast.h -- dang tai ve $INCLUDE_DIR/ ..."
+        if ! curl -fsSL -o "$INCLUDE_DIR/nanosvgrast.h" "$NANOSVG_BASE_URL/nanosvgrast.h"; then
+            echo "[LOI] Khong tai duoc nanosvgrast.h. Kiem tra ket noi internet roi thu lai."
+            rm -f "$INCLUDE_DIR/nanosvgrast.h"
+            exit 1
+        fi
+    fi
+}
+
+ensure_nanosvg
+
+# --- Tu dong sinh gameStory_logo_svg.h tu gameStory_logo.svg ---
+# Embed noi dung SVG vao raw string literal de plug-and-play (khong can
+# copy file SVG di kem .exe/.app). Chi regenerate khi .svg moi hon .h.
+generate_logo_header() {
+    SVG_FILE="src/gameStory/gameStory_logo.svg"
+    HEADER_FILE="src/gameStory/include/gameStory_logo_svg.h"
+
+    if [ ! -f "$SVG_FILE" ]; then
+        echo "[LOI] Khong tim thay $SVG_FILE"
+        exit 1
+    fi
+
+    # Skip neu header da ton tai va moi hon SVG (giong make dependency)
+    if [ -f "$HEADER_FILE" ] && [ "$HEADER_FILE" -nt "$SVG_FILE" ]; then
+        return 0
+    fi
+
+    echo "Sinh $HEADER_FILE tu $SVG_FILE ..."
+
+    # Dung delimiter SVG_RAW_LOGO de tranh trung lap voi noi dung file SVG
+    {
+        echo "#pragma once"
+        echo "// File nay duoc sinh tu dong tu gameStory_logo.svg boi build.sh"
+        echo "// KHONG sua tay -- moi thay doi se bi ghi de o lan build tiep theo."
+        echo "static const char* LOGO_SVG_DATA = R\"SVG_RAW_LOGO("
+        cat "$SVG_FILE"
+        echo ")SVG_RAW_LOGO\";"
+    } > "$HEADER_FILE"
+}
+
+generate_logo_header
+
 # --- Hoi target ---
 echo "Ban muon build gi?"
 echo "  1) Toan bo chuong trinh tich hop (ctetris)"
