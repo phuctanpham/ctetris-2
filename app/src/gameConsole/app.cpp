@@ -40,7 +40,7 @@ struct AppState {
     bool isRunning  = true;
     int  nextScene  = 0;
     int  boardScroll = 0;
-    int  guideScroll = 0;       // scroll cho guide vi noi dung dai
+    int  guideScroll = 0;
     int  focusIndex  = 0;
 };
 
@@ -62,8 +62,8 @@ static const BoardEntry BOARD_DATA[] = {
     {"NightOwl",     1800, "04-12 04:20"}, {"SilverFang",   1650, "04-11 21:10"},
     {"GoldenEye",    1400, "04-12 06:45"}, {"ProGamerVN",   1250, "04-12 08:05"}
 };
-static const int BOARD_TOTAL  = (int)(sizeof(BOARD_DATA)/sizeof(BOARD_DATA[0]));
-static const int BOARD_VISIBLE = 7;
+static const int BOARD_TOTAL = (int)(sizeof(BOARD_DATA)/sizeof(BOARD_DATA[0]));
+static const int BOARD_VISIBLE = 9;   // tang tu 7 -> 9
 
 static const float BTN_W = 140.0f;
 static const float BTN_H = 30.0f;
@@ -76,48 +76,93 @@ static const Button MAIN_BUTTONS[] = {
 };
 static const int NUM_MAIN_BUTTONS = (int)(sizeof(MAIN_BUTTONS)/sizeof(MAIN_BUTTONS[0]));
 
-static const SDL_FRect GUIDE_POPUP = { 10.0f, 30.0f, 250.0f, 420.0f };
+// Popup guide chiem gan toan man hinh de chua noi dung dai
+static const SDL_FRect GUIDE_POPUP = { 5.0f, 20.0f, 260.0f, 440.0f };
 static const SDL_FRect GUIDE_CLOSE = { GUIDE_POPUP.x + GUIDE_POPUP.w - 22.0f,
                                        GUIDE_POPUP.y + 4.0f, 18.0f, 18.0f };
-static const SDL_FRect BOARD_POPUP = { 10.0f, 60.0f, 250.0f, 380.0f };
+// Popup board: rong 260 de fit 3 cot
+static const SDL_FRect BOARD_POPUP = { 5.0f, 30.0f, 260.0f, 420.0f };
 static const SDL_FRect BOARD_CLOSE = { BOARD_POPUP.x + BOARD_POPUP.w - 22.0f,
                                        BOARD_POPUP.y + 4.0f, 18.0f, 18.0f };
+
+// Helper ngat text theo so ky tu max moi dong (font 8px/char)
+static int drawWrappedText(SDL_Renderer* renderer, const char* text,
+                           float x, float y, int maxCharsPerLine, int maxLines) {
+    int len = (int)SDL_strlen(text);
+    int pos = 0;
+    int lineCount = 0;
+    char buf[128];
+    while (pos < len && lineCount < maxLines) {
+        int remaining = len - pos;
+        int take = (remaining > maxCharsPerLine) ? maxCharsPerLine : remaining;
+        if (take == maxCharsPerLine && pos + take < len) {
+            int back = take;
+            while (back > 0 && text[pos + back - 1] != ' ') back--;
+            if (back > 0) take = back;
+        }
+        if (take >= (int)sizeof(buf)) take = (int)sizeof(buf) - 1;
+        SDL_memcpy(buf, text + pos, take);
+        buf[take] = '\0';
+        SDL_RenderDebugText(renderer, x, y + lineCount * 14.0f, buf);
+        pos += take;
+        while (pos < len && text[pos] == ' ') pos++;
+        lineCount++;
+    }
+    return lineCount;
+}
+
+// Helper scrollbar dung
+static void drawVerticalScrollbar(SDL_Renderer* renderer,
+                                  float x, float y, float h,
+                                  int totalLines, int visibleLines, int scrollPos) {
+    if (totalLines <= visibleLines) return;
+    SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+    SDL_FRect track = { x, y, 4.0f, h };
+    SDL_RenderFillRect(renderer, &track);
+    float thumbH = h * (float)visibleLines / (float)totalLines;
+    if (thumbH < 8.0f) thumbH = 8.0f;
+    float thumbY = y + (h - thumbH) * (float)scrollPos
+                   / (float)(totalLines - visibleLines);
+    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+    SDL_FRect thumb = { x, thumbY, 4.0f, thumbH };
+    SDL_RenderFillRect(renderer, &thumb);
+}
 
 // Noi dung guide tieng Anh - mo ta 12 component cua sidebar gameCore
 static const char* GUIDE_LINES[] = {
     "HOW TO PLAY",
     "",
     "Movement keys:",
-    " - LEFT  / A : move left",
+    " - LEFT / A : move left",
     " - RIGHT / D : move right",
-    " - UP    / W : rotate CCW",
-    " - DOWN  / S : rotate CW",
-    " - SPACE     : speed boost x3",
-    " - ENTER     : pause / resume",
-    " - ESC       : open quit menu",
+    " - UP / W : rotate CCW",
+    " - DOWN / S : rotate CW",
+    " - SPACE : speed boost x3",
+    " - ENTER : pause / resume",
+    " - ESC : open quit menu",
     "",
     "Sidebar (12 components):",
-    "  1. QUIT  : open quit menu",
-    "  2. PAUSE : stop / play toggle",
-    "  3. SCORE : current points",
-    "  4. SPEED : drop speed level",
-    "  5. NEXT-1: upcoming piece",
-    "  6. NEXT-2: reserved (v2)",
-    "  7. NEXT-3: reserved (v3)",
-    "  8. ARROW UP    = key UP/W",
-    "  9. ARROW DOWN  = key DOWN/S",
-    " 10. ARROW LEFT  = key LEFT/A",
-    " 11. ARROW RIGHT = key RIGHT/D",
-    " 12. SPEED BOOST : hold = SPACE",
+    "  1 QUIT  : open quit menu",
+    "  2 PAUSE : stop / play",
+    "  3 SCORE : current points",
+    "  4 SPEED : drop speed level",
+    "  5 NEXT-1: upcoming piece",
+    "  6 NEXT-2: reserved (v2)",
+    "  7 NEXT-3: reserved (v3)",
+    "  8 ARR UP    = key UP/W",
+    "  9 ARR DOWN  = key DOWN/S",
+    " 10 ARR LEFT  = key LEFT/A",
+    " 11 ARR RIGHT = key RIGHT/D",
+    " 12 SPEED BOOST: hold=SPACE",
     "",
     "Quit popup options:",
-    " - Restart : new game, score 0",
-    " - Console : back to setting",
-    " - Quit    : close app",
-    " - Cancel  : keep paused",
+    " - Restart: new game, score 0",
+    " - Console: back to setting",
+    " - Quit   : close app",
+    " - Cancel : keep paused",
     "",
-    "Tip: hold SPEED BOOST to make",
-    "the piece drop 3x faster.",
+    "Tip: hold SPEED BOOST",
+    "to make piece drop 3x faster.",
     "",
     "Press X or ESC to close.",
 };
@@ -135,8 +180,8 @@ static void drawBackground(SDL_Renderer* renderer) {
     SDL_RenderDebugText(renderer, subX, 90.0f, "-- GAME CONSOLE --");
 
     SDL_SetRenderDrawColor(renderer, 180, 180, 180, 255);
-    SDL_RenderDebugText(renderer, 10.0f, 380.0f, "TAB/DOWN/LEFT (S/A): next");
-    SDL_RenderDebugText(renderer, 10.0f, 395.0f, "SHIFT+TAB/UP/RIGHT (W/D): prev");
+    SDL_RenderDebugText(renderer, 10.0f, 380.0f, "TAB/DOWN/LEFT(S/A): next");
+    SDL_RenderDebugText(renderer, 10.0f, 395.0f, "SHIFT+TAB/UP/RIGHT(W/D):prev");
     SDL_RenderDebugText(renderer, 10.0f, 410.0f, "ENTER/SPACE: select");
     SDL_RenderDebugText(renderer, 10.0f, 425.0f, "ESC: close / cancel");
 }
@@ -160,14 +205,28 @@ static void drawGuideLightbox(SDL_Renderer* renderer, int scroll) {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderRect(renderer, &GUIDE_POPUP);
 
-    // Hien thi tu GUIDE_LINES[scroll] lay GUIDE_VISIBLE_LINES dong, moi dong cao 14px
+    // Vung text: chua 4px le trai, 12px le phai (de cho scrollbar)
+    const float CONTENT_X = GUIDE_POPUP.x + 8;
+    const float CONTENT_Y0 = GUIDE_POPUP.y + 30;
     const float ROW_H = 14.0f;
-    const float ROW_Y0 = GUIDE_POPUP.y + 30.0f;
-    for (int i = 0; i < GUIDE_VISIBLE_LINES; i++) {
+    const int   MAX_CHARS = 28; // 28 * 8 = 224 px <= 240px content width
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    int rowDrawn = 0;
+    for (int i = 0; i < GUIDE_VISIBLE_LINES && rowDrawn < GUIDE_VISIBLE_LINES; i++) {
         int idx = scroll + i;
         if (idx >= GUIDE_LINE_COUNT) break;
-        SDL_RenderDebugText(renderer, GUIDE_POPUP.x + 12, ROW_Y0 + i * ROW_H, GUIDE_LINES[idx]);
+        // wrap: neu line dai > MAX_CHARS, dung helper de ngat (toi da 2 dong)
+        int used = drawWrappedText(renderer, GUIDE_LINES[idx],
+                                   CONTENT_X, CONTENT_Y0 + rowDrawn * ROW_H,
+                                   MAX_CHARS, 2);
+        rowDrawn += (used > 0) ? used : 1;
     }
+
+    // Scrollbar
+    drawVerticalScrollbar(renderer,
+                          GUIDE_POPUP.x + GUIDE_POPUP.w - 8,
+                          GUIDE_POPUP.y + 30, GUIDE_POPUP.h - 40,
+                          GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES, scroll);
 
     drawCloseButton(renderer, GUIDE_CLOSE);
 }
@@ -184,23 +243,41 @@ static void drawBoardLightbox(SDL_Renderer* renderer, int scroll) {
     SDL_RenderRect(renderer, &BOARD_POPUP);
 
     SDL_RenderDebugText(renderer, BOARD_POPUP.x + 80, BOARD_POPUP.y + 14, "LEADERBOARD");
-    SDL_RenderDebugText(renderer, BOARD_POPUP.x + 12, BOARD_POPUP.y + 38, "# USER         SCORE");
 
-    const float ROW_H = 40.0f;
+    // Header 3 cot: # USER         SCORE TIME
+    // Layout 1 dong: "## UUUUUUUUUUUU SSSSS MM-DD HH:MM"
+    //                 2 + 1 + 12      + 1 + 5 + 1 + 11 = 33 ky tu
+    // Voi font 8px/char => 33*8 = 264px < 252px content => can rut gon them
+    // Dieu chinh: bo MM-DD chi giu HH:MM (5 ky tu), tong = 27 ky tu = 216px (fit)
+    SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8, BOARD_POPUP.y + 38,
+                        "#  USER         SCORE TIME");
+
+    const float ROW_H = 36.0f; // 9 hang * 36 = 324px, vua trong 420 - header - footer
     const float ROW_Y0 = BOARD_POPUP.y + 60.0f;
+    char line[64];
     for (int i = 0; i < BOARD_VISIBLE; i++) {
         int idx = scroll + i;
         if (idx >= BOARD_TOTAL) break;
         const BoardEntry& e = BOARD_DATA[idx];
         float y = ROW_Y0 + i * ROW_H;
-        char line1[64];
-        SDL_snprintf(line1, sizeof(line1), "%2d %-12.12s %5d", idx + 1, e.user, e.score);
-        SDL_RenderDebugText(renderer, BOARD_POPUP.x + 12, y,         line1);
-        SDL_RenderDebugText(renderer, BOARD_POPUP.x + 12, y + 14.0f, e.time);
+        // Chi lay 5 ky tu cuoi cua time (HH:MM) de fit 1 dong
+        const char* tShort = e.time;
+        int tLen = (int)SDL_strlen(e.time);
+        if (tLen >= 5) tShort = e.time + tLen - 5;
+        SDL_snprintf(line, sizeof(line), "%2d %-12.12s %5d %s",
+                     idx + 1, e.user, e.score, tShort);
+        SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8, y, line);
     }
 
-    SDL_RenderDebugText(renderer, BOARD_POPUP.x + 12,
-                        BOARD_POPUP.y + BOARD_POPUP.h - 14, "W/S to scroll, ESC to close");
+    // Scrollbar
+    drawVerticalScrollbar(renderer,
+                          BOARD_POPUP.x + BOARD_POPUP.w - 8,
+                          ROW_Y0, BOARD_VISIBLE * ROW_H,
+                          BOARD_TOTAL, BOARD_VISIBLE, scroll);
+
+    SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8,
+                        BOARD_POPUP.y + BOARD_POPUP.h - 14,
+                        "W/S to scroll, ESC close");
 
     drawCloseButton(renderer, BOARD_CLOSE);
 }

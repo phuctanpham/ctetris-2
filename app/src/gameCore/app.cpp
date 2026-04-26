@@ -207,47 +207,62 @@ static void drawPauseIcon(SDL_Renderer* renderer, const SDL_FRect& host, bool is
     }
 }
 
-// Mui ten don gian: "tam giac" gia lap bang chuoi line
+// Mui ten kieu net thang co 2 vet cheo o dau (khong phai tam giac dac)
 // dir: 0 = up, 1 = down, 2 = left, 3 = right
 static void drawArrowIcon(SDL_Renderer* renderer, const SDL_FRect& host, int dir) {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     float cx = host.x + host.w / 2;
     float cy = host.y + host.h / 2;
-    const int N = 10; // do dai mui ten
-    for (int i = 0; i < N; i++) {
-        float w = (float)(i + 1);
-        SDL_FRect ln;
-        if (dir == 0) {           // up: dinh phia tren
-            ln = { cx - w/2, cy - 5 + i, w, 1.0f };
-        } else if (dir == 1) {    // down: dinh phia duoi
-            ln = { cx - (N - i)/2.0f, cy - 5 + i, (float)(N - i), 1.0f };
-        } else if (dir == 2) {    // left: dinh ben trai
-            ln = { cx - 5 + i, cy - w/2, 1.0f, w };
-        } else {                  // right: dinh ben phai
-            ln = { cx - 5 + i, cy - (N - i)/2.0f, 1.0f, (float)(N - i) };
+    const float L = 14.0f;   // do dai net thang
+    const float HEAD = 5.0f; // do dai vet cheo o dau
+
+    if (dir == 0 || dir == 1) {
+        // Net dung
+        SDL_FRect shaft = { cx - 1, cy - L/2, 2, L };
+        SDL_RenderFillRect(renderer, &shaft);
+        // Hai vet cheo lam dau mui ten (gia lap bang chuoi pixel cheo)
+        for (int i = 0; i < (int)HEAD; i++) {
+            float dy = (dir == 0) ? (cy - L/2 + i) : (cy + L/2 - i - 1);
+            SDL_FRect pL = { cx - 1 - i, dy, 2, 1 };
+            SDL_FRect pR = { cx + i,     dy, 2, 1 };
+            SDL_RenderFillRect(renderer, &pL);
+            SDL_RenderFillRect(renderer, &pR);
         }
-        SDL_RenderFillRect(renderer, &ln);
+    } else {
+        // Net ngang
+        SDL_FRect shaft = { cx - L/2, cy - 1, L, 2 };
+        SDL_RenderFillRect(renderer, &shaft);
+        for (int i = 0; i < (int)HEAD; i++) {
+            float dx = (dir == 2) ? (cx - L/2 + i) : (cx + L/2 - i - 1);
+            SDL_FRect pT = { dx, cy - 1 - i, 1, 2 };
+            SDL_FRect pB = { dx, cy + i,     1, 2 };
+            SDL_RenderFillRect(renderer, &pT);
+            SDL_RenderFillRect(renderer, &pB);
+        }
     }
 }
 
-// 2 tam giac dac noi tiep (>>) cho speed booster
+// Hai chevron ">>" cho speed booster (chi ve duong vien V, khong phai tam giac dac)
 static void drawSpeedBoosterIcon(SDL_Renderer* renderer, const SDL_FRect& host, bool active) {
     if (active) SDL_SetRenderDrawColor(renderer, 255, 215, 0, 255);
     else        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     float cx = host.x + host.w / 2;
     float cy = host.y + host.h / 2;
-    // Tam giac 1 (ben trai)
-    for (int i = 0; i < 8; i++) {
-        float h = (i < 4) ? (i + 1) : (8 - i);
-        SDL_FRect ln = { cx - 9 + i, cy - h, 1.0f, 2 * h };
-        SDL_RenderFillRect(renderer, &ln);
-    }
-    // Tam giac 2 (ben phai, dich offset)
-    for (int i = 0; i < 8; i++) {
-        float h = (i < 4) ? (i + 1) : (8 - i);
-        SDL_FRect ln = { cx + 1 + i, cy - h, 1.0f, 2 * h };
-        SDL_RenderFillRect(renderer, &ln);
-    }
+
+    // Moi chevron ">" gom 2 net cheo gap nhau tai dinh
+    // Ve bang chuoi 2-pixel cheo cho ro net
+    auto drawChevron = [&](float tipX) {
+        for (int i = 0; i < 6; i++) {
+            // Net tren: tu (tipX - 6 + i, cy - 6 + i) di xuong toi dinh
+            SDL_FRect pTop = { tipX - 6 + i, cy - 6 + i, 2, 2 };
+            // Net duoi: tu (tipX - 6 + i, cy + 6 - i) di len toi dinh
+            SDL_FRect pBot = { tipX - 6 + i, cy + 5 - i, 2, 2 };
+            SDL_RenderFillRect(renderer, &pTop);
+            SDL_RenderFillRect(renderer, &pBot);
+        }
+    };
+    drawChevron(cx - 1);   // chevron ben trai
+    drawChevron(cx + 7);   // chevron ben phai
 }
 
 // Preview piece thu nho trong slot
@@ -328,7 +343,58 @@ static void drawPopupButton(SDL_Renderer* renderer, const SDL_FRect& r,
                         r.x + (r.w - ll * 8.0f) / 2.0f,
                         r.y + (r.h - 8.0f) / 2.0f, label);
 }
+// Helper: ngat text theo so ky tu toi da moi dong (font 8px/ky tu)
+// Tra ve so dong da ve, bat dau tu y, moi dong cao 14px
+static int drawWrappedText(SDL_Renderer* renderer, const char* text,
+                           float x, float y, int maxCharsPerLine, int maxLines) {
+    int len = (int)SDL_strlen(text);
+    int pos = 0;
+    int lineCount = 0;
+    char buf[128];
 
+    while (pos < len && lineCount < maxLines) {
+        int remaining = len - pos;
+        int take = (remaining > maxCharsPerLine) ? maxCharsPerLine : remaining;
+
+        // Co gang ngat tai dau cach gan nhat neu chua het cau
+        if (take == maxCharsPerLine && pos + take < len) {
+            int back = take;
+            while (back > 0 && text[pos + back - 1] != ' ') back--;
+            if (back > 0) take = back;
+        }
+
+        if (take >= (int)sizeof(buf)) take = (int)sizeof(buf) - 1;
+        SDL_memcpy(buf, text + pos, take);
+        buf[take] = '\0';
+
+        SDL_RenderDebugText(renderer, x, y + lineCount * 14.0f, buf);
+        pos += take;
+        // Bo qua dau cach o dau dong tiep theo
+        while (pos < len && text[pos] == ' ') pos++;
+        lineCount++;
+    }
+    return lineCount;
+}
+
+// Helper: ve scrollbar dung (track + thumb) sat le phai cua vung content
+// totalLines: tong so dong, visibleLines: so dong hien thi, scrollPos: chi so dong dau
+static void drawVerticalScrollbar(SDL_Renderer* renderer,
+                                  float x, float y, float h,
+                                  int totalLines, int visibleLines, int scrollPos) {
+    if (totalLines <= visibleLines) return;
+    // Track
+    SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+    SDL_FRect track = { x, y, 4.0f, h };
+    SDL_RenderFillRect(renderer, &track);
+    // Thumb
+    float thumbH = h * (float)visibleLines / (float)totalLines;
+    if (thumbH < 8.0f) thumbH = 8.0f;
+    float thumbY = y + (h - thumbH) * (float)scrollPos
+                   / (float)(totalLines - visibleLines);
+    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+    SDL_FRect thumb = { x, thumbY, 4.0f, thumbH };
+    SDL_RenderFillRect(renderer, &thumb);
+}
 // gamecore-popup-quit-08
 static void drawQuitPopup(SDL_Renderer* renderer, const GameState& state) {
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -347,13 +413,16 @@ static void drawQuitPopup(SDL_Renderer* renderer, const GameState& state) {
     SDL_RenderRect(renderer, &POPUP_CLOSE);
     SDL_RenderDebugText(renderer, POPUP_CLOSE.x + 5, POPUP_CLOSE.y + 5, "X");
 
-    SDL_RenderDebugText(renderer, POPUP_BG.x + 20, POPUP_BG.y + 30,
+    // Tieu de + cau hoi (wrap theo do rong popup, content rong = 200, ~25 ky tu)
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderDebugText(renderer, POPUP_BG.x + 15, POPUP_BG.y + 30,
                         state.isGameOver ? "GAME OVER" : "PAUSED");
-    SDL_RenderDebugText(renderer, POPUP_BG.x + 20, POPUP_BG.y + 70,
-                        "What do you want to do?");
+    drawWrappedText(renderer, "What do you want to do?",
+                    POPUP_BG.x + 15, POPUP_BG.y + 60, 25, 2);
     char scoreLine[40];
     SDL_snprintf(scoreLine, sizeof(scoreLine), "Current score: %d", state.score);
-    SDL_RenderDebugText(renderer, POPUP_BG.x + 20, POPUP_BG.y + 95, scoreLine);
+    drawWrappedText(renderer, scoreLine,
+                    POPUP_BG.x + 15, POPUP_BG.y + 95, 25, 2);
 
     drawPopupButton(renderer, POPUP_RESTART, "Restart (new game)",     { 70, 130,  90, 255});
     drawPopupButton(renderer, POPUP_CONSOLE, "Console (back to menu)", { 70, 100, 160, 255});
