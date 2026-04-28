@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Template brandkit cho cTetris.
+    Logo nguon goc {{LOGO_HREF}} la hinh vuong; SVG nay them background trang
+    + padding 10% (de logo nam tron trong safe-zone 80% theo chuan PWA W3C).
+    Khi maskable=1: padding 20% (logo trong vung 60%) cho chac chan an toan
+    voi moi mask shape (circle, squircle, rounded square).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+    <rect width="1024" height="1024" fill="{{BG_COLOR}}" />
+    <image href="{{LOGO_HREF}}"
+           x="{{PAD}}" y="{{PAD}}"
+           width="{{INNER}}" height="{{INNER}}"
+           preserveAspectRatio="xMidYMid meet" />
+</svg>

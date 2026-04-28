@@ -10,8 +10,9 @@
 #define NANOSVGRAST_IMPLEMENTATION
 #include "nanosvgrast.h"
 
-// Du lieu SVG cua logo UIT (raw string literal)
+// Du lieu SVG (raw string literal) cua logo UIT va logo cong ty
 #include "gameStory_logo_svg.h"
+#include "gameStory_corp_svg.h"
 
 #include <SDL3/SDL.h>
 #include <cstdlib>
@@ -20,29 +21,38 @@
 const int INTRO_DURATION = 3000;
 
 // gamestory-logo-intro-01
-// Cache texture logo de chi rasterize 1 lan duy nhat (frame dau tien)
+// Cache 2 texture (logo + corp) de chi rasterize 1 lan duy nhat
 // va tai su dung cho moi frame ke tiep -> tiet kiem CPU.
-static SDL_Texture* g_logoTexture = nullptr;
-static int          g_logoW       = 0;
-static int          g_logoH       = 0;
+struct SvgTexture {
+    SDL_Texture* texture = nullptr;
+    int          w       = 0;
+    int          h       = 0;
+};
+static SvgTexture g_logo;
+static SvgTexture g_corp;
 
-// Rasterize SVG ra texture co chieu rong = targetW (pixel), giu nguyen ti le.
-// Quy trinh: parse SVG -> rasterize ra buffer RGBA -> tao SDL_Surface
-// -> chuyen thanh SDL_Texture roi giai phong buffer trung gian.
-static SDL_Texture* createLogoTexture(SDL_Renderer* renderer, int targetW) {
-    // nanosvgParse SE ghi de len buffer (modify in-place) nen phai copy data ra
-    // mot vung nho mutable, tranh sua chuoi const cua chuong trinh.
-    size_t svgLen = SDL_strlen(LOGO_SVG_DATA);
+// Helper chung: rasterize 1 SVG (raw string) ra SDL_Texture co chieu rong
+// = targetW pixel, giu aspect ratio cua SVG goc.
+// Quy trinh: copy SVG ra buffer mutable -> nsvgParse -> rasterize ra
+// pixel buffer RGBA -> tao SDL_Surface -> upload thanh SDL_Texture.
+static SvgTexture createSvgTexture(SDL_Renderer* renderer,
+                                   const char* svgData,
+                                   int targetW) {
+    SvgTexture result;
+
+    // nanosvgParse SE ghi de len buffer (modify in-place) nen phai copy
+    // data ra mot vung nho mutable, tranh sua chuoi const cua chuong trinh.
+    size_t svgLen = SDL_strlen(svgData);
     char* svgCopy = (char*)SDL_malloc(svgLen + 1);
-    if (!svgCopy) return nullptr;
-    SDL_memcpy(svgCopy, LOGO_SVG_DATA, svgLen + 1);
+    if (!svgCopy) return result;
+    SDL_memcpy(svgCopy, svgData, svgLen + 1);
 
     NSVGimage* image = nsvgParse(svgCopy, "px", 96.0f);
     SDL_free(svgCopy);
     if (!image || image->width <= 0 || image->height <= 0) {
         if (image) nsvgDelete(image);
-        SDL_Log("Khong the parse SVG logo");
-        return nullptr;
+        SDL_Log("Khong the parse SVG");
+        return result;
     }
 
     // Tinh ti le scale theo chieu rong mong muon, giu aspect ratio
@@ -50,66 +60,65 @@ static SDL_Texture* createLogoTexture(SDL_Renderer* renderer, int targetW) {
     int outW = targetW;
     int outH = (int)(image->height * scale + 0.5f);
 
-    // Cap phat buffer pixel RGBA (4 byte/pixel)
+    // Cap phat buffer pixel RGBA (4 byte/pixel), khoi tao trong suot
     size_t pixelBytes = (size_t)outW * (size_t)outH * 4;
     unsigned char* pixels = (unsigned char*)SDL_malloc(pixelBytes);
-    if (!pixels) { nsvgDelete(image); return nullptr; }
-    SDL_memset(pixels, 0, pixelBytes); // nen trong suot
+    if (!pixels) { nsvgDelete(image); return result; }
+    SDL_memset(pixels, 0, pixelBytes);
 
-    // Rasterize: nanosvg ho tro fill, transform matrix, antialias - ket qua
-    // dep, sat voi SVG goc (ke ca cac path Bezier phuc tap cua shield UIT).
+    // Rasterize: nanosvg ho tro fill, transform matrix, antialias.
     NSVGrasterizer* rast = nsvgCreateRasterizer();
-    if (!rast) { SDL_free(pixels); nsvgDelete(image); return nullptr; }
+    if (!rast) { SDL_free(pixels); nsvgDelete(image); return result; }
     nsvgRasterize(rast, image, 0.0f, 0.0f, scale,
                   pixels, outW, outH, outW * 4);
     nsvgDeleteRasterizer(rast);
     nsvgDelete(image);
 
-    // Tao SDL_Surface tu pixel buffer (byte order R-G-B-A khop nanosvg output)
+    // Tao SDL_Surface tu pixel buffer (byte order R-G-B-A khop nanosvg)
     SDL_Surface* surface = SDL_CreateSurfaceFrom(outW, outH,
                                                  SDL_PIXELFORMAT_RGBA32,
                                                  pixels, outW * 4);
-    if (!surface) { SDL_free(pixels); return nullptr; }
+    if (!surface) { SDL_free(pixels); return result; }
 
-    // CreateTextureFromSurface se COPY pixel data sang GPU memory,
-    // nen sau buoc nay free buffer va surface deu an toan.
+    // CreateTextureFromSurface COPY pixel data sang GPU memory ->
+    // sau buoc nay free surface va buffer deu an toan.
     SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_DestroySurface(surface);
     SDL_free(pixels);
 
     if (texture) {
-        // Bat blend mode de hieu ung fade-in (alpha mod) hoat dong
         SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
-        g_logoW = outW;
-        g_logoH = outH;
+        result.texture = texture;
+        result.w       = outW;
+        result.h       = outH;
     } else {
-        SDL_Log("Khong the tao texture tu logo SVG: %s", SDL_GetError());
+        SDL_Log("Khong the tao texture tu SVG: %s", SDL_GetError());
     }
-    return texture;
+    return result;
 }
 
-// Ve logo voi hieu ung fade-in (alpha tang dan theo thoi gian intro)
+// Ve logo UIT voi hieu ung fade-in (alpha tang dan theo thoi gian intro)
 static void drawLogo(SDL_Renderer* renderer, Uint32 elapsedTime) {
     // Lazy init: chi tao texture lan dau goi (sau khi renderer da san sang)
-    if (!g_logoTexture) {
-        g_logoTexture = createLogoTexture(renderer, 140);
+    if (!g_logo.texture) {
+        g_logo = createSvgTexture(renderer, LOGO_SVG_DATA, 140);
     }
-    if (!g_logoTexture) return; // an toan: bo qua neu loi
+    if (!g_logo.texture) return;
 
     // Tinh alpha fade-in 0..255 theo tien do thoi gian
     float t = (float)elapsedTime / (float)INTRO_DURATION;
     if (t > 1.0f) t = 1.0f;
     Uint8 alpha = (Uint8)(t * 255.0f);
-    SDL_SetTextureAlphaMod(g_logoTexture, alpha);
+    SDL_SetTextureAlphaMod(g_logo.texture, alpha);
 
-    // Canh giua man hinh, hoi lech len tren de chua thanh loading ben duoi
+    // Canh giua man hinh, lech len de chua thanh loading + corp ben duoi
     SDL_FRect dst = {
-        (STORY_SCREEN_WIDTH  - g_logoW) / 2.0f,
-        (STORY_SCREEN_HEIGHT - g_logoH) / 2.0f - 40.0f,
-        (float)g_logoW,
-        (float)g_logoH
+        (STORY_SCREEN_WIDTH  - g_logo.w) / 2.0f,
+        (STORY_SCREEN_HEIGHT - g_logo.h) / 2.0f - 60.0f,
+        (float)g_logo.w,
+        (float)g_logo.h
     };
-    SDL_RenderTexture(renderer, g_logoTexture, NULL, &dst);
+    SDL_RenderTexture(renderer, g_logo.texture, NULL, &dst);
 
     // Tieu de game ngay duoi logo
     SDL_SetRenderDrawColor(renderer, 230, 230, 230, alpha);
@@ -122,12 +131,14 @@ static void drawLogo(SDL_Renderer* renderer, Uint32 elapsedTime) {
 
 // gamestory-loading-bar-02
 // Thanh tien trinh loading chay song song voi hieu ung fade-in cua logo.
-static void drawLoadingBar(SDL_Renderer* renderer, Uint32 elapsedTime) {
+// Tra ve toa do Y day cua bar de cac thanh phan ben duoi can chinh theo.
+static float drawLoadingBar(SDL_Renderer* renderer, Uint32 elapsedTime) {
     float progress = (float)elapsedTime / INTRO_DURATION;
     if (progress > 1.0f) progress = 1.0f;
     const float barW = 180.0f, barH = 12.0f;
     const float barX = (STORY_SCREEN_WIDTH - barW) / 2.0f;
-    const float barY = STORY_SCREEN_HEIGHT - 100.0f;
+    // Day len 1 chut so voi v1 de chua dong "Powered up by..." ben duoi
+    const float barY = STORY_SCREEN_HEIGHT - 110.0f;
 
     // Nen thanh tien trinh (mau xam toi)
     SDL_FRect bgBar = { barX, barY, barW, barH };
@@ -138,6 +149,77 @@ static void drawLoadingBar(SDL_Renderer* renderer, Uint32 elapsedTime) {
     SDL_FRect fgBar = { barX, barY, barW * progress, barH };
     SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
     SDL_RenderFillRect(renderer, &fgBar);
+
+    return barY + barH;  // y = day cua bar
+}
+
+// gamestory-corp-credit-03
+// Hang chu "Powered up by" + logo cong ty nho ben canh, can giua theo
+// chieu ngang. Y duoc xac dinh ngay duoi loading bar.
+//
+// Can bang kich thuoc: SDL_RenderDebugText dung font 8x8 pixel/ky tu.
+// Tang scale 1.5x cho de doc -> moi ky tu cao ~12px. Logo corp render
+// voi targetH ~16px (lon hon text mot chut de can thi giac), sau do
+// scale ngang theo aspect ratio cua SVG.
+static void drawCorpCredit(SDL_Renderer* renderer,
+                           Uint32 elapsedTime,
+                           float topY) {
+    // Lazy init corp texture: render mot lan voi chieu cao 16px
+    // (do hoa chuan: ~2x chieu cao text de noi bat nhe nhung khong ap text).
+    if (!g_corp.texture) {
+        // Render o do phan giai cao (40px) roi shrink xuong hien thi 16px
+        // -> antialias muot, khong bi vo pixel. Width tinh tu aspect ratio
+        // sau khi parse SVG goc.
+        g_corp = createSvgTexture(renderer, CORP_SVG_DATA, 40);
+    }
+
+    // Fade-in dong bo voi cac thanh phan khac
+    float t = (float)elapsedTime / (float)INTRO_DURATION;
+    if (t > 1.0f) t = 1.0f;
+    Uint8 alpha = (Uint8)(t * 255.0f);
+
+    // Cau hinh layout: text scale 1.0 (font 8x8) co kich thuoc moi ky tu = 8px
+    // de gon nhe; corp logo display 16px chieu cao de can voi text
+    const char* prefix = "Powered up by ";
+    const int   prefixLen = (int)SDL_strlen(prefix);
+    const float CHAR_W = 8.0f;        // SDL_RenderDebugText pixel/ky tu
+    const float CHAR_H = 8.0f;
+    const float CORP_DISPLAY_H = 16.0f;
+    const float SPACING = 4.0f;        // khoang cach giua text va logo
+
+    // Tinh chieu rong corp display de can giua tong the
+    float corpDisplayW = 0.0f;
+    if (g_corp.texture && g_corp.h > 0) {
+        // Giu aspect ratio: scale corp.w theo ti le CORP_DISPLAY_H / corp.h
+        corpDisplayW = (float)g_corp.w * CORP_DISPLAY_H / (float)g_corp.h;
+    }
+
+    // Tong width = text width + spacing + corp display width
+    float totalW = prefixLen * CHAR_W
+                 + (corpDisplayW > 0 ? SPACING + corpDisplayW : 0);
+    float startX = (STORY_SCREEN_WIDTH - totalW) / 2.0f;
+
+    // Y can giua doc giua text va logo: text dat sao cho center y = top + half
+    // cua phan tu cao nhat (corp logo). Logo dat ngay phai text.
+    float lineCenterY = topY + 16.0f;  // cach loading bar 16px
+    float textY = lineCenterY - CHAR_H / 2.0f;
+    float corpY = lineCenterY - CORP_DISPLAY_H / 2.0f;
+
+    // Ve text trang voi alpha fade-in
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, alpha);
+    SDL_RenderDebugText(renderer, startX, textY, prefix);
+
+    // Ve logo corp ngay sau text, can theo chieu doc
+    if (g_corp.texture) {
+        SDL_SetTextureAlphaMod(g_corp.texture, alpha);
+        SDL_FRect corpDst = {
+            startX + prefixLen * CHAR_W + SPACING,
+            corpY,
+            corpDisplayW,
+            CORP_DISPLAY_H
+        };
+        SDL_RenderTexture(renderer, g_corp.texture, NULL, &corpDst);
+    }
 }
 
 int runGameStory(SDL_Window* window, SDL_Renderer* renderer) {
@@ -147,27 +229,32 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer) {
     Uint32 startTime = SDL_GetTicks();
 
     while (running) {
-        // Xu ly su kien thoat
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) std::exit(0);
         }
-        // Het thoi gian intro -> chuyen tiep sang gameConsole (return)
         Uint32 elapsedTime = SDL_GetTicks() - startTime;
         if (elapsedTime > (Uint32)INTRO_DURATION) running = false;
 
-        // Nen toi de logo xanh duong noi bat
+        // Nen toi de logo va text noi bat
         SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
         SDL_RenderClear(renderer);
+
         drawLogo(renderer, elapsedTime);
-        drawLoadingBar(renderer, elapsedTime);
+        float barBottomY = drawLoadingBar(renderer, elapsedTime);
+        drawCorpCredit(renderer, elapsedTime, barBottomY);
+
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
 
-    // Don dep texture truoc khi roi scene (tranh leak)
-    if (g_logoTexture) {
-        SDL_DestroyTexture(g_logoTexture);
-        g_logoTexture = nullptr;
+    // Don dep ca 2 texture truoc khi roi scene (tranh leak)
+    if (g_logo.texture) {
+        SDL_DestroyTexture(g_logo.texture);
+        g_logo.texture = nullptr;
+    }
+    if (g_corp.texture) {
+        SDL_DestroyTexture(g_corp.texture);
+        g_corp.texture = nullptr;
     }
     return 0;
 }

@@ -34,6 +34,158 @@ static void drawButton(SDL_Renderer* renderer, const Button& b, bool focused) {
     SDL_RenderDebugText(renderer, tx, ty, b.label);
 }
 
+// =========================================================
+// Scrollbar tuong tac (dung chung cho guide va board)
+// - 2 nut ↑/↓ o 2 dau (click giu -> auto-repeat scroll)
+// - Thumb keo duoc (drag) tren track
+// - Click vao track (ngoai thumb) -> nhay nhanh den vi tri do
+// =========================================================
+struct SBLayout {
+    SDL_FRect upBtn;
+    SDL_FRect track;
+    SDL_FRect downBtn;
+    SDL_FRect thumb;     // 0-rect neu khong can scroll
+};
+
+struct SBInteraction {
+    bool   upHeld         = false;
+    bool   downHeld       = false;
+    bool   dragging       = false;
+    float  dragOffsetY    = 0.0f;     // khoang cach tu chuot toi top cua thumb
+    Uint32 lastAutoScroll = 0;        // moc scroll gan nhat
+    Uint32 nextAutoStart  = 0;        // cho delay truoc khi auto-repeat
+};
+
+static const float SB_W     = 8.0f;
+static const float SB_BTN_H = 12.0f;
+
+static SBLayout layoutSB(float x, float y, float h, int total, int visible, int pos) {
+    SBLayout sb;
+    sb.upBtn   = { x, y,                 SB_W, SB_BTN_H };
+    sb.downBtn = { x, y + h - SB_BTN_H,  SB_W, SB_BTN_H };
+    sb.track   = { x, y + SB_BTN_H,      SB_W, h - 2 * SB_BTN_H };
+    sb.thumb   = { 0, 0, 0, 0 };
+    if (total > visible && sb.track.h > 0) {
+        float thumbH = sb.track.h * (float)visible / (float)total;
+        if (thumbH < 16.0f)        thumbH = 16.0f;
+        if (thumbH > sb.track.h)   thumbH = sb.track.h;
+        float maxScroll = (float)(total - visible);
+        float thumbY = sb.track.y + (sb.track.h - thumbH) * (float)pos / maxScroll;
+        sb.thumb = { x, thumbY, SB_W, thumbH };
+    }
+    return sb;
+}
+
+static int clampScroll(int pos, int total, int visible) {
+    int maxS = total - visible;
+    if (maxS < 0) maxS = 0;
+    if (pos < 0) pos = 0;
+    if (pos > maxS) pos = maxS;
+    return pos;
+}
+
+static void drawSB(SDL_Renderer* r, const SBLayout& sb, int total, int visible,
+                   bool upHeld, bool downHeld, bool dragging) {
+    // Nen 2 nut ↑/↓: vang khi giu, xam khi binh thuong
+    SDL_Color upC = upHeld   ? SDL_Color{255, 215, 0, 255} : SDL_Color{120, 120, 130, 255};
+    SDL_Color dnC = downHeld ? SDL_Color{255, 215, 0, 255} : SDL_Color{120, 120, 130, 255};
+
+    SDL_SetRenderDrawColor(r, upC.r, upC.g, upC.b, 255);
+    SDL_RenderFillRect(r, &sb.upBtn);
+    SDL_SetRenderDrawColor(r, dnC.r, dnC.g, dnC.b, 255);
+    SDL_RenderFillRect(r, &sb.downBtn);
+
+    // Mui ten len/xuong (ve bang chuoi pixel cho net)
+    SDL_SetRenderDrawColor(r, 30, 30, 40, 255);
+    float ucx = sb.upBtn.x   + sb.upBtn.w   / 2;
+    float ucy = sb.upBtn.y   + sb.upBtn.h   / 2;
+    float dcx = sb.downBtn.x + sb.downBtn.w / 2;
+    float dcy = sb.downBtn.y + sb.downBtn.h / 2;
+    for (int i = 0; i < 3; i++) {
+        SDL_FRect lnUp = { ucx - i, ucy - 1 + i, 1.0f + 2.0f * i, 1.0f };
+        SDL_FRect lnDn = { dcx - i, dcy + 1 - i, 1.0f + 2.0f * i, 1.0f };
+        SDL_RenderFillRect(r, &lnUp);
+        SDL_RenderFillRect(r, &lnDn);
+    }
+
+    // Track + thumb (chi ve khi co the scroll)
+    if (total > visible) {
+        SDL_SetRenderDrawColor(r, 40, 40, 50, 255);
+        SDL_RenderFillRect(r, &sb.track);
+        SDL_Color tC = dragging ? SDL_Color{255, 215, 0, 255} : SDL_Color{200, 200, 200, 255};
+        SDL_SetRenderDrawColor(r, tC.r, tC.g, tC.b, 255);
+        SDL_RenderFillRect(r, &sb.thumb);
+    }
+}
+
+// Xu ly mouse-down tren scrollbar; tra ve true neu da bat su kien
+static bool sbOnMouseDown(SBInteraction& sbi, const SBLayout& sb, float mx, float my,
+                          int& scrollPos, int total, int visible, Uint32 nowMs) {
+    if (hitTest(sb.upBtn, mx, my)) {
+        sbi.upHeld = true;
+        scrollPos = clampScroll(scrollPos - 1, total, visible);
+        sbi.lastAutoScroll = nowMs;
+        sbi.nextAutoStart  = nowMs + 300;  // delay truoc khi auto-repeat
+        return true;
+    }
+    if (hitTest(sb.downBtn, mx, my)) {
+        sbi.downHeld = true;
+        scrollPos = clampScroll(scrollPos + 1, total, visible);
+        sbi.lastAutoScroll = nowMs;
+        sbi.nextAutoStart  = nowMs + 300;
+        return true;
+    }
+    if (total > visible) {
+        if (hitTest(sb.thumb, mx, my)) {
+            sbi.dragging    = true;
+            sbi.dragOffsetY = my - sb.thumb.y;
+            return true;
+        }
+        if (hitTest(sb.track, mx, my)) {
+            // Click vao track (ngoai thumb) -> nhay nhanh den vi tri tuong ung
+            float ratio = (my - sb.track.y) / sb.track.h;
+            if (ratio < 0) ratio = 0;
+            if (ratio > 1) ratio = 1;
+            scrollPos = clampScroll((int)(ratio * (total - visible) + 0.5f), total, visible);
+            return true;
+        }
+    }
+    return false;
+}
+
+static void sbOnMouseMotion(SBInteraction& sbi, const SBLayout& sb, float my,
+                            int& scrollPos, int total, int visible) {
+    if (!sbi.dragging || total <= visible) return;
+    float trackUsable = sb.track.h - sb.thumb.h;
+    if (trackUsable <= 0) return;
+    float thumbY = my - sbi.dragOffsetY;
+    float ratio = (thumbY - sb.track.y) / trackUsable;
+    if (ratio < 0) ratio = 0;
+    if (ratio > 1) ratio = 1;
+    scrollPos = clampScroll((int)(ratio * (total - visible) + 0.5f), total, visible);
+}
+
+static void sbResetInteraction(SBInteraction& sbi) {
+    sbi.upHeld = false;
+    sbi.downHeld = false;
+    sbi.dragging = false;
+}
+
+// Auto-repeat scroll khi giu nut ↑/↓
+static void sbAutoRepeat(SBInteraction& sbi, int& scrollPos, int total, int visible, Uint32 nowMs) {
+    const Uint32 REPEAT_INTERVAL = 60;
+    if (nowMs < sbi.nextAutoStart) return;
+    if (nowMs - sbi.lastAutoScroll < REPEAT_INTERVAL) return;
+    if (sbi.upHeld) {
+        scrollPos = clampScroll(scrollPos - 1, total, visible);
+        sbi.lastAutoScroll = nowMs;
+    }
+    if (sbi.downHeld) {
+        scrollPos = clampScroll(scrollPos + 1, total, visible);
+        sbi.lastAutoScroll = nowMs;
+    }
+}
+
 struct AppState {
     bool showGuide  = false;
     bool showBoard  = false;
@@ -42,6 +194,7 @@ struct AppState {
     int  boardScroll = 0;
     int  guideScroll = 0;
     int  focusIndex  = 0;
+    SBInteraction sb;   // dung chung: chi 1 popup mo tai mot thoi diem
 };
 
 struct BoardEntry { const char* user; int score; const char* time; };
@@ -62,8 +215,8 @@ static const BoardEntry BOARD_DATA[] = {
     {"NightOwl",     1800, "04-12 04:20"}, {"SilverFang",   1650, "04-11 21:10"},
     {"GoldenEye",    1400, "04-12 06:45"}, {"ProGamerVN",   1250, "04-12 08:05"}
 };
-static const int BOARD_TOTAL = (int)(sizeof(BOARD_DATA)/sizeof(BOARD_DATA[0]));
-static const int BOARD_VISIBLE = 9;   // tang tu 7 -> 9
+static const int BOARD_TOTAL   = (int)(sizeof(BOARD_DATA)/sizeof(BOARD_DATA[0]));
+static const int BOARD_VISIBLE = 9;
 
 static const float BTN_W = 140.0f;
 static const float BTN_H = 30.0f;
@@ -80,12 +233,23 @@ static const int NUM_MAIN_BUTTONS = (int)(sizeof(MAIN_BUTTONS)/sizeof(MAIN_BUTTO
 static const SDL_FRect GUIDE_POPUP = { 5.0f, 20.0f, 260.0f, 440.0f };
 static const SDL_FRect GUIDE_CLOSE = { GUIDE_POPUP.x + GUIDE_POPUP.w - 22.0f,
                                        GUIDE_POPUP.y + 4.0f, 18.0f, 18.0f };
-// Popup board: rong 260 de fit 3 cot
 static const SDL_FRect BOARD_POPUP = { 5.0f, 30.0f, 260.0f, 420.0f };
 static const SDL_FRect BOARD_CLOSE = { BOARD_POPUP.x + BOARD_POPUP.w - 22.0f,
                                        BOARD_POPUP.y + 4.0f, 18.0f, 18.0f };
 
-// Helper ngat text theo so ky tu max moi dong (font 8px/char)
+// Vung scrollbar cho 2 popup (tinh san de tai su dung trong su kien)
+// Guide: tu y = popup.y + 30 toi popup.y + popup.h - 10
+static const float GUIDE_SB_X = GUIDE_POPUP.x + GUIDE_POPUP.w - 12.0f;
+static const float GUIDE_SB_Y = GUIDE_POPUP.y + 30.0f;
+static const float GUIDE_SB_H = GUIDE_POPUP.h - 40.0f;
+// Board: tu y = ROW_Y0 toi ROW_Y0 + BOARD_VISIBLE * ROW_H
+// (Tham khao tu drawBoardLightbox: ROW_Y0 = popup.y + 60, ROW_H = 36)
+static const float BOARD_ROW_H = 36.0f;
+static const float BOARD_SB_X  = BOARD_POPUP.x + BOARD_POPUP.w - 12.0f;
+static const float BOARD_SB_Y  = BOARD_POPUP.y + 60.0f;
+static const float BOARD_SB_H  = BOARD_VISIBLE * BOARD_ROW_H;
+
+// Helper ngat text theo so ky tu max moi dong
 static int drawWrappedText(SDL_Renderer* renderer, const char* text,
                            float x, float y, int maxCharsPerLine, int maxLines) {
     int len = (int)SDL_strlen(text);
@@ -111,24 +275,6 @@ static int drawWrappedText(SDL_Renderer* renderer, const char* text,
     return lineCount;
 }
 
-// Helper scrollbar dung
-static void drawVerticalScrollbar(SDL_Renderer* renderer,
-                                  float x, float y, float h,
-                                  int totalLines, int visibleLines, int scrollPos) {
-    if (totalLines <= visibleLines) return;
-    SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
-    SDL_FRect track = { x, y, 4.0f, h };
-    SDL_RenderFillRect(renderer, &track);
-    float thumbH = h * (float)visibleLines / (float)totalLines;
-    if (thumbH < 8.0f) thumbH = 8.0f;
-    float thumbY = y + (h - thumbH) * (float)scrollPos
-                   / (float)(totalLines - visibleLines);
-    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
-    SDL_FRect thumb = { x, thumbY, 4.0f, thumbH };
-    SDL_RenderFillRect(renderer, &thumb);
-}
-
-// Noi dung guide tieng Anh - mo ta 12 component cua sidebar gameCore
 static const char* GUIDE_LINES[] = {
     "HOW TO PLAY",
     "",
@@ -145,7 +291,7 @@ static const char* GUIDE_LINES[] = {
     "  1 QUIT  : open quit menu",
     "  2 PAUSE : stop / play",
     "  3 SCORE : current points",
-    "  4 SPEED : drop speed level",
+    "  4 TIMER : total play time",
     "  5 NEXT-1: upcoming piece",
     "  6 NEXT-2: reserved (v2)",
     "  7 NEXT-3: reserved (v3)",
@@ -194,7 +340,7 @@ static void drawCloseButton(SDL_Renderer* renderer, const SDL_FRect& r) {
     SDL_RenderDebugText(renderer, r.x + r.w/2 - 4, r.y + r.h/2 - 4, "X");
 }
 
-static void drawGuideLightbox(SDL_Renderer* renderer, int scroll) {
+static void drawGuideLightbox(SDL_Renderer* renderer, const AppState& state) {
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
     SDL_FRect screen = { 0, 0, (float)CONSOLE_SCREEN_WIDTH, (float)CONSOLE_SCREEN_HEIGHT };
@@ -205,33 +351,31 @@ static void drawGuideLightbox(SDL_Renderer* renderer, int scroll) {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderRect(renderer, &GUIDE_POPUP);
 
-    // Vung text: chua 4px le trai, 12px le phai (de cho scrollbar)
     const float CONTENT_X = GUIDE_POPUP.x + 8;
     const float CONTENT_Y0 = GUIDE_POPUP.y + 30;
     const float ROW_H = 14.0f;
-    const int   MAX_CHARS = 28; // 28 * 8 = 224 px <= 240px content width
+    const int   MAX_CHARS = 28;
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     int rowDrawn = 0;
     for (int i = 0; i < GUIDE_VISIBLE_LINES && rowDrawn < GUIDE_VISIBLE_LINES; i++) {
-        int idx = scroll + i;
+        int idx = state.guideScroll + i;
         if (idx >= GUIDE_LINE_COUNT) break;
-        // wrap: neu line dai > MAX_CHARS, dung helper de ngat (toi da 2 dong)
         int used = drawWrappedText(renderer, GUIDE_LINES[idx],
                                    CONTENT_X, CONTENT_Y0 + rowDrawn * ROW_H,
                                    MAX_CHARS, 2);
         rowDrawn += (used > 0) ? used : 1;
     }
 
-    // Scrollbar
-    drawVerticalScrollbar(renderer,
-                          GUIDE_POPUP.x + GUIDE_POPUP.w - 8,
-                          GUIDE_POPUP.y + 30, GUIDE_POPUP.h - 40,
-                          GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES, scroll);
+    // Scrollbar moi co nut ↑/↓ + thumb keo duoc
+    SBLayout sb = layoutSB(GUIDE_SB_X, GUIDE_SB_Y, GUIDE_SB_H,
+                           GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES, state.guideScroll);
+    drawSB(renderer, sb, GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES,
+           state.sb.upHeld, state.sb.downHeld, state.sb.dragging);
 
     drawCloseButton(renderer, GUIDE_CLOSE);
 }
 
-static void drawBoardLightbox(SDL_Renderer* renderer, int scroll) {
+static void drawBoardLightbox(SDL_Renderer* renderer, const AppState& state) {
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
     SDL_FRect screen = { 0, 0, (float)CONSOLE_SCREEN_WIDTH, (float)CONSOLE_SCREEN_HEIGHT };
@@ -243,24 +387,16 @@ static void drawBoardLightbox(SDL_Renderer* renderer, int scroll) {
     SDL_RenderRect(renderer, &BOARD_POPUP);
 
     SDL_RenderDebugText(renderer, BOARD_POPUP.x + 80, BOARD_POPUP.y + 14, "LEADERBOARD");
-
-    // Header 3 cot: # USER         SCORE TIME
-    // Layout 1 dong: "## UUUUUUUUUUUU SSSSS MM-DD HH:MM"
-    //                 2 + 1 + 12      + 1 + 5 + 1 + 11 = 33 ky tu
-    // Voi font 8px/char => 33*8 = 264px < 252px content => can rut gon them
-    // Dieu chinh: bo MM-DD chi giu HH:MM (5 ky tu), tong = 27 ky tu = 216px (fit)
     SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8, BOARD_POPUP.y + 38,
                         "#  USER         SCORE TIME");
 
-    const float ROW_H = 36.0f; // 9 hang * 36 = 324px, vua trong 420 - header - footer
-    const float ROW_Y0 = BOARD_POPUP.y + 60.0f;
+    const float ROW_Y0 = BOARD_SB_Y;  // 60
     char line[64];
     for (int i = 0; i < BOARD_VISIBLE; i++) {
-        int idx = scroll + i;
+        int idx = state.boardScroll + i;
         if (idx >= BOARD_TOTAL) break;
         const BoardEntry& e = BOARD_DATA[idx];
-        float y = ROW_Y0 + i * ROW_H;
-        // Chi lay 5 ky tu cuoi cua time (HH:MM) de fit 1 dong
+        float y = ROW_Y0 + i * BOARD_ROW_H;
         const char* tShort = e.time;
         int tLen = (int)SDL_strlen(e.time);
         if (tLen >= 5) tShort = e.time + tLen - 5;
@@ -269,11 +405,11 @@ static void drawBoardLightbox(SDL_Renderer* renderer, int scroll) {
         SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8, y, line);
     }
 
-    // Scrollbar
-    drawVerticalScrollbar(renderer,
-                          BOARD_POPUP.x + BOARD_POPUP.w - 8,
-                          ROW_Y0, BOARD_VISIBLE * ROW_H,
-                          BOARD_TOTAL, BOARD_VISIBLE, scroll);
+    // Scrollbar moi co nut ↑/↓ + thumb keo duoc
+    SBLayout sb = layoutSB(BOARD_SB_X, BOARD_SB_Y, BOARD_SB_H,
+                           BOARD_TOTAL, BOARD_VISIBLE, state.boardScroll);
+    drawSB(renderer, sb, BOARD_TOTAL, BOARD_VISIBLE,
+           state.sb.upHeld, state.sb.downHeld, state.sb.dragging);
 
     SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8,
                         BOARD_POPUP.y + BOARD_POPUP.h - 14,
@@ -286,8 +422,10 @@ static void playBackgroundMusic() { SDL_Log("Phat nhac nen console"); }
 
 static void activateButton(AppState& state, int index) {
     switch (index) {
-        case 0: state.showGuide = true; state.guideScroll = 0; break;
-        case 1: state.showBoard = true; state.boardScroll = 0; break;
+        case 0: state.showGuide = true; state.guideScroll = 0;
+                sbResetInteraction(state.sb); break;
+        case 1: state.showBoard = true; state.boardScroll = 0;
+                sbResetInteraction(state.sb); break;
         case 2: state.isRunning = false; state.nextScene = 1; break;
         case 3: state.isRunning = false; state.nextScene = 0; break;
         default: break;
@@ -301,6 +439,8 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer) {
     playBackgroundMusic();
 
     while (state.isRunning) {
+        Uint32 nowMs = SDL_GetTicks();
+
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) {
                 state.isRunning = false; state.nextScene = 0; break;
@@ -308,16 +448,11 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer) {
 
             if (event.type == SDL_EVENT_MOUSE_WHEEL) {
                 if (state.showBoard) {
-                    state.boardScroll -= (int)event.wheel.y;
-                    if (state.boardScroll < 0) state.boardScroll = 0;
-                    int maxScroll = BOARD_TOTAL - BOARD_VISIBLE;
-                    if (state.boardScroll > maxScroll) state.boardScroll = maxScroll;
+                    state.boardScroll = clampScroll(state.boardScroll - (int)event.wheel.y,
+                                                    BOARD_TOTAL, BOARD_VISIBLE);
                 } else if (state.showGuide) {
-                    state.guideScroll -= (int)event.wheel.y;
-                    if (state.guideScroll < 0) state.guideScroll = 0;
-                    int maxScroll = GUIDE_LINE_COUNT - GUIDE_VISIBLE_LINES;
-                    if (maxScroll < 0) maxScroll = 0;
-                    if (state.guideScroll > maxScroll) state.guideScroll = maxScroll;
+                    state.guideScroll = clampScroll(state.guideScroll - (int)event.wheel.y,
+                                                    GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES);
                 }
             }
 
@@ -330,24 +465,19 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer) {
                 bool isRight = (key == SDLK_RIGHT || key == SDLK_D);
 
                 if (key == SDLK_ESCAPE) {
-                    if (state.showGuide)      state.showGuide = false;
-                    else if (state.showBoard) state.showBoard = false;
+                    if (state.showGuide)      { state.showGuide = false; sbResetInteraction(state.sb); }
+                    else if (state.showBoard) { state.showBoard = false; sbResetInteraction(state.sb); }
                     else                      state.focusIndex = 3;
                 }
                 else if (state.showBoard && (isUp || isDown)) {
                     int delta = isUp ? -1 : 1;
-                    state.boardScroll += delta;
-                    if (state.boardScroll < 0) state.boardScroll = 0;
-                    int maxScroll = BOARD_TOTAL - BOARD_VISIBLE;
-                    if (state.boardScroll > maxScroll) state.boardScroll = maxScroll;
+                    state.boardScroll = clampScroll(state.boardScroll + delta,
+                                                    BOARD_TOTAL, BOARD_VISIBLE);
                 }
                 else if (state.showGuide && (isUp || isDown)) {
                     int delta = isUp ? -1 : 1;
-                    state.guideScroll += delta;
-                    if (state.guideScroll < 0) state.guideScroll = 0;
-                    int maxScroll = GUIDE_LINE_COUNT - GUIDE_VISIBLE_LINES;
-                    if (maxScroll < 0) maxScroll = 0;
-                    if (state.guideScroll > maxScroll) state.guideScroll = maxScroll;
+                    state.guideScroll = clampScroll(state.guideScroll + delta,
+                                                    GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES);
                 }
                 else if (!state.showGuide && !state.showBoard) {
                     if ((key == SDLK_TAB && !shiftHeld) || isLeft || isDown)
@@ -363,10 +493,30 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer) {
                 event.button.button == SDL_BUTTON_LEFT) {
                 float mx = event.button.x;
                 float my = event.button.y;
+
                 if (state.showGuide) {
-                    if (hitTest(GUIDE_CLOSE, mx, my)) state.showGuide = false;
+                    if (hitTest(GUIDE_CLOSE, mx, my)) {
+                        state.showGuide = false;
+                        sbResetInteraction(state.sb);
+                    } else {
+                        // Tuong tac voi scrollbar
+                        SBLayout sb = layoutSB(GUIDE_SB_X, GUIDE_SB_Y, GUIDE_SB_H,
+                                               GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES,
+                                               state.guideScroll);
+                        sbOnMouseDown(state.sb, sb, mx, my, state.guideScroll,
+                                      GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES, nowMs);
+                    }
                 } else if (state.showBoard) {
-                    if (hitTest(BOARD_CLOSE, mx, my)) state.showBoard = false;
+                    if (hitTest(BOARD_CLOSE, mx, my)) {
+                        state.showBoard = false;
+                        sbResetInteraction(state.sb);
+                    } else {
+                        SBLayout sb = layoutSB(BOARD_SB_X, BOARD_SB_Y, BOARD_SB_H,
+                                               BOARD_TOTAL, BOARD_VISIBLE,
+                                               state.boardScroll);
+                        sbOnMouseDown(state.sb, sb, mx, my, state.boardScroll,
+                                      BOARD_TOTAL, BOARD_VISIBLE, nowMs);
+                    }
                 } else {
                     for (int i = 0; i < NUM_MAIN_BUTTONS; i++) {
                         if (hitTest(MAIN_BUTTONS[i].rect, mx, my)) {
@@ -377,6 +527,40 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer) {
                     }
                 }
             }
+
+            if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                if (state.sb.dragging) {
+                    if (state.showGuide) {
+                        SBLayout sb = layoutSB(GUIDE_SB_X, GUIDE_SB_Y, GUIDE_SB_H,
+                                               GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES,
+                                               state.guideScroll);
+                        sbOnMouseMotion(state.sb, sb, event.motion.y,
+                                        state.guideScroll, GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES);
+                    } else if (state.showBoard) {
+                        SBLayout sb = layoutSB(BOARD_SB_X, BOARD_SB_Y, BOARD_SB_H,
+                                               BOARD_TOTAL, BOARD_VISIBLE,
+                                               state.boardScroll);
+                        sbOnMouseMotion(state.sb, sb, event.motion.y,
+                                        state.boardScroll, BOARD_TOTAL, BOARD_VISIBLE);
+                    }
+                }
+            }
+
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                event.button.button == SDL_BUTTON_LEFT) {
+                // Tha chuot -> reset toan bo trang thai dang giu/keo cua scrollbar
+                sbResetInteraction(state.sb);
+            }
+        }
+
+        // Auto-repeat scroll khi giu nut ↑/↓ tren scrollbar
+        if (state.showGuide && (state.sb.upHeld || state.sb.downHeld)) {
+            sbAutoRepeat(state.sb, state.guideScroll,
+                         GUIDE_LINE_COUNT, GUIDE_VISIBLE_LINES, nowMs);
+        }
+        if (state.showBoard && (state.sb.upHeld || state.sb.downHeld)) {
+            sbAutoRepeat(state.sb, state.boardScroll,
+                         BOARD_TOTAL, BOARD_VISIBLE, nowMs);
         }
 
         drawBackground(renderer);
@@ -384,8 +568,8 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer) {
             for (int i = 0; i < NUM_MAIN_BUTTONS; i++)
                 drawButton(renderer, MAIN_BUTTONS[i], i == state.focusIndex);
         }
-        if (state.showGuide) drawGuideLightbox(renderer, state.guideScroll);
-        if (state.showBoard) drawBoardLightbox(renderer, state.boardScroll);
+        if (state.showGuide) drawGuideLightbox(renderer, state);
+        if (state.showBoard) drawBoardLightbox(renderer, state);
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
