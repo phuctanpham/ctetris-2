@@ -58,6 +58,20 @@ add_executable(cTetris ${GAME_SOURCES})
 target_include_directories(cTetris PRIVATE ${GAME_INCLUDE_DIRS})
 
 # -----------------------------------------------------------------------------
+# nanosvg headers: build.sh truyen path qua -DNANOSVG_INCLUDE_DIR.
+# Neu khong co (vi du user mo project trong IDE truc tiep), thu tim trong
+# source tree (vendored) hoac libs/<OS>/downloads/nanosvg/.
+# -----------------------------------------------------------------------------
+if(NANOSVG_INCLUDE_DIR AND EXISTS "${NANOSVG_INCLUDE_DIR}/nanosvg.h")
+    target_include_directories(cTetris PRIVATE "${NANOSVG_INCLUDE_DIR}")
+    message(STATUS "[cTetris] nanosvg: ${NANOSVG_INCLUDE_DIR}")
+elseif(EXISTS "${CMAKE_SOURCE_DIR}/src/gameStory/include/nanosvg.h")
+    message(STATUS "[cTetris] nanosvg: source tree (vendored)")
+else()
+    message(WARNING "[cTetris] nanosvg headers khong tim thay -- compile co the fail")
+endif()
+
+# -----------------------------------------------------------------------------
 # SDL3 dependency: tim qua CMake config package.
 # Cho native build, SDL3 nam o /usr/local/lib/cmake/SDL3 hoac
 # /opt/homebrew/lib/cmake/SDL3 (Homebrew silicon). Cho WASM build, build.sh

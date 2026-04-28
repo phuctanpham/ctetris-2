@@ -61,48 +61,22 @@ jobs:
             build-essential cmake git curl python3 ca-certificates
 
       # -----------------------------------------------------------------
-      # Step 3: Cache thu muc .emsdk de khong phai download lai 200MB+
-      # moi lan run. Cache key co bao gom version emsdk -- neu doi version
-      # trong build.sh thi cache se invalid va emsdk se tai lai.
+      # Step 3: Cache toan bo libs/ubuntu/downloads/ -- bao gom emsdk,
+      # SDL3 source clone, SDL3 WASM static install, va nanosvg headers.
+      # Tat ca downloads/clones cua build.sh nam o day.
+      # Cache key bind theo build.sh (de doi version pinning thi tu invalidate)
+      # va theo runner OS.
       # -----------------------------------------------------------------
-      - name: Cache emsdk
+      - name: Cache OS-driven downloads (libs/ubuntu/downloads/)
         uses: actions/cache@v4
         with:
-          path: app/.emsdk
-          key: emsdk-3.1.72-${{ runner.os }}
+          path: app/libs/ubuntu/downloads
+          key: libs-ubuntu-${{ hashFiles('app/build.sh') }}-${{ runner.os }}
           restore-keys: |
-            emsdk-3.1.72-
+            libs-ubuntu-
 
       # -----------------------------------------------------------------
-      # Step 4: Cache nanosvg headers (chi 2 file ~150KB nhung tranh
-      # phu thuoc vao network khi github raw bi rate-limit).
-      # -----------------------------------------------------------------
-      - name: Cache nanosvg headers
-        uses: actions/cache@v4
-        with:
-          path: |
-            app/src/gameStory/include/nanosvg.h
-            app/src/gameStory/include/nanosvgrast.h
-          key: nanosvg-master-${{ hashFiles('app/build.sh') }}
-
-      # -----------------------------------------------------------------
-      # Step 5: Cache SDL3 WASM static lib + clone source.
-      # SDL3 build tu source mat ~1-2 phut, cache lai tiet kiem nhieu
-      # cho cac lan push tiep theo. Cache key gan voi build.sh -- doi
-      # SDL3_VERSION trong script se tu invalidate cache.
-      # -----------------------------------------------------------------
-      - name: Cache SDL3 WASM build
-        uses: actions/cache@v4
-        with:
-          path: |
-            app/.sdl3-wasm
-            app/thirdparty/SDL
-          key: sdl3-wasm-${{ hashFiles('app/build.sh') }}-${{ runner.os }}
-          restore-keys: |
-            sdl3-wasm-
-
-      # -----------------------------------------------------------------
-      # Step 6: Lam cho build.sh executable (git tren Windows hay strip
+      # Step 4: Lam cho build.sh executable (git tren Windows hay strip
       # exec bit). Sau do chay build WASM.
       # -----------------------------------------------------------------
       - name: Build WASM via build.sh
@@ -113,26 +87,21 @@ jobs:
 
       # -----------------------------------------------------------------
       # Step 6: Chuan bi thu muc public/ chua artifact se deploy.
-      #   - Rename cTetris.html -> index.html (GitHub Pages mac dinh
-      #     phuc vu file index.html khi access dang root URL).
-      #   - Copy cac file Emscripten dau ra: .js, .wasm, favicon.svg
-      #   - Tao .nojekyll de Pages KHONG chay Jekyll (Jekyll bo qua
-      #     file/folder bat dau bang dau gach duoi -- co the lam mat
-      #     mot so asset cua Emscripten).
+      # Build artifact da nam o app/build/wasm/ubuntu/ (OS-driven path).
+      #   - Rename cTetris.html -> index.html
+      #   - Copy .js / .wasm / favicon.svg
+      #   - Tao .nojekyll de Pages khong chay Jekyll
       # -----------------------------------------------------------------
       - name: Stage Pages artifact
         run: |
           mkdir -p public
-          cp app/build/wasm/cTetris.html  public/index.html
-          cp app/build/wasm/cTetris.js    public/
-          cp app/build/wasm/cTetris.wasm  public/
-          # favicon.svg duoc build.sh copy tu brandkit/logo.svg
-          if [ -f app/build/wasm/favicon.svg ]; then
-            cp app/build/wasm/favicon.svg public/
+          cp app/build/wasm/ubuntu/cTetris.html  public/index.html
+          cp app/build/wasm/ubuntu/cTetris.js    public/
+          cp app/build/wasm/ubuntu/cTetris.wasm  public/
+          if [ -f app/build/wasm/ubuntu/favicon.svg ]; then
+            cp app/build/wasm/ubuntu/favicon.svg public/
           fi
-          # .nojekyll: ngan GitHub Pages chay Jekyll trong rendered output
           touch public/.nojekyll
-          # Liet ke artifact de dieu tra debug khi cac step sau fail
           ls -la public/
 
       # -----------------------------------------------------------------
