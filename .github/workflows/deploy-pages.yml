@@ -1,0 +1,118 @@
+name: Deploy WASM to GitHub Pages
+
+# Trigger khi co thay doi tai cac path lien quan tren branch main
+# YAML rules: branches phai la list cua string -- vd [main, develop]
+# Khong duoc viet [main] [other] -- do la 2 list lien tiep, parser fail.
+on:
+  push:
+    branches:
+      - main
+      - phucpt/github-pages
+    paths:
+      - 'app/src/**'
+      - 'app/main.cpp'
+      - 'app/web/**'
+      - 'app/brandkit/**'
+      - 'app/CMakeLists.txt'
+      - 'app/build.sh'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cai dat dependencies he thong
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+              cmake ninja-build git curl \
+              librsvg2-bin imagemagick
+
+      - name: Cache emsdk
+        id: cache-emsdk
+        uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-3.1.72-${{ runner.os }}
+
+      - name: Cai dat emsdk neu cache miss
+        if: steps.cache-emsdk.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git ~/emsdk
+          cd ~/emsdk
+          ./emsdk install  3.1.72
+          ./emsdk activate 3.1.72
+
+      - name: Cache SDL3 + brandkit assets
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/build/wasm/ubuntu/_deps
+            app/build/wasm/ubuntu/icons
+          key: build-deps-${{ runner.os }}-${{ hashFiles('app/CMakeLists.txt', 'app/brandkit/logo.svg') }}
+
+      - name: Build WASM ctetris
+        env:
+          CI: 'true'
+          TARGET: 'ctetris'
+          PLAT_CHOICE: '2'
+        run: |
+          source ~/emsdk/emsdk_env.sh
+          bash app/build.sh
+
+      - name: Chuan bi artifact deploy
+        run: |
+          mkdir -p _site
+          # Copy moi output WASM (HTML, JS, WASM, manifest, sw, icons)
+          cp -r app/build/wasm/ubuntu/. _site/
+
+          # File .nojekyll: tat Jekyll de GitHub Pages KHONG render README.md
+          # ma serve raw cac file static cua chung ta
+          touch _site/.nojekyll
+
+          # index.html: redirect tu root cua GitHub Pages -> ctetris.html
+          # (truoc do user vao https://user.github.io/repo/ -> Jekyll show README)
+          cat > _site/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="vi">
+          <head>
+              <meta charset="UTF-8">
+              <meta http-equiv="refresh" content="0; url=ctetris.html">
+              <link rel="canonical" href="ctetris.html">
+              <title>cTetris</title>
+          </head>
+          <body>
+              <p>Redirect den <a href="ctetris.html">cTetris</a>...</p>
+              <script>window.location.replace('ctetris.html');</script>
+          </body>
+          </html>
+          EOF
+          ls -la _site/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy len GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
