@@ -84,3 +84,4 @@ bld/
 **/.emsdk
 **/thirdparty
 **/.sdl3-wasm
+**/libs
