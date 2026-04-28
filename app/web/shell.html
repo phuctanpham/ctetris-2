@@ -1,169 +1,118 @@
 <!DOCTYPE html>
-<html lang="vi">
+<!--
+    shell.html -- Emscripten shell template cho cTetris (WASM build)
+    ==============================================================
+    THAY DOI v1:
+      - Da loai bo HOAN TOAN co che PWA install:
+          * Khong link <link rel="manifest" ...>
+          * Khong dang ky service worker (sw.js)
+          * Khong co button "Cai dat" / "Install" trong UI
+          * Khong co cac the meta apple-mobile-web-app-* va apple-touch-icon
+        => Browser SE KHONG hien thi icon "cai app" o thanh dia chi nua,
+           dung dau yeu cau v1.
+      - Favicon: chi su dung mot file SVG duy nhat (favicon.svg) duoc copy
+        boi build.sh tu brandkit/logo.svg. Khong PNG fallback nua.
+-->
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#4b63b7">
-<title>cTetris</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 
-<!-- PWA: manifest phai relative; favicon SVG cho modern browsers + PNG fallback -->
-<link rel="manifest" href="manifest.webmanifest">
+<!-- Tieu de tab: hau to (c) thay vi ky tu copyright vi can ASCII-safe
+     trong mot so trinh duyet/font cu. Tag <title> nay HTML thoa man UTF-8
+     nen dung truc tiep ky tu (c) thuong duoc -- nhung de chac, dung
+     entity &copy; cho dam bao moi browser hien thi dung. -->
+<title>cTetris &copy;</title>
+
+<!-- Favicon SVG-driven: SVG don gian hon nhieu kich thuoc PNG va modern
+     browser deu ho tro. Khong khai bao type=image/png nua. -->
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-
-<!-- iOS standalone PWA -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="mobile-web-app-capable" content="yes">
 
 <style>
-html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    background: #ffffff;
-    overflow: hidden;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-}
-body { display: flex; align-items: center; justify-content: center; }
-
-canvas.emscripten {
-    aspect-ratio: 270 / 480;
-    height: 100vh;
-    height: 100dvh;
-    max-height: 100dvh;
-    max-width: 100vw;
-    width: auto;
-    background: #000000;
-    display: block;
-    outline: none;
-    border: 0;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-}
-
-#loading {
-    position: fixed;
-    inset: 0;
-    background: #ffffff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-    transition: opacity 0.3s;
-}
-#loading.hidden { opacity: 0; pointer-events: none; }
-#spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid #e0e0e0;
-    border-top-color: #4b63b7;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-bottom: 16px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-#loading-text { color: #4b63b7; font-size: 14px; letter-spacing: 0.05em; }
-
-/* Nut Install custom: hien thi khi browser fire 'beforeinstallprompt'.
-   Mac dinh hidden; chuyen sang flex khi co prompt event. */
-#install-btn {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    z-index: 20;
-    padding: 8px 14px;
-    background: #4b63b7;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    display: none;
-}
-#install-btn.show { display: inline-block; }
-#install-btn:hover { background: #3d52a0; }
+    /* Reset co ban + chiem toan vung view */
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        height: 100vh;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    /* Container can giua canvas trong viewport */
+    #game-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+    }
+    /* Canvas Emscripten render game vao */
+    #canvas {
+        display: block;
+        background: #000;
+        outline: none;
+        /* Bo border mac dinh cua canvas, cho cam giac fullscreen */
+        border: none;
+    }
+    /* Loading text hien thi truoc khi WASM ready */
+    #loading {
+        color: #fff;
+        font-size: 14px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
 </style>
 </head>
 <body>
+    <div id="game-container">
+        <!-- Canvas thiet bi cua Emscripten -->
+        <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+        <!-- Text trong khi tai WASM module -->
+        <div id="loading">Loading cTetris &copy;...</div>
+    </div>
 
-<div id="loading">
-    <div id="spinner"></div>
-    <div id="loading-text">Loading cTetris...</div>
-</div>
+    <script>
+        // ==============================================
+        // Emscripten Module config (bat buoc)
+        // ==============================================
+        // Cau hinh nay duoc Emscripten generated code doc de
+        // - lay reference den canvas
+        // - in log/error ra console
+        // - an "loading" text khi runtime san sang
+        var Module = {
+            canvas: (function() {
+                var canvas = document.getElementById('canvas');
+                // Nhan focus de phim chuc nang (Esc, F5...) van duoc capture
+                canvas.addEventListener('webglcontextlost', function(e) {
+                    alert('WebGL context lost. Vui long reload.');
+                    e.preventDefault();
+                }, false);
+                return canvas;
+            })(),
+            print: function(text) {
+                console.log('[wasm]', text);
+            },
+            printErr: function(text) {
+                console.error('[wasm]', text);
+            },
+            onRuntimeInitialized: function() {
+                // An loading text khi WASM san sang
+                var loading = document.getElementById('loading');
+                if (loading) loading.style.display = 'none';
+            }
+        };
 
-<button id="install-btn" type="button">Install App</button>
+        // ==============================================
+        // KHONG dang ky service worker -- de browser khong
+        // hien thi prompt "cai dat ung dung" o thanh dia chi
+        // (yeu cau disable PWA install).
+        // ==============================================
+        // (Co tinh khong navigator.serviceWorker.register(...) o day)
+    </script>
 
-<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
-
-<script>
-// Emscripten Module config
-var Module = {
-    canvas: (function() {
-        var c = document.getElementById('canvas');
-        c.addEventListener("webglcontextlost", function(e) {
-            alert('WebGL context bi mat. Hay reload trang.');
-            e.preventDefault();
-        }, false);
-        return c;
-    })(),
-    onRuntimeInitialized: function() {
-        var loading = document.getElementById('loading');
-        if (loading) {
-            loading.classList.add('hidden');
-            setTimeout(function() { loading.style.display = 'none'; }, 300);
-        }
-    },
-    print: function(t) { console.log(t); },
-    printErr: function(t) { console.error(t); }
-};
-
-// PWA install prompt: bat su kien beforeinstallprompt de hien nut Install
-// (dac biet huu ich tren mobile va khi browser khong tu dong show banner)
-var deferredPrompt = null;
-var installBtn = document.getElementById('install-btn');
-
-window.addEventListener('beforeinstallprompt', function(e) {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.classList.add('show');
-});
-
-installBtn.addEventListener('click', function() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function() {
-        deferredPrompt = null;
-        installBtn.classList.remove('show');
-    });
-});
-
-// An nut khi da install xong
-window.addEventListener('appinstalled', function() {
-    installBtn.classList.remove('show');
-    deferredPrompt = null;
-});
-
-// Service worker: register voi scope tuong doi de hoat dong tot duoi subpath
-// (vd /ctetris/ tren GitHub Pages). Chi register tren HTTPS hoac localhost.
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-        navigator.serviceWorker.register('sw.js', { scope: './' })
-            .catch(function(err) { console.warn('SW register fail:', err); });
-    });
-}
-</script>
-
-{{{ SCRIPT }}}
-
+    <!-- Emscripten se chen script tag tro den cTetris.js o vi tri sau -->
+    {{{ SCRIPT }}}
 </body>
 </html>

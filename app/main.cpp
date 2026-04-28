@@ -1,5 +1,8 @@
 // integration/v1
 // Cua so duy nhat 270x480; Core co the tra ve 2 -> quay lai Console
+// Tieu de cua so su dung "cTetris ©" -- ky tu copyright (U+00A9) duoc OS render
+// truc tiep qua window manager nen hien thi tot tren title bar (khac voi text
+// trong SDL canvas vi SDL_RenderDebugText chi ho tro ASCII).
 #include <SDL3/SDL.h>
 
 extern int runGameStory(SDL_Window* window, SDL_Renderer* renderer);
@@ -13,7 +16,8 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    SDL_Window*   window   = SDL_CreateWindow("cTetris - Integrated", 270, 480, 0);
+    // Tieu de cua so chinh: "cTetris ©" thay vi "cTetris - Integrated"
+    SDL_Window*   window   = SDL_CreateWindow("cTetris \xC2\xA9", 270, 480, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
     if (!window || !renderer) { SDL_Quit(); return -1; }
 

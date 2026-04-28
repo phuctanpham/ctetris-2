@@ -10,15 +10,24 @@
 #define NANOSVGRAST_IMPLEMENTATION
 #include "nanosvgrast.h"
 
-// Du lieu SVG (raw string literal) cua logo UIT va logo cong ty
-#include "gameStory_logo_svg.h"
-#include "gameStory_corp_svg.h"
+// =========================================================
+// LUU Y QUAN TRONG VE 2 FILE SVG TRONG MODULE NAY:
+//   - gameStory_logo.svg  : LOGO CUA GAME cTetris (3x3 o vuong nhieu mau,
+//                           mo phong phong cach Tetris). Day la BRAND LOGO
+//                           cua game, KHONG phai logo UIT.
+//   - gameStory_corp.svg  : LOGO TRUONG DAI HOC UIT (corp credit) -- hien thi
+//                           kem dong "Powered up by ..." o cuoi man hinh intro.
+// =========================================================
+#include "gameStory_logo_svg.h"   // LOGO_SVG_DATA: logo cua GAME cTetris
+#include "gameStory_corp_svg.h"   // CORP_SVG_DATA: logo UIT (truong DH)
 
 #include <SDL3/SDL.h>
 #include <cstdlib>
 #include <cstring>
 
-const int INTRO_DURATION = 3000;
+// Loading bar duration: tang them 5 giay (3000 -> 8000) de hien thi cot truyen
+// dai hon va cho asset/network kip load tren WASM.
+const int INTRO_DURATION = 8000;
 
 // gamestory-logo-intro-01
 // Cache 2 texture (logo + corp) de chi rasterize 1 lan duy nhat
@@ -28,8 +37,8 @@ struct SvgTexture {
     int          w       = 0;
     int          h       = 0;
 };
-static SvgTexture g_logo;
-static SvgTexture g_corp;
+static SvgTexture g_logo;   // Texture logo cua GAME cTetris (gameStory_logo.svg)
+static SvgTexture g_corp;   // Texture logo UIT (gameStory_corp.svg)
 
 // Helper chung: rasterize 1 SVG (raw string) ra SDL_Texture co chieu rong
 // = targetW pixel, giu aspect ratio cua SVG goc.
@@ -97,7 +106,9 @@ static SvgTexture createSvgTexture(SDL_Renderer* renderer,
     return result;
 }
 
-// Ve logo UIT voi hieu ung fade-in (alpha tang dan theo thoi gian intro)
+// Ve LOGO CUA GAME cTetris (gameStory_logo.svg) voi hieu ung fade-in
+// (alpha tang dan theo thoi gian intro). Day KHONG phai logo UIT --
+// logo UIT la corp credit duoc ve boi drawCorpCredit() ben duoi.
 static void drawLogo(SDL_Renderer* renderer, Uint32 elapsedTime) {
     // Lazy init: chi tao texture lan dau goi (sau khi renderer da san sang)
     if (!g_logo.texture) {
@@ -120,9 +131,12 @@ static void drawLogo(SDL_Renderer* renderer, Uint32 elapsedTime) {
     };
     SDL_RenderTexture(renderer, g_logo.texture, NULL, &dst);
 
-    // Tieu de game ngay duoi logo
-    SDL_SetRenderDrawColor(renderer, 230, 230, 230, alpha);
-    const char* title = "C T E T R I S";
+    // Tieu de game ngay duoi logo. Su dung mau hoi xam (220) thay vi trang
+    // tinh (255) de font xuat hien "mong/nhe" hon (yeu cau giam thickness).
+    // Hau to "(C)" la ASCII-safe substitute cho ky tu copyright © vi
+    // SDL_RenderDebugText chi ho tro ASCII printable (0x20-0x7F).
+    SDL_SetRenderDrawColor(renderer, 220, 220, 220, alpha);
+    const char* title = "C T E T R I S (C)";
     int titleLen = (int)SDL_strlen(title);
     SDL_RenderDebugText(renderer,
                         (STORY_SCREEN_WIDTH - titleLen * 8.0f) / 2.0f,
@@ -154,22 +168,20 @@ static float drawLoadingBar(SDL_Renderer* renderer, Uint32 elapsedTime) {
 }
 
 // gamestory-corp-credit-03
-// Hang chu "Powered up by" + logo cong ty nho ben canh, can giua theo
-// chieu ngang. Y duoc xac dinh ngay duoi loading bar.
+// Hang chu "Powered up by" + LOGO UIT (gameStory_corp.svg) nho ben canh,
+// can giua theo chieu ngang. Y duoc xac dinh ngay duoi loading bar.
+//
+// LUU Y: g_corp = logo UIT (truong dai hoc), KHONG phai logo cua game.
+// Logo cua game la g_logo da ve o tren.
 //
 // Can bang kich thuoc: SDL_RenderDebugText dung font 8x8 pixel/ky tu.
-// Tang scale 1.5x cho de doc -> moi ky tu cao ~12px. Logo corp render
-// voi targetH ~16px (lon hon text mot chut de can thi giac), sau do
-// scale ngang theo aspect ratio cua SVG.
+// Mau text dung 220 (xam nhat) de tao cam giac mong/nhe hon trang tinh.
 static void drawCorpCredit(SDL_Renderer* renderer,
                            Uint32 elapsedTime,
                            float topY) {
-    // Lazy init corp texture: render mot lan voi chieu cao 16px
+    // Lazy init corp texture: render mot lan voi chieu cao tham chieu 40px
     // (do hoa chuan: ~2x chieu cao text de noi bat nhe nhung khong ap text).
     if (!g_corp.texture) {
-        // Render o do phan giai cao (40px) roi shrink xuong hien thi 16px
-        // -> antialias muot, khong bi vo pixel. Width tinh tu aspect ratio
-        // sau khi parse SVG goc.
         g_corp = createSvgTexture(renderer, CORP_SVG_DATA, 40);
     }
 
@@ -205,11 +217,12 @@ static void drawCorpCredit(SDL_Renderer* renderer,
     float textY = lineCenterY - CHAR_H / 2.0f;
     float corpY = lineCenterY - CORP_DISPLAY_H / 2.0f;
 
-    // Ve text trang voi alpha fade-in
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, alpha);
+    // Ve text mau xam nhat (220) thay vi trang tinh (255) de tao cam giac
+    // chu mong/nhe hon (yeu cau giam font thickness).
+    SDL_SetRenderDrawColor(renderer, 220, 220, 220, alpha);
     SDL_RenderDebugText(renderer, startX, textY, prefix);
 
-    // Ve logo corp ngay sau text, can theo chieu doc
+    // Ve LOGO UIT ngay sau text, can theo chieu doc
     if (g_corp.texture) {
         SDL_SetTextureAlphaMod(g_corp.texture, alpha);
         SDL_FRect corpDst = {
@@ -263,7 +276,8 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer) {
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window* window = SDL_CreateWindow("Game Story - Standalone",
+    // Standalone window title: them suffix copyright (UTF-8: \xC2\xA9 = ©)
+    SDL_Window* window = SDL_CreateWindow("Game Story \xC2\xA9 - Standalone",
                                           STORY_SCREEN_WIDTH, STORY_SCREEN_HEIGHT, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
     runGameStory(window, renderer);
