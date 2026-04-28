@@ -2,35 +2,35 @@
 # .github/workflows/deploy-pages.yml
 # Workflow build cTetris (WASM) + deploy len GitHub Pages
 # =============================================================================
-# Quy trinh:
-#   1. Trigger khi push len main hoac chay thu cong (workflow_dispatch).
-#   2. Job "build" : cai emsdk -> build WASM -> chuan bi artifact (rename
-#      cTetris.html -> index.html, them .nojekyll, copy favicon.svg).
-#   3. Job "deploy": dung action chinh thuc cua GitHub de deploy artifact
-#      ra environment github-pages.
+# Triet ly v2 (verification approach):
+#   - Workflow PRE-INSTALL day du tat ca packages can thiet truoc khi goi
+#     build.sh. Day la "ground truth" cua moi truong CI.
+#   - Sau do build.sh chay -- script PHAI detect tat ca packages da co va
+#     SKIP cac install step. Cu the:
+#       Mong doi: [OK] Tat ca N apt packages da co
+#       Khong duoc: [INFO] Thieu N/M apt packages
+#   - Step "Verify build.sh detection" sau khi build se grep log -- neu thay
+#     "Thieu .* apt packages" thi FAIL workflow voi error message ro rang.
+#     Day la guard tu dong: phat hien khi function `is_apt_pkg_installed`
+#     bi loi ma chua kip notice o local.
 #
 # Yeu cau cau hinh repo (mot lan):
-#   Settings > Pages > Source = "GitHub Actions" (KHONG dung gh-pages branch).
-#   Settings > Actions > General > Workflow permissions = "Read and write".
+#   Settings > Pages > Source = "GitHub Actions"
+#   Settings > Actions > General > Workflow permissions = "Read and write"
 # =============================================================================
 
 name: Deploy cTetris to GitHub Pages
 
-# Trigger: push len main + cho phep run thu cong
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# Quyen: pages:write + id-token:write la BAT BUOC cho actions/deploy-pages.
-# contents:read de checkout source.
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Chi cho phep 1 deployment chay tai 1 thoi diem. Neu co commit moi keo
-# vao trong khi job dang chay, GitHub se huy job cu va chay job moi.
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -50,20 +50,27 @@ jobs:
         uses: actions/checkout@v4
 
       # -----------------------------------------------------------------
-      # Step 2: Cai system dependencies cho compile (cmake, git, curl,
-      # python3 -- emsdk can python). KHONG can SDL3 dev libs vi WASM
-      # build dung emscripten port -sUSE_SDL=3, khong link SDL3 he thong.
+      # Step 2: PRE-INSTALL toan bo packages can thiet cho WASM build.
+      # Danh sach nay PHAI khop chinh xac voi danh sach trong
+      # ensure_basic_tools()/ubuntu cua build.sh -- de script detect duoc
+      # day du va skip install. Neu khong khop, script se chay apt-get
+      # install dac thua va workflow phat hien o step Verify cuoi cung.
       # -----------------------------------------------------------------
-      - name: Install build tools
+      - name: Pre-install required apt packages (CI ground truth)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake git curl python3 ca-certificates
+            build-essential \
+            cmake \
+            git \
+            curl \
+            python3 \
+            ca-certificates \
+            pkg-config
 
       # -----------------------------------------------------------------
       # Step 3: Cache toan bo libs/ubuntu/downloads/ -- bao gom emsdk,
       # SDL3 source clone, SDL3 WASM static install, va nanosvg headers.
-      # Tat ca downloads/clones cua build.sh nam o day.
       # Cache key bind theo build.sh (de doi version pinning thi tu invalidate)
       # va theo runner OS.
       # -----------------------------------------------------------------
@@ -76,21 +83,60 @@ jobs:
             libs-ubuntu-
 
       # -----------------------------------------------------------------
-      # Step 4: Lam cho build.sh executable (git tren Windows hay strip
-      # exec bit). Sau do chay build WASM.
+      # Step 4: Run build.sh wasm + capture log de verify o step sau.
+      # Quan trong: chay voi `set -o pipefail` de exit code cua build.sh
+      # khong bi che bo tee -- neu build fail, workflow van fail.
       # -----------------------------------------------------------------
-      - name: Build WASM via build.sh
+      - name: Build WASM (script should DETECT all installed packages)
         working-directory: app
         run: |
+          set -o pipefail
           chmod +x build.sh
-          ./build.sh wasm
+          ./build.sh wasm 2>&1 | tee build.log
 
       # -----------------------------------------------------------------
-      # Step 6: Chuan bi thu muc public/ chua artifact se deploy.
-      # Build artifact da nam o app/build/wasm/ubuntu/ (OS-driven path).
+      # Step 5: VERIFY -- grep log de check rang script khong tu install lai
+      # cac packages ma workflow da pre-install. Neu phat hien thi fail
+      # workflow voi message ro rang -- la indicator script's detection
+      # function (is_apt_pkg_installed) co bug.
+      # -----------------------------------------------------------------
+      - name: Verify build.sh detection works correctly
+        working-directory: app
+        run: |
+          echo "=== Verifying build.sh package detection ==="
+
+          # Test 1: KHONG duoc thay "Thieu N/M apt packages: ..."
+          # day nghia la script khong detect duoc package da pre-install
+          if grep -E "Thieu [0-9]+/[0-9]+ apt packages" build.log; then
+            echo "::error::build.sh tried to install apt packages despite them being pre-installed!"
+            echo "::error::Function is_apt_pkg_installed() is BROKEN -- check dpkg-query usage."
+            echo "::error::Workflow Step 2 pre-installed: build-essential cmake git curl python3 ca-certificates pkg-config"
+            echo "::error::Script should report '[OK] Tat ca N apt packages da co' instead."
+            exit 1
+          fi
+
+          # Test 2: PHAI thay "[OK] Tat ca N apt packages da co" -- xac nhan
+          # ensure_basic_tools da chay va detect thanh cong
+          if ! grep -E "\[OK\].*apt packages da co" build.log; then
+            echo "::warning::Khong thay log xac nhan apt packages detection chay thanh cong"
+            echo "::warning::Co the build.sh skip phan ensure_basic_tools (vi da co cache?)"
+          else
+            echo "OK: build.sh detected pre-installed apt packages correctly"
+          fi
+
+          # Test 3: build artifact phai ton tai
+          if [ ! -f build/wasm/ubuntu/cTetris.html ]; then
+            echo "::error::Build artifact missing: build/wasm/ubuntu/cTetris.html"
+            exit 1
+          fi
+          echo "OK: Build artifacts present"
+
+      # -----------------------------------------------------------------
+      # Step 6: Stage Pages artifact
+      # Build artifact nam o app/build/wasm/ubuntu/ (OS-driven path).
       #   - Rename cTetris.html -> index.html
       #   - Copy .js / .wasm / favicon.svg
-      #   - Tao .nojekyll de Pages khong chay Jekyll
+      #   - Tao .nojekyll
       # -----------------------------------------------------------------
       - name: Stage Pages artifact
         run: |
@@ -105,26 +151,32 @@ jobs:
           ls -la public/
 
       # -----------------------------------------------------------------
-      # Step 7: Upload thu muc public/ thanh artifact "github-pages".
-      # actions/deploy-pages o job sau chi accept dung ten artifact nay.
+      # Step 7: Upload Pages artifact
       # -----------------------------------------------------------------
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
 
+      # -----------------------------------------------------------------
+      # Step 8: Upload build.log la artifact rieng -- de debug khi can.
+      # Always run, ke ca khi cac step truoc fail.
+      # -----------------------------------------------------------------
+      - name: Upload build log (for debugging)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: app/build.log
+          retention-days: 7
+
   # ---------------------------------------------------------------------------
   # Job 2: DEPLOY
-  # ---------------------------------------------------------------------------
-  # Tach rieng ra de neu deploy fail thi build artifact van con (debug).
-  # Phu thuoc vao job build hoan thanh thanh cong.
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
-    # Khai bao environment github-pages -- bat buoc de actions/deploy-pages
-    # co the tac dong vao Pages config va xuat ra page_url cua deployment.
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

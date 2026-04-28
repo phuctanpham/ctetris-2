@@ -75,9 +75,21 @@ endif()
 # SDL3 dependency: tim qua CMake config package.
 # Cho native build, SDL3 nam o /usr/local/lib/cmake/SDL3 hoac
 # /opt/homebrew/lib/cmake/SDL3 (Homebrew silicon). Cho WASM build, build.sh
-# install SDL3 tinh vao $APP_DIR/.sdl3-wasm/ va truyen
-# -DCMAKE_PREFIX_PATH=... khi goi emcmake.
+# install SDL3 tinh vao $APP_DIR/libs/<OS>/downloads/sdl3-wasm/ va truyen
+# -DSDL3_DIR=... + -DCMAKE_PREFIX_PATH=... khi goi emcmake.
 # -----------------------------------------------------------------------------
+# CRITICAL: Emscripten toolchain (Emscripten.cmake) mac dinh set
+#   CMAKE_FIND_ROOT_PATH_MODE_PACKAGE = ONLY
+# nghia la find_package CHI search trong sysroot cua emsdk va BO QUA
+# CMAKE_PREFIX_PATH cua user. Day la cu phap bao ve cross-compile, nhung
+# trong project nay ta CO tinh truyen path den SDL3 da build cho wasm32 --
+# nen phai mo rong sang BOTH (ca sysroot va prefix path) khi build WASM.
+if(BUILD_WASM)
+    set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
+    set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
+    set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
+endif()
+
 find_package(SDL3 REQUIRED CONFIG)
 target_link_libraries(cTetris PRIVATE SDL3::SDL3)
 message(STATUS "[cTetris] SDL3 found: ${SDL3_DIR}")

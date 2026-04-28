@@ -244,13 +244,28 @@ function Initialize-Emsdk {
 #   3. Build tu source vao $DownloadDir\sdl3-native\
 # =============================================================================
 function Initialize-Sdl3Native {
-    if ((Get-Command pkg-config -ErrorAction SilentlyContinue) -and `
-        ((& pkg-config --exists sdl3 2>$null; $LASTEXITCODE) -eq 0)) {
-        $v = & pkg-config --modversion sdl3
-        Write-Ok "SDL3 da co qua pkg-config (version $v)"
-        return
+    Write-Info 'Checking SDL3 cho native Windows (priority chain)...'
+
+    # Priority 1: pkg-config
+    Write-Info '  [1/4] Try pkg-config --exists sdl3...'
+    if (Get-Command pkg-config -ErrorAction SilentlyContinue) {
+        & pkg-config --exists sdl3 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $v = & pkg-config --modversion sdl3
+            Write-Ok "Found via pkg-config (version $v) -- skip install"
+            return
+        }
     }
-    Write-Info "Build SDL3 $Sdl3Version tu source cho native Windows..."
+    Write-Info '  ... pkg-config khong co SDL3'
+
+    # Priority 2: winget / choco install (rare cho SDL3 -- thuong khong co)
+    Write-Info '  [2/4] Skip package manager (SDL3 hiem co o winget/choco)'
+
+    # Priority 3: vcpkg (neu user da setup)
+    Write-Info '  [3/4] Skip vcpkg (chua implement)'
+
+    # Priority 4: build tu source
+    Write-Info '  [4/4] Build tu source...'
     Build-Sdl3FromSource -InstallPrefix (Join-Path $DownloadDir 'sdl3-native') `
                          -Target 'native'
 }
@@ -263,16 +278,25 @@ function Initialize-Sdl3Wasm {
     $cmakeConf  = Join-Path $installDir 'lib\cmake\SDL3'
     $cmakeConf64= Join-Path $installDir 'lib64\cmake\SDL3'
 
+    Write-Info "Checking SDL3 WASM cache tai $installDir..."
+
     if ((Test-Path $cmakeConf) -or (Test-Path $cmakeConf64)) {
         $hasLib = Get-ChildItem -Path $installDir -Recurse -Filter 'libSDL3*.a' `
                                 -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($hasLib) {
-            Write-Ok "SDL3 WASM static da co tai $installDir (skip)"
+            Write-Ok "SDL3 WASM cache HIT -- skip rebuild (~1-2 phut tiet kiem)"
             return
         }
+        Write-Warn 'Cache co cmake config nhung thieu .a -- rebuild'
+    } else {
+        Write-Info 'Cache MISS -- chua build SDL3 cho WASM lan nao'
     }
 
-    Write-Info "Build SDL3 $Sdl3Version cho WASM (lan dau, ~1-2 phut)..."
+    # Note: Win/system SDL3 (neu co) la binary native arch, KHONG dung duoc
+    # cho wasm32 target. Phai build rieng voi Emscripten toolchain.
+    Write-Info 'System SDL3 (neu co) la native arch -- KHONG dung duoc cho wasm32'
+    Write-Info "Build SDL3 $Sdl3Version cho WASM target (lan dau, ~1-2 phut)..."
+
     Build-Sdl3FromSource -InstallPrefix $installDir -Target 'wasm'
 }
 
@@ -369,6 +393,7 @@ function Test-Sources {
         'src\gameCore\app.cpp',
         'src\gameStory\include\gameStory_layout.h',
         'src\gameStory\include\gameStory_logo_svg.h',
+        'src\gameStory\include\gameStory_corp_svg.h',
         'src\gameConsole\include\gameConsole_layout.h',
         'src\gameCore\include\gameCore_layout.h',
         'CMakeLists.txt'
@@ -396,12 +421,27 @@ function Build-Native {
     Initialize-Sdl3Native
     Initialize-Nanosvg
 
+    # Tim path SDL3Config.cmake (uu tien lib\, fallback lib64\)
+    $sdlInstall = Join-Path $DownloadDir 'sdl3-native'
+    $sdlDirArgs = @()
+    foreach ($cand in @(
+        (Join-Path $sdlInstall 'lib\cmake\SDL3'),
+        (Join-Path $sdlInstall 'lib64\cmake\SDL3')
+    )) {
+        if (Test-Path (Join-Path $cand 'SDL3Config.cmake')) {
+            $sdlDirArgs = @("-DSDL3_DIR=$cand")
+            Write-Info "SDL3_DIR = $cand"
+            break
+        }
+    }
+
     New-Item -ItemType Directory -Force -Path $BuildNativeDir | Out-Null
     cmake -S $AppDir -B $BuildNativeDir `
           -DCMAKE_BUILD_TYPE=Release `
           -DBUILD_WASM=OFF `
-          -DCMAKE_PREFIX_PATH=(Join-Path $DownloadDir 'sdl3-native') `
-          -DNANOSVG_INCLUDE_DIR=(Join-Path $DownloadDir 'nanosvg')
+          -DCMAKE_PREFIX_PATH=$sdlInstall `
+          -DNANOSVG_INCLUDE_DIR=(Join-Path $DownloadDir 'nanosvg') `
+          @sdlDirArgs
     cmake --build $BuildNativeDir --config Release -j
     Write-Ok "Native build hoan tat: $BuildNativeDir"
 }
@@ -414,11 +454,30 @@ function Build-Wasm {
     Initialize-Sdl3Wasm
     Initialize-Nanosvg
 
+    # Tim chinh xac thu muc chua SDL3Config.cmake (bypass Emscripten root path)
+    $sdlInstall = Join-Path $DownloadDir 'sdl3-wasm'
+    $sdlDir = $null
+    foreach ($cand in @(
+        (Join-Path $sdlInstall 'lib\cmake\SDL3'),
+        (Join-Path $sdlInstall 'lib64\cmake\SDL3')
+    )) {
+        if (Test-Path (Join-Path $cand 'SDL3Config.cmake')) {
+            $sdlDir = $cand
+            break
+        }
+    }
+    if (-not $sdlDir) {
+        Write-Err "Khong tim thay SDL3Config.cmake trong $sdlInstall\lib*\cmake\SDL3\"
+        throw 'SDL3 WASM build incomplete'
+    }
+    Write-Info "SDL3_DIR = $sdlDir"
+
     New-Item -ItemType Directory -Force -Path $BuildWasmDir | Out-Null
     emcmake cmake -S $AppDir -B $BuildWasmDir `
                   -DCMAKE_BUILD_TYPE=Release `
                   -DBUILD_WASM=ON `
-                  -DCMAKE_PREFIX_PATH=(Join-Path $DownloadDir 'sdl3-wasm') `
+                  -DSDL3_DIR=$sdlDir `
+                  -DCMAKE_PREFIX_PATH=$sdlInstall `
                   -DNANOSVG_INCLUDE_DIR=(Join-Path $DownloadDir 'nanosvg')
     cmake --build $BuildWasmDir -j
 

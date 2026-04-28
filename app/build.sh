@@ -292,54 +292,77 @@ ensure_emsdk() {
 #   4. Build tu source vao $DOWNLOAD_DIR/sdl3-native/, install local
 # =============================================================================
 ensure_sdl3_native() {
-    # Priority 1+2: SDL3 da co tren he thong
+    log_info "Checking SDL3 cho native build (priority chain)..."
+
+    # Priority 1: pkg-config --exists sdl3 (chuan moi nhat, brew + distro deu cap)
+    log_info "  [1/4] Try pkg-config --exists sdl3..."
     if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists sdl3 2>/dev/null; then
         local v; v=$(pkg-config --modversion sdl3)
-        log_ok "SDL3 da co qua pkg-config (version $v)"
+        log_ok "Found via pkg-config (version $v) -- skip install"
         return 0
     fi
-    if command -v sdl3-config >/dev/null 2>&1; then
-        log_ok "SDL3 da co qua sdl3-config"
-        return 0
-    fi
+    log_info "  ... pkg-config khong co SDL3 (hoac pkg-config khong co)"
 
-    # Priority 3: package manager
+    # Priority 2: sdl3-config tren PATH (legacy, mot so distro van con)
+    log_info "  [2/4] Try sdl3-config tren PATH..."
+    if command -v sdl3-config >/dev/null 2>&1; then
+        log_ok "Found via sdl3-config -- skip install"
+        return 0
+    fi
+    log_info "  ... sdl3-config khong co"
+
+    # Priority 3: package manager (brew/apt/dnf/pacman)
+    log_info "  [3/4] Try install qua package manager..."
     case "$OS_NAME" in
         macos)
             if command -v brew >/dev/null 2>&1; then
-                log_info "Cai SDL3 qua Homebrew..."
-                install_brew_formulas_if_missing sdl3
-                if pkg-config --exists sdl3 2>/dev/null; then
-                    log_ok "SDL3 da cai xong qua brew"
+                if is_brew_formula_installed sdl3; then
+                    log_ok "Brew formula 'sdl3' da cai (re-check pkg-config sau install path)"
+                else
+                    log_info "Cai SDL3 qua Homebrew..."
+                    brew install sdl3
+                fi
+                # Brew co the install vao /opt/homebrew (silicon) hoac /usr/local (intel)
+                # pkg-config se tu pickup. Re-check lan nua.
+                if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists sdl3 2>/dev/null; then
+                    local v; v=$(pkg-config --modversion sdl3)
+                    log_ok "Found via brew + pkg-config (version $v) -- skip source build"
                     return 0
                 fi
+                log_warn "Brew co cai sdl3 nhung pkg-config khong thay -- check PKG_CONFIG_PATH"
+            else
+                log_warn "Khong co Homebrew tren macOS"
             fi
             ;;
         ubuntu)
-            # apt: SDL3 chua co binary package o Ubuntu LTS hien tai (12.2024)
-            # nen apt-get install libsdl3-dev se fail -- fall through xuong source build.
-            # Ghi chu: kiem tra lai khi Ubuntu them SDL3 vao official repo.
-            log_info "Ubuntu: SDL3 chua co binary package o repo chinh, build tu source"
+            log_info "Ubuntu: SDL3 chua co binary o repo chinh (12.2024). Skip apt, di xuong source build."
             ;;
         fedora)
             if command -v dnf >/dev/null 2>&1; then
                 log_info "Thu cai SDL3 qua dnf..."
                 install_dnf_packages_if_missing SDL3-devel || true
-                pkg-config --exists sdl3 2>/dev/null && { log_ok "SDL3 da cai xong"; return 0; }
+                if pkg-config --exists sdl3 2>/dev/null; then
+                    log_ok "Found via dnf -- skip source build"
+                    return 0
+                fi
             fi
             ;;
         arch)
             if command -v pacman >/dev/null 2>&1; then
                 log_info "Thu cai SDL3 qua pacman..."
                 install_pacman_packages_if_missing sdl3 || true
-                pkg-config --exists sdl3 2>/dev/null && { log_ok "SDL3 da cai xong"; return 0; }
+                if pkg-config --exists sdl3 2>/dev/null; then
+                    log_ok "Found via pacman -- skip source build"
+                    return 0
+                fi
             fi
             ;;
     esac
 
-    # Priority 4: build tu source local
-    log_info "Build SDL3 $SDL3_VERSION tu source (fallback)..."
-    ensure_linux_dev_libs   # can X11/Wayland/OpenGL... cho native build
+    # Priority 4: Build tu source local (last resort)
+    log_info "  [4/4] Build tu source vao $DOWNLOAD_DIR/sdl3-native/..."
+    log_info "Lanh dao package manager khong co SDL3, fallback ve source build"
+    ensure_linux_dev_libs   # X11/Wayland/OpenGL... can cho native build
     build_sdl3_from_source "$DOWNLOAD_DIR/sdl3-native" "native"
 }
 
@@ -351,15 +374,27 @@ ensure_sdl3_native() {
 ensure_sdl3_wasm() {
     local install_dir="$DOWNLOAD_DIR/sdl3-wasm"
 
-    # Validate da install thanh cong: co cmake config + .a
+    log_info "Checking SDL3 WASM cache tai $install_dir..."
+
+    # Priority 1: Cache tu lan build truoc -- check ca cmake config + .a
     if [ -d "$install_dir/lib/cmake/SDL3" ] || [ -d "$install_dir/lib64/cmake/SDL3" ]; then
         if find "$install_dir" -name 'libSDL3*.a' -print -quit 2>/dev/null | grep -q .; then
-            log_ok "SDL3 WASM static da co tai $install_dir (skip rebuild)"
+            log_ok "SDL3 WASM cache HIT -- skip rebuild (~1-2 phut tiet kiem)"
             return 0
         fi
+        log_warn "Cache co cmake config nhung thieu .a -- rebuild"
+    else
+        log_info "Cache MISS -- chua build SDL3 cho WASM lan nao"
     fi
 
-    log_info "Build SDL3 $SDL3_VERSION cho WASM (lan dau, ~1-2 phut)..."
+    # Note quan trong: Brew SDL3 (neu da brew install sdl3 san) la binary
+    # native arch (x86_64/arm64), KHONG TUONG THICH voi WASM target (wasm32).
+    # Emscripten port -sUSE_SDL=3 cung khong on dinh tren emsdk 3.1.72.
+    # -> Phai build SDL3 RIENG voi Emscripten toolchain. Lan dau ~1-2 phut,
+    #    cache se tai $install_dir va lan sau skip nhanh.
+    log_info "Brew/system SDL3 (neu co) la native arch -- KHONG dung duoc cho wasm32"
+    log_info "Build SDL3 $SDL3_VERSION cho WASM target (lan dau, ~1-2 phut)..."
+
     build_sdl3_from_source "$install_dir" "wasm"
 }
 
@@ -517,6 +552,7 @@ validate_sources() {
         "$APP_DIR/src/gameCore/app.cpp"
         "$APP_DIR/src/gameStory/include/gameStory_layout.h"
         "$APP_DIR/src/gameStory/include/gameStory_logo_svg.h"
+        "$APP_DIR/src/gameStory/include/gameStory_corp_svg.h"
         "$APP_DIR/src/gameConsole/include/gameConsole_layout.h"
         "$APP_DIR/src/gameCore/include/gameCore_layout.h"
         "$APP_DIR/CMakeLists.txt"
@@ -544,12 +580,27 @@ build_native() {
     ensure_sdl3_native
     ensure_nanosvg
 
+    # Tim path SDL3Config.cmake de truyen truc tiep qua SDL3_DIR.
+    # Neu khong tim duoc (SDL3 cai he thong qua brew/distro), de cmake tu
+    # search qua CMAKE_PREFIX_PATH va default search paths.
+    local sdl_dir_arg=()
+    for candidate in \
+        "$DOWNLOAD_DIR/sdl3-native/lib/cmake/SDL3" \
+        "$DOWNLOAD_DIR/sdl3-native/lib64/cmake/SDL3"; do
+        if [ -f "$candidate/SDL3Config.cmake" ]; then
+            sdl_dir_arg=(-DSDL3_DIR="$candidate")
+            log_info "SDL3_DIR = $candidate"
+            break
+        fi
+    done
+
     mkdir -p "$BUILD_NATIVE_DIR"
     cmake -S "$APP_DIR" -B "$BUILD_NATIVE_DIR" \
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_WASM=OFF \
           -DCMAKE_PREFIX_PATH="$DOWNLOAD_DIR/sdl3-native" \
-          -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg"
+          -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg" \
+          "${sdl_dir_arg[@]}"
     cmake --build "$BUILD_NATIVE_DIR" -j
     log_ok "Native build hoan tat: $BUILD_NATIVE_DIR"
 }
@@ -562,11 +613,32 @@ build_wasm() {
     ensure_sdl3_wasm
     ensure_nanosvg
 
+    # Tim chinh xac thu muc chua SDL3Config.cmake -- truyen qua SDL3_DIR
+    # de bypass van de Emscripten root path mode (find_package mac dinh
+    # khong search ngoai sysroot khi cross-compile).
+    local sdl_install="$DOWNLOAD_DIR/sdl3-wasm"
+    local sdl_dir=""
+    for candidate in \
+        "$sdl_install/lib/cmake/SDL3" \
+        "$sdl_install/lib64/cmake/SDL3"; do
+        if [ -f "$candidate/SDL3Config.cmake" ]; then
+            sdl_dir="$candidate"
+            break
+        fi
+    done
+    if [ -z "$sdl_dir" ]; then
+        log_error "Khong tim thay SDL3Config.cmake trong $sdl_install/lib*/cmake/SDL3/"
+        log_error "Co the build SDL3 WASM bi loi -- xem log build_sdl3_from_source"
+        exit 1
+    fi
+    log_info "SDL3_DIR = $sdl_dir"
+
     mkdir -p "$BUILD_WASM_DIR"
     emcmake cmake -S "$APP_DIR" -B "$BUILD_WASM_DIR" \
                   -DCMAKE_BUILD_TYPE=Release \
                   -DBUILD_WASM=ON \
-                  -DCMAKE_PREFIX_PATH="$DOWNLOAD_DIR/sdl3-wasm" \
+                  -DSDL3_DIR="$sdl_dir" \
+                  -DCMAKE_PREFIX_PATH="$sdl_install" \
                   -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg"
     cmake --build "$BUILD_WASM_DIR" -j
 

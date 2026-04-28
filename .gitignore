@@ -81,7 +81,4 @@ bld/
 *.svclog
 *.scc
 **/build
-**/.emsdk
-**/thirdparty
-**/.sdl3-wasm
 **/libs
