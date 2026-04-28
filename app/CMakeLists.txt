@@ -55,13 +55,29 @@ if(BUILD_WASM)
     # -------------------------------------------------------------------------
     message(STATUS "[cTetris] Build mode: WASM (Emscripten)")
 
-    # USE_SDL=3 lay tu emsdk port -- tu link SDL3 san co
-    set(EMS_FLAGS "-sUSE_SDL=3 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY=1")
-    set_target_properties(cTetris PROPERTIES
-        SUFFIX ".html"
-        LINK_FLAGS "${EMS_FLAGS} --shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
+    # -------------------------------------------------------------------------
+    # SDL3 port cua Emscripten: PHAI pass -sUSE_SDL=3 o CA HAI giai doan
+    # COMPILE va LINK. O compile time, em++ them include path cua port
+    # (cho SDL3/SDL.h tim duoc); o link time, em++ build & link library
+    # SDL3 san co cua port.
+    # Ly do dung "SHELL:..." prefix:
+    #   - CMake mac dinh deduplicate args, va co the bo qua / merge cac
+    #     option co dau "=" theo cach khong mong muon. SHELL: bao CMake
+    #     pass nguyen ven 1 chuoi nhu the user go vao terminal.
+    #   - Ap dung nguyen tac nay cho moi -s* flag de tranh edge-case.
+    # -------------------------------------------------------------------------
+    target_compile_options(cTetris PRIVATE
+        "SHELL:-sUSE_SDL=3"
     )
-    target_compile_options(cTetris PRIVATE -sUSE_SDL=3)
+    target_link_options(cTetris PRIVATE
+        "SHELL:-sUSE_SDL=3"
+        "SHELL:-sALLOW_MEMORY_GROWTH=1"
+        "SHELL:-sASYNCIFY=1"
+        "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
+    )
+
+    # Sinh ra cTetris.html (kem .js + .wasm) thay vi binary mac dinh
+    set_target_properties(cTetris PROPERTIES SUFFIX ".html")
 
     # Copy favicon.svg ra cung cap voi cTetris.html. SVG-driven, khong PNG.
     # File favicon.svg do build.sh / build.ps1 copy tu brandkit/logo.svg

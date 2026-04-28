@@ -139,7 +139,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     # Khai bao environment github-pages -- bat buoc de actions/deploy-pages
-    # co the tac dong vao Pages config va xuat ra page_url cua deployment.
+    # co the tac dong vao Pages config va xuat thanh page_url cua deployment.
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
