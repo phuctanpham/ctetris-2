@@ -139,7 +139,155 @@ ensure_emsdk() {
 }
 
 # -----------------------------------------------------------------------------
-# Cai SDL3 cho build native. Tren macOS dung Homebrew, Linux build tu source.
+# Cai system dev libraries can thiet de BUILD SDL3 tu source tren Linux.
+# SDL3 yeu cau headers cua: X11/Wayland (windowing), libdrm/gbm (KMS),
+# OpenGL/EGL/GLES (renderer), ALSA/PulseAudio (audio), libudev (input),
+# libunwind (stack trace cua SDL_assert).
+# Nhan dien package manager (apt-get / dnf / yum / pacman / zypper / apk) va
+# cai dat goi tuong ung. Cai goi heo theo distro:
+#   - Debian/Ubuntu: dung apt-get  (vi du Ubuntu 22.04, Debian 12)
+#   - Fedora/RHEL/CentOS: dung dnf hoac yum
+#   - Arch / Manjaro: dung pacman
+#   - openSUSE: dung zypper
+#   - Alpine: dung apk
+# Neu khong tim thay package manager nao, in danh sach yeu cau de user tu cai.
+# -----------------------------------------------------------------------------
+ensure_linux_dev_libs() {
+    # Detect: chi can chay tren Linux. macOS bo qua hoan toan.
+    if [[ "$(uname)" != "Linux" ]]; then
+        return 0
+    fi
+
+    # Helper goi sudo neu user khong phai root va sudo san co
+    local SUDO=""
+    if [[ "$EUID" -ne 0 ]]; then
+        if command -v sudo &>/dev/null; then
+            SUDO="sudo"
+        else
+            log_warn "Khong phai root va khong co sudo -- viec cai system libs co the fail"
+        fi
+    fi
+
+    # ----- apt-get (Debian, Ubuntu) -----
+    if command -v apt-get &>/dev/null; then
+        log_info "Detect apt-get -> cai SDL3 dev libs cho Debian/Ubuntu..."
+        $SUDO apt-get update -qq || log_warn "apt-get update fail"
+        $SUDO apt-get install -y --no-install-recommends \
+            build-essential pkg-config cmake git curl \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxinerama-dev libxxf86vm-dev libxss-dev \
+            libwayland-dev libxkbcommon-dev wayland-protocols \
+            libdrm-dev libgbm-dev \
+            libgl1-mesa-dev libglu1-mesa-dev libegl1-mesa-dev \
+            libgles2-mesa-dev \
+            libpulse-dev libasound2-dev libsndio-dev \
+            libudev-dev libdbus-1-dev libibus-1.0-dev \
+            libunwind-dev \
+            || log_warn "apt-get install gap loi mot so goi"
+        return 0
+    fi
+
+    # ----- dnf (Fedora, RHEL 8+, CentOS 8+) -----
+    if command -v dnf &>/dev/null; then
+        log_info "Detect dnf -> cai SDL3 dev libs cho Fedora/RHEL..."
+        $SUDO dnf install -y \
+            gcc-c++ make pkgconf-pkg-config cmake git curl \
+            libX11-devel libXext-devel libXrandr-devel libXcursor-devel \
+            libXi-devel libXinerama-devel libXxf86vm-devel libXScrnSaver-devel \
+            wayland-devel libxkbcommon-devel wayland-protocols-devel \
+            libdrm-devel mesa-libgbm-devel \
+            mesa-libGL-devel mesa-libGLU-devel mesa-libEGL-devel mesa-libGLES-devel \
+            pulseaudio-libs-devel alsa-lib-devel \
+            systemd-devel dbus-devel ibus-devel \
+            libunwind-devel \
+            || log_warn "dnf install gap loi mot so goi"
+        return 0
+    fi
+
+    # ----- yum (RHEL 7 / CentOS 7) -----
+    if command -v yum &>/dev/null; then
+        log_info "Detect yum -> cai SDL3 dev libs cho RHEL7/CentOS7..."
+        $SUDO yum install -y \
+            gcc-c++ make pkgconfig cmake git curl \
+            libX11-devel libXext-devel libXrandr-devel libXcursor-devel \
+            libXi-devel libXinerama-devel libXxf86vm-devel libXScrnSaver-devel \
+            wayland-devel libxkbcommon-devel \
+            libdrm-devel mesa-libgbm-devel \
+            mesa-libGL-devel mesa-libGLU-devel mesa-libEGL-devel \
+            pulseaudio-libs-devel alsa-lib-devel \
+            systemd-devel dbus-devel \
+            libunwind-devel \
+            || log_warn "yum install gap loi mot so goi"
+        return 0
+    fi
+
+    # ----- pacman (Arch, Manjaro) -----
+    if command -v pacman &>/dev/null; then
+        log_info "Detect pacman -> cai SDL3 dev libs cho Arch/Manjaro..."
+        $SUDO pacman -Sy --needed --noconfirm \
+            base-devel pkgconf cmake git curl \
+            libx11 libxext libxrandr libxcursor libxi libxinerama libxxf86vm libxss \
+            wayland libxkbcommon wayland-protocols \
+            libdrm mesa \
+            alsa-lib libpulse \
+            systemd dbus \
+            libunwind \
+            || log_warn "pacman install gap loi mot so goi"
+        return 0
+    fi
+
+    # ----- zypper (openSUSE) -----
+    if command -v zypper &>/dev/null; then
+        log_info "Detect zypper -> cai SDL3 dev libs cho openSUSE..."
+        $SUDO zypper install -y -t pattern devel_C_C++ || true
+        $SUDO zypper install -y \
+            cmake git curl pkg-config \
+            libX11-devel libXext-devel libXrandr-devel libXcursor-devel \
+            libXi-devel libXinerama-devel libXxf86vm-devel \
+            wayland-devel libxkbcommon-devel \
+            libdrm-devel Mesa-libGL-devel Mesa-libEGL-devel Mesa-libgbm-devel \
+            libpulse-devel alsa-devel \
+            systemd-devel dbus-1-devel \
+            libunwind-devel \
+            || log_warn "zypper install gap loi mot so goi"
+        return 0
+    fi
+
+    # ----- apk (Alpine) -----
+    if command -v apk &>/dev/null; then
+        log_info "Detect apk -> cai SDL3 dev libs cho Alpine..."
+        $SUDO apk add --no-cache \
+            build-base cmake git curl pkgconfig \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxinerama-dev libxxf86vm-dev libxscrnsaver-dev \
+            wayland-dev libxkbcommon-dev wayland-protocols \
+            libdrm-dev mesa-dev \
+            pulseaudio-dev alsa-lib-dev \
+            eudev-dev dbus-dev \
+            libunwind-dev \
+            || log_warn "apk add gap loi mot so goi"
+        return 0
+    fi
+
+    # ----- Fallback: in danh sach goi can cai thu cong -----
+    log_error "Khong nhan dien duoc package manager."
+    log_error "Vui long cai THU CONG cac dev libs sau truoc khi build SDL3:"
+    cat <<'EOF'
+  X11:        libX11, libXext, libXrandr, libXcursor, libXi, libXinerama,
+              libXxf86vm, libXScrnSaver  (kem -dev / -devel)
+  Wayland:    libwayland, libxkbcommon, wayland-protocols (kem -dev / -devel)
+  KMS/DRM:    libdrm, libgbm  (kem -dev / -devel)
+  OpenGL:     libGL, libGLU, libEGL, libGLES (Mesa, kem -dev / -devel)
+  Audio:      libpulse, libasound (ALSA)  (kem -dev / -devel)
+  Input:      libudev (systemd hoac eudev), libdbus (kem -dev / -devel)
+  Other:      libunwind  (kem -dev / -devel)
+EOF
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# Cai SDL3 cho build native. Tren macOS dung Homebrew, Linux cai dev libs
+# system roi build SDL3 tu source.
 # -----------------------------------------------------------------------------
 ensure_native_deps() {
     if command -v sdl3-config &>/dev/null; then
@@ -150,18 +298,32 @@ ensure_native_deps() {
     if [[ "$(uname)" == "Darwin" ]]; then
         log_info "Cai SDL3 qua Homebrew (macOS)..."
         brew install sdl3 || log_warn "brew install sdl3 fail, can install thu cong"
-    else
-        log_info "Build SDL3 tu source (Linux)..."
-        mkdir -p "$THIRDPARTY_DIR"
-        if [[ ! -d "$THIRDPARTY_DIR/SDL" ]]; then
-            git clone --depth 1 --branch release-3.2.18 \
-                https://github.com/libsdl-org/SDL "$THIRDPARTY_DIR/SDL"
-        fi
-        cmake -S "$THIRDPARTY_DIR/SDL" -B "$THIRDPARTY_DIR/SDL/build" \
-              -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=ON
-        cmake --build "$THIRDPARTY_DIR/SDL/build" -j
-        sudo cmake --install "$THIRDPARTY_DIR/SDL/build" || true
+        return 0
     fi
+
+    # Linux: cai system dev libs TRUOC, sau do moi build SDL3 tu source.
+    # Neu thieu cac headers nay, SDL3 cmake configure se fail voi loi
+    # "could not find X11 or Wayland", "libdrm not found"...
+    ensure_linux_dev_libs
+
+    log_info "Build SDL3 tu source (Linux)..."
+    mkdir -p "$THIRDPARTY_DIR"
+    if [[ ! -d "$THIRDPARTY_DIR/SDL" ]]; then
+        git clone --depth 1 --branch release-3.2.18 \
+            https://github.com/libsdl-org/SDL "$THIRDPARTY_DIR/SDL"
+    fi
+
+    # Bat dam bao co X11 va OpenGL. Tat ALSA/PulseAudio/Wayland tuy chon
+    # neu cmake detect duoc. SDL_DUMMYVIDEO=ON la fallback an toan cuoi cung.
+    cmake -S "$THIRDPARTY_DIR/SDL" -B "$THIRDPARTY_DIR/SDL/build" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DSDL_SHARED=ON \
+          -DSDL_X11=ON \
+          -DSDL_OPENGL=ON \
+          -DSDL_OPENGLES=ON
+    cmake --build "$THIRDPARTY_DIR/SDL/build" -j
+    $([ "$EUID" -ne 0 ] && command -v sudo &>/dev/null && echo sudo) \
+        cmake --install "$THIRDPARTY_DIR/SDL/build" || true
 }
 
 # -----------------------------------------------------------------------------

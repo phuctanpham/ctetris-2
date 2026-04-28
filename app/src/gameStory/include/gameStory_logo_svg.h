@@ -1,12 +1,13 @@
 #pragma once
-// File nay duoc sinh tu dong tu gameStory_logo.svg boi build.sh / build.ps1
+// File nay duoc sinh tu dong tu gameStory_logo.svg boi build.sh
 // KHONG sua tay -- moi thay doi se bi ghi de o lan build tiep theo.
-//
-// QUAN TRONG: SVG nay la LOGO CUA GAME cTetris (3x3 o vuong nhieu mau),
-// KHONG phai logo cua truong dai hoc UIT. Logo UIT nam o file rieng la
-// gameStory_corp.svg (corp credit "Powered up by ...").
 static const char* LOGO_SVG_DATA = R"SVG_RAW_DATA(
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    File nay la LOGO CUA GAME cTetris (3x3 o vuong vang/teal mo phong khoi
+    Tetris). KHONG phai logo cua truong dai hoc UIT (logo UIT nam o file
+    rieng: gameStory_corp.svg, hien thi kem dong "Powered up by ...").
+-->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
   <rect x="0" y="0" width="100" height="100" fill="#D5A305"/>
   <rect x="110" y="0" width="100" height="100" fill="#D9A604"/>
