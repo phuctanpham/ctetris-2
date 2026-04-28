@@ -81,7 +81,6 @@ bld/
 *.svclog
 *.scc
 **/build
-**/icons/*
-!**/icons/gen_icons.ps1
-!**/icons/gen_icons.sh
-!**/icons/app.rc
+**/.emsdk
+**/thirdparty
+**/.sdl3-wasm

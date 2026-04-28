@@ -86,7 +86,23 @@ jobs:
           key: nanosvg-master-${{ hashFiles('app/build.sh') }}
 
       # -----------------------------------------------------------------
-      # Step 5: Lam cho build.sh executable (git tren Windows hay strip
+      # Step 5: Cache SDL3 WASM static lib + clone source.
+      # SDL3 build tu source mat ~1-2 phut, cache lai tiet kiem nhieu
+      # cho cac lan push tiep theo. Cache key gan voi build.sh -- doi
+      # SDL3_VERSION trong script se tu invalidate cache.
+      # -----------------------------------------------------------------
+      - name: Cache SDL3 WASM build
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/.sdl3-wasm
+            app/thirdparty/SDL
+          key: sdl3-wasm-${{ hashFiles('app/build.sh') }}-${{ runner.os }}
+          restore-keys: |
+            sdl3-wasm-
+
+      # -----------------------------------------------------------------
+      # Step 6: Lam cho build.sh executable (git tren Windows hay strip
       # exec bit). Sau do chay build WASM.
       # -----------------------------------------------------------------
       - name: Build WASM via build.sh
@@ -139,7 +155,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     # Khai bao environment github-pages -- bat buoc de actions/deploy-pages
-    # co the tac dong vao Pages config va xuat thanh page_url cua deployment.
+    # co the tac dong vao Pages config va xuat ra page_url cua deployment.
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

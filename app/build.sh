@@ -4,35 +4,44 @@
 # =============================================================================
 # THAY DOI v1:
 #   - Drop hoan toan pipeline rasterize SVG -> PNG -> ICO/ICNS cho desktop.
-#     Desktop app (.app / executable) khong con embed icon binary nua,
-#     OS se dung icon mac dinh. Thay vao do, file SVG goc duoc bundle nguyen
-#     ve nhu mot resource (de hien thi trong runtime neu can).
-#   - WASM build chi can mot file favicon.svg duy nhat (SVG-driven), khong
-#     can sinh array PNG nhieu kich thuoc va khong can manifest PWA.
-#   - Cac function generate_brandkit / detect_rasterizer / svg_to_png da
-#     bi loai bo. Chi giu lai generate_svg_header (embed SVG goc thanh
-#     C string header de runtime ve logo bang nanosvg).
+#   - WASM build chi can mot file favicon.svg duy nhat (SVG-driven).
+#
+# THAY DOI v2 (smart-install):
+#   - KHONG con chay "apt-get update + install" toan bo list nhu cu.
+#   - Quy trinh moi: KIEM TRA -> DIFF -> INSTALL CHI THIEU
+#       1. Kiem tra tung tool (cmake/git/curl/python3) co ton tai chua,
+#          va version >= min yeu cau hay khong.
+#       2. Kiem tra tung dev library qua dpkg/rpm/pacman... -- liet ke ra
+#          danh sach THIEU thuc su.
+#       3. CHI khi danh sach thieu khac rong: chay "apt-get update" (1 lan)
+#          roi "apt-get install" voi danh sach loc.
+#       4. Neu danh sach thieu rong -> bo qua hoan toan, log "OK".
+#   - Tuong tu cho brew (macOS): chi install formula thieu.
+#   - emsdk: kiem tra version da activate, chi re-activate khi khac.
+#   - nanosvg: chi download neu file thieu (logic da co tu v1).
 # =============================================================================
 
-set -e  # Bao loi ngay khi co lenh fail (tranh build dang do)
+set -e
 
 # -----------------------------------------------------------------------------
-# Cau hinh duong dan co ban
+# Cau hinh duong dan + version yeu cau toi thieu
 # -----------------------------------------------------------------------------
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$APP_DIR/build"
 THIRDPARTY_DIR="$APP_DIR/thirdparty"
 EMSDK_DIR="$APP_DIR/.emsdk"
-
-# Brandkit chi con 1 file SVG goc duy nhat (logo.svg) -- khong co PNG/ICO/ICNS
 BRANDKIT_DIR="$APP_DIR/brandkit"
 BRAND_LOGO_SVG="$BRANDKIT_DIR/logo.svg"
 
-# Build mode: native (mac default) hoac wasm (truyen "wasm" lam tham so 1)
+# Version pinning -- doi o day se tu dong invalidate cache CI
+CMAKE_MIN_VERSION="3.16"
+EMSDK_VERSION="3.1.72"
+SDL3_VERSION="3.2.18"
+
 BUILD_MODE="${1:-native}"
 
 # -----------------------------------------------------------------------------
-# Helper: in log co mau de de doc trong CI/CD
+# Helper log co mau
 # -----------------------------------------------------------------------------
 log_info()  { echo -e "\033[0;36m[INFO]\033[0m  $*"; }
 log_warn()  { echo -e "\033[0;33m[WARN]\033[0m  $*"; }
@@ -40,19 +49,180 @@ log_error() { echo -e "\033[0;31m[ERROR]\033[0m $*"; }
 log_ok()    { echo -e "\033[0;32m[OK]\033[0m    $*"; }
 
 # -----------------------------------------------------------------------------
-# Tai header nanosvg (parser + rasterizer) neu chua co.
-# Chi can 2 file header don le -- khong can build library rieng.
+# Helper version: tra ve 0 (true) neu $1 >= $2 theo so sanh semver
+# Dung "sort -V" (version sort) cua coreutils -- co san o moi distro.
 # -----------------------------------------------------------------------------
+version_ge() {
+    [ -z "$2" ] && return 0
+    [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+}
+
+# -----------------------------------------------------------------------------
+# Helper: lay version cua mot command qua "<cmd> --version"
+# Tra ve chuoi "X.Y.Z" dau tien tim duoc trong output.
+# -----------------------------------------------------------------------------
+get_cmd_version() {
+    "$1" --version 2>&1 | head -n1 \
+        | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1
+}
+
+# -----------------------------------------------------------------------------
+# Helper: kiem tra command co ton tai voi version >= min hay khong
+# Return: 0 = OK, 1 = thieu hoac qua cu
+# -----------------------------------------------------------------------------
+check_cmd_version() {
+    local cmd="$1" min="$2"
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        return 1
+    fi
+    local current
+    current=$(get_cmd_version "$cmd")
+    if [ -z "$current" ]; then
+        return 0
+    fi
+    if version_ge "$current" "$min"; then
+        return 0
+    fi
+    log_warn "$cmd version $current < $min (yeu cau)"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# Helper sudo
+# -----------------------------------------------------------------------------
+get_sudo() {
+    if [ "$EUID" -eq 0 ]; then
+        echo ""
+    elif command -v sudo &>/dev/null; then
+        echo "sudo"
+    else
+        echo ""
+    fi
+}
+
+# =============================================================================
+# APT (Debian / Ubuntu): kiem tra package roi install chi cai thieu
+# =============================================================================
+is_apt_pkg_installed() {
+    dpkg-query -W -f='${Status}' "$1" 2>/dev/null \
+        | grep -q "install ok installed"
+}
+
+install_apt_packages_if_missing() {
+    local pkgs=("$@") missing=()
+    for p in "${pkgs[@]}"; do
+        is_apt_pkg_installed "$p" || missing+=("$p")
+    done
+    if [ ${#missing[@]} -eq 0 ]; then
+        log_ok "Tat ca ${#pkgs[@]} apt packages da co san, bo qua install"
+        return 0
+    fi
+    log_info "Thieu ${#missing[@]}/${#pkgs[@]} apt packages: ${missing[*]}"
+    local SUDO; SUDO=$(get_sudo)
+    log_info "Chay apt-get update (chi 1 lan, vi co package can install)..."
+    $SUDO apt-get update -qq || log_warn "apt-get update fail"
+    $SUDO apt-get install -y --no-install-recommends "${missing[@]}"
+}
+
+# =============================================================================
+# DNF / YUM (Fedora / RHEL) -- kiem tra qua "rpm -q"
+# =============================================================================
+is_rpm_pkg_installed() { rpm -q "$1" >/dev/null 2>&1; }
+
+install_dnf_packages_if_missing() {
+    local pkgs=("$@") missing=()
+    for p in "${pkgs[@]}"; do is_rpm_pkg_installed "$p" || missing+=("$p"); done
+    if [ ${#missing[@]} -eq 0 ]; then
+        log_ok "Tat ca ${#pkgs[@]} dnf packages da co san"; return 0
+    fi
+    log_info "Thieu ${#missing[@]}/${#pkgs[@]} dnf packages: ${missing[*]}"
+    local SUDO; SUDO=$(get_sudo)
+    $SUDO dnf install -y "${missing[@]}"
+}
+
+install_yum_packages_if_missing() {
+    local pkgs=("$@") missing=()
+    for p in "${pkgs[@]}"; do is_rpm_pkg_installed "$p" || missing+=("$p"); done
+    if [ ${#missing[@]} -eq 0 ]; then
+        log_ok "Tat ca ${#pkgs[@]} yum packages da co san"; return 0
+    fi
+    log_info "Thieu ${#missing[@]}/${#pkgs[@]} yum packages: ${missing[*]}"
+    local SUDO; SUDO=$(get_sudo)
+    $SUDO yum install -y "${missing[@]}"
+}
+
+# =============================================================================
+# PACMAN / ZYPPER / APK
+# =============================================================================
+is_pacman_pkg_installed() { pacman -Qi "$1" >/dev/null 2>&1; }
+
+install_pacman_packages_if_missing() {
+    local pkgs=("$@") missing=()
+    for p in "${pkgs[@]}"; do is_pacman_pkg_installed "$p" || missing+=("$p"); done
+    if [ ${#missing[@]} -eq 0 ]; then
+        log_ok "Tat ca ${#pkgs[@]} pacman packages da co san"; return 0
+    fi
+    log_info "Thieu ${#missing[@]}/${#pkgs[@]} pacman packages: ${missing[*]}"
+    local SUDO; SUDO=$(get_sudo)
+    $SUDO pacman -Sy --needed --noconfirm "${missing[@]}"
+}
+
+install_zypper_packages_if_missing() {
+    local pkgs=("$@") missing=()
+    for p in "${pkgs[@]}"; do is_rpm_pkg_installed "$p" || missing+=("$p"); done
+    if [ ${#missing[@]} -eq 0 ]; then
+        log_ok "Tat ca ${#pkgs[@]} zypper packages da co san"; return 0
+    fi
+    log_info "Thieu ${#missing[@]}/${#pkgs[@]} zypper packages: ${missing[*]}"
+    local SUDO; SUDO=$(get_sudo)
+    $SUDO zypper install -y "${missing[@]}"
+}
+
+is_apk_pkg_installed() { apk info -e "$1" >/dev/null 2>&1; }
+
+install_apk_packages_if_missing() {
+    local pkgs=("$@") missing=()
+    for p in "${pkgs[@]}"; do is_apk_pkg_installed "$p" || missing+=("$p"); done
+    if [ ${#missing[@]} -eq 0 ]; then
+        log_ok "Tat ca ${#pkgs[@]} apk packages da co san"; return 0
+    fi
+    log_info "Thieu ${#missing[@]}/${#pkgs[@]} apk packages: ${missing[*]}"
+    local SUDO; SUDO=$(get_sudo)
+    $SUDO apk add --no-cache "${missing[@]}"
+}
+
+# =============================================================================
+# HOMEBREW (macOS): chi install formula thuc su thieu
+# =============================================================================
+is_brew_formula_installed() {
+    brew list --formula "$1" >/dev/null 2>&1
+}
+
+install_brew_formulas_if_missing() {
+    local pkgs=("$@") missing=()
+    for p in "${pkgs[@]}"; do
+        [ -z "$p" ] && continue
+        is_brew_formula_installed "$p" || missing+=("$p")
+    done
+    if [ ${#missing[@]} -eq 0 ]; then
+        log_ok "Tat ca brew formulas da co san"; return 0
+    fi
+    log_info "Thieu ${#missing[@]} brew formulas: ${missing[*]}"
+    # brew install tu fetch metadata moi -- khong can chu dong "brew update"
+    brew install "${missing[@]}"
+}
+
+# =============================================================================
+# nanosvg + SVG header generation
+# =============================================================================
 ensure_nanosvg() {
     local include_dir="$APP_DIR/src/gameStory/include"
     local nano="$include_dir/nanosvg.h"
     local nano_rast="$include_dir/nanosvgrast.h"
-
     if [[ -f "$nano" && -f "$nano_rast" ]]; then
         log_ok "nanosvg headers da ton tai, bo qua download"
         return 0
     fi
-
     log_info "Tai nanosvg headers..."
     mkdir -p "$include_dir"
     local base="https://raw.githubusercontent.com/memononen/nanosvg/master/src"
@@ -61,26 +231,16 @@ ensure_nanosvg() {
     log_ok "nanosvg headers da san sang"
 }
 
-# -----------------------------------------------------------------------------
-# Sinh header C tu file SVG goc.
-#   $1 = path den file SVG nguon
-#   $2 = path den header dau ra
-#   $3 = ten bien C (vi du LOGO_SVG_DATA)
-# Sinh ra mot raw string literal R"SVG_RAW_DATA(...)SVG_RAW_DATA";
-# -- ASCII-safe, khong can escape ky tu dac biet.
-# -----------------------------------------------------------------------------
 generate_svg_header() {
-    local svg_path="$1"
-    local header_path="$2"
-    local var_name="$3"
-
-    if [[ ! -f "$svg_path" ]]; then
-        log_error "Khong tim thay SVG nguon: $svg_path"
-        return 1
-    fi
-
+    local svg_path="$1" header_path="$2" var_name="$3"
+    [ -f "$svg_path" ] || { log_error "Khong tim thay $svg_path"; return 1; }
     mkdir -p "$(dirname "$header_path")"
-    local header_name=$(basename "$header_path")
+
+    # Skip neu header da fresh hon SVG nguon -- tranh recompile khong can
+    if [ -f "$header_path" ] && [ "$header_path" -nt "$svg_path" ]; then
+        log_ok "Header $(basename "$header_path") da fresh, bo qua regenerate"
+        return 0
+    fi
 
     {
         echo "#pragma once"
@@ -90,245 +250,314 @@ generate_svg_header() {
         cat "$svg_path"
         echo ")SVG_RAW_DATA\";"
     } > "$header_path"
-
-    log_ok "Sinh header: $header_name (tu $(basename "$svg_path"))"
+    log_ok "Sinh header: $(basename "$header_path") (tu $(basename "$svg_path"))"
 }
 
-# -----------------------------------------------------------------------------
-# Sinh ca 2 header SVG (logo cua game + logo UIT) neu file SVG goc ton tai.
-# -----------------------------------------------------------------------------
 generate_logo_headers() {
     local story_dir="$APP_DIR/src/gameStory"
     local include_dir="$story_dir/include"
-
-    # Logo cua GAME cTetris (3x3 o vuong vang/teal)
-    if [[ -f "$story_dir/gameStory_logo.svg" ]]; then
+    [ -f "$story_dir/gameStory_logo.svg" ] && \
         generate_svg_header "$story_dir/gameStory_logo.svg" \
-                            "$include_dir/gameStory_logo_svg.h" \
-                            "LOGO_SVG_DATA"
-    else
-        log_warn "Khong co gameStory_logo.svg, bo qua sinh header"
-    fi
-
-    # Logo UIT (corp credit "Powered up by ...")
-    if [[ -f "$story_dir/gameStory_corp.svg" ]]; then
+                            "$include_dir/gameStory_logo_svg.h" "LOGO_SVG_DATA"
+    [ -f "$story_dir/gameStory_corp.svg" ] && \
         generate_svg_header "$story_dir/gameStory_corp.svg" \
-                            "$include_dir/gameStory_corp_svg.h" \
-                            "CORP_SVG_DATA"
-    else
-        log_warn "Khong co gameStory_corp.svg, bo qua sinh header"
-    fi
+                            "$include_dir/gameStory_corp_svg.h" "CORP_SVG_DATA"
 }
 
-# -----------------------------------------------------------------------------
-# Cai dat emsdk (Emscripten SDK) cho build WASM, chi cai khi can.
-# -----------------------------------------------------------------------------
+# =============================================================================
+# emsdk: chi install/activate neu version dang active != target
+# =============================================================================
 ensure_emsdk() {
-    if [[ -d "$EMSDK_DIR" && -f "$EMSDK_DIR/emsdk_env.sh" ]]; then
-        log_ok "emsdk da ton tai, kich hoat moi truong"
-    else
-        log_info "Cai emsdk lan dau (mat vai phut)..."
+    if [ ! -d "$EMSDK_DIR" ] || [ ! -f "$EMSDK_DIR/emsdk_env.sh" ]; then
+        log_info "Cai emsdk lan dau tu GitHub..."
         git clone https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
-        ( cd "$EMSDK_DIR"
-          ./emsdk install 3.1.72
-          ./emsdk activate 3.1.72 )
-    fi
-    # shellcheck disable=SC1091
-    source "$EMSDK_DIR/emsdk_env.sh"
-    log_ok "emsdk active: $(em++ --version | head -n1)"
-}
-
-# -----------------------------------------------------------------------------
-# Cai system dev libraries can thiet de BUILD SDL3 tu source tren Linux.
-# SDL3 yeu cau headers cua: X11/Wayland (windowing), libdrm/gbm (KMS),
-# OpenGL/EGL/GLES (renderer), ALSA/PulseAudio (audio), libudev (input),
-# libunwind (stack trace cua SDL_assert).
-# Nhan dien package manager (apt-get / dnf / yum / pacman / zypper / apk) va
-# cai dat goi tuong ung. Cai goi heo theo distro:
-#   - Debian/Ubuntu: dung apt-get  (vi du Ubuntu 22.04, Debian 12)
-#   - Fedora/RHEL/CentOS: dung dnf hoac yum
-#   - Arch / Manjaro: dung pacman
-#   - openSUSE: dung zypper
-#   - Alpine: dung apk
-# Neu khong tim thay package manager nao, in danh sach yeu cau de user tu cai.
-# -----------------------------------------------------------------------------
-ensure_linux_dev_libs() {
-    # Detect: chi can chay tren Linux. macOS bo qua hoan toan.
-    if [[ "$(uname)" != "Linux" ]]; then
-        return 0
+    else
+        log_ok "emsdk thu muc da ton tai"
     fi
 
-    # Helper goi sudo neu user khong phai root va sudo san co
-    local SUDO=""
-    if [[ "$EUID" -ne 0 ]]; then
-        if command -v sudo &>/dev/null; then
-            SUDO="sudo"
-        else
-            log_warn "Khong phai root va khong co sudo -- viec cai system libs co the fail"
+    # Kiem tra ban da install va active
+    local installed_marker="$EMSDK_DIR/upstream/emscripten"
+    local need_install=true
+
+    if [ -d "$installed_marker" ]; then
+        # Co em++ da active -- so version voi target
+        # shellcheck disable=SC1091
+        source "$EMSDK_DIR/emsdk_env.sh" >/dev/null 2>&1 || true
+        if command -v em++ >/dev/null 2>&1; then
+            local cur
+            cur=$(em++ --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+            if [ "$cur" = "$EMSDK_VERSION" ]; then
+                log_ok "emsdk $EMSDK_VERSION da active, bo qua install/activate"
+                need_install=false
+            else
+                log_warn "emsdk active version $cur != target $EMSDK_VERSION, se re-activate"
+            fi
         fi
     fi
 
-    # ----- apt-get (Debian, Ubuntu) -----
-    if command -v apt-get &>/dev/null; then
-        log_info "Detect apt-get -> cai SDL3 dev libs cho Debian/Ubuntu..."
-        $SUDO apt-get update -qq || log_warn "apt-get update fail"
-        $SUDO apt-get install -y --no-install-recommends \
-            build-essential pkg-config cmake git curl \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
-            libxi-dev libxinerama-dev libxxf86vm-dev libxss-dev \
-            libwayland-dev libxkbcommon-dev wayland-protocols \
-            libdrm-dev libgbm-dev \
-            libgl1-mesa-dev libglu1-mesa-dev libegl1-mesa-dev \
-            libgles2-mesa-dev \
-            libpulse-dev libasound2-dev libsndio-dev \
-            libudev-dev libdbus-1-dev libibus-1.0-dev \
-            libunwind-dev \
-            || log_warn "apt-get install gap loi mot so goi"
-        return 0
+    if $need_install; then
+        log_info "Install + activate emsdk $EMSDK_VERSION..."
+        ( cd "$EMSDK_DIR"
+          ./emsdk install "$EMSDK_VERSION"
+          ./emsdk activate "$EMSDK_VERSION" )
+        # shellcheck disable=SC1091
+        source "$EMSDK_DIR/emsdk_env.sh"
     fi
-
-    # ----- dnf (Fedora, RHEL 8+, CentOS 8+) -----
-    if command -v dnf &>/dev/null; then
-        log_info "Detect dnf -> cai SDL3 dev libs cho Fedora/RHEL..."
-        $SUDO dnf install -y \
-            gcc-c++ make pkgconf-pkg-config cmake git curl \
-            libX11-devel libXext-devel libXrandr-devel libXcursor-devel \
-            libXi-devel libXinerama-devel libXxf86vm-devel libXScrnSaver-devel \
-            wayland-devel libxkbcommon-devel wayland-protocols-devel \
-            libdrm-devel mesa-libgbm-devel \
-            mesa-libGL-devel mesa-libGLU-devel mesa-libEGL-devel mesa-libGLES-devel \
-            pulseaudio-libs-devel alsa-lib-devel \
-            systemd-devel dbus-devel ibus-devel \
-            libunwind-devel \
-            || log_warn "dnf install gap loi mot so goi"
-        return 0
-    fi
-
-    # ----- yum (RHEL 7 / CentOS 7) -----
-    if command -v yum &>/dev/null; then
-        log_info "Detect yum -> cai SDL3 dev libs cho RHEL7/CentOS7..."
-        $SUDO yum install -y \
-            gcc-c++ make pkgconfig cmake git curl \
-            libX11-devel libXext-devel libXrandr-devel libXcursor-devel \
-            libXi-devel libXinerama-devel libXxf86vm-devel libXScrnSaver-devel \
-            wayland-devel libxkbcommon-devel \
-            libdrm-devel mesa-libgbm-devel \
-            mesa-libGL-devel mesa-libGLU-devel mesa-libEGL-devel \
-            pulseaudio-libs-devel alsa-lib-devel \
-            systemd-devel dbus-devel \
-            libunwind-devel \
-            || log_warn "yum install gap loi mot so goi"
-        return 0
-    fi
-
-    # ----- pacman (Arch, Manjaro) -----
-    if command -v pacman &>/dev/null; then
-        log_info "Detect pacman -> cai SDL3 dev libs cho Arch/Manjaro..."
-        $SUDO pacman -Sy --needed --noconfirm \
-            base-devel pkgconf cmake git curl \
-            libx11 libxext libxrandr libxcursor libxi libxinerama libxxf86vm libxss \
-            wayland libxkbcommon wayland-protocols \
-            libdrm mesa \
-            alsa-lib libpulse \
-            systemd dbus \
-            libunwind \
-            || log_warn "pacman install gap loi mot so goi"
-        return 0
-    fi
-
-    # ----- zypper (openSUSE) -----
-    if command -v zypper &>/dev/null; then
-        log_info "Detect zypper -> cai SDL3 dev libs cho openSUSE..."
-        $SUDO zypper install -y -t pattern devel_C_C++ || true
-        $SUDO zypper install -y \
-            cmake git curl pkg-config \
-            libX11-devel libXext-devel libXrandr-devel libXcursor-devel \
-            libXi-devel libXinerama-devel libXxf86vm-devel \
-            wayland-devel libxkbcommon-devel \
-            libdrm-devel Mesa-libGL-devel Mesa-libEGL-devel Mesa-libgbm-devel \
-            libpulse-devel alsa-devel \
-            systemd-devel dbus-1-devel \
-            libunwind-devel \
-            || log_warn "zypper install gap loi mot so goi"
-        return 0
-    fi
-
-    # ----- apk (Alpine) -----
-    if command -v apk &>/dev/null; then
-        log_info "Detect apk -> cai SDL3 dev libs cho Alpine..."
-        $SUDO apk add --no-cache \
-            build-base cmake git curl pkgconfig \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
-            libxi-dev libxinerama-dev libxxf86vm-dev libxscrnsaver-dev \
-            wayland-dev libxkbcommon-dev wayland-protocols \
-            libdrm-dev mesa-dev \
-            pulseaudio-dev alsa-lib-dev \
-            eudev-dev dbus-dev \
-            libunwind-dev \
-            || log_warn "apk add gap loi mot so goi"
-        return 0
-    fi
-
-    # ----- Fallback: in danh sach goi can cai thu cong -----
-    log_error "Khong nhan dien duoc package manager."
-    log_error "Vui long cai THU CONG cac dev libs sau truoc khi build SDL3:"
-    cat <<'EOF'
-  X11:        libX11, libXext, libXrandr, libXcursor, libXi, libXinerama,
-              libXxf86vm, libXScrnSaver  (kem -dev / -devel)
-  Wayland:    libwayland, libxkbcommon, wayland-protocols (kem -dev / -devel)
-  KMS/DRM:    libdrm, libgbm  (kem -dev / -devel)
-  OpenGL:     libGL, libGLU, libEGL, libGLES (Mesa, kem -dev / -devel)
-  Audio:      libpulse, libasound (ALSA)  (kem -dev / -devel)
-  Input:      libudev (systemd hoac eudev), libdbus (kem -dev / -devel)
-  Other:      libunwind  (kem -dev / -devel)
-EOF
-    return 1
+    log_ok "emsdk active: $(em++ --version | head -n1)"
 }
 
+# =============================================================================
+# SDL3 self-built cho WASM
 # -----------------------------------------------------------------------------
-# Cai SDL3 cho build native. Tren macOS dung Homebrew, Linux cai dev libs
-# system roi build SDL3 tu source.
-# -----------------------------------------------------------------------------
-ensure_native_deps() {
-    if command -v sdl3-config &>/dev/null; then
-        log_ok "SDL3 da co tren he thong"
-        return 0
+# Tai sao tu build:
+#   - Emscripten port "-sUSE_SDL=3" yeu cau emsdk version moi (SDL3 chi
+#     duoc them rat gan day, va co ban release-3.1.72 chua ho tro on dinh).
+#   - Build SDL3 tinh tai dia phuong dam bao chinh xac version SDL3_VERSION
+#     va khong phu thuoc vao bien dong cua emsdk port.
+# Quy trinh:
+#   1. Re-use $THIRDPARTY_DIR/SDL (clone tu native deps neu da co).
+#   2. Build vao thu muc rieng $THIRDPARTY_DIR/SDL/build-wasm (khong dum
+#      voi build native).
+#   3. Install vao $APP_DIR/.sdl3-wasm/ -- nho hon /usr/local de cache CI.
+#   4. CMakeLists.txt cua app dung find_package(SDL3 CONFIG); build.sh
+#      truyen -DCMAKE_PREFIX_PATH=$APP_DIR/.sdl3-wasm de no tim duoc.
+# Skip neu .a + cmake config files da ton tai -- tiet kiem ~1-2 phut moi build.
+# =============================================================================
+ensure_sdl3_wasm() {
+    local sdl_install="$APP_DIR/.sdl3-wasm"
+
+    # Kiem tra san pham da install: co .a + co cmake config
+    if [ -d "$sdl_install/lib/cmake/SDL3" ] || [ -d "$sdl_install/lib64/cmake/SDL3" ]; then
+        if find "$sdl_install" -name 'libSDL3*.a' -print -quit 2>/dev/null | grep -q .; then
+            log_ok "SDL3 WASM static da co tai $sdl_install (skip rebuild)"
+            return 0
+        fi
     fi
 
-    if [[ "$(uname)" == "Darwin" ]]; then
-        log_info "Cai SDL3 qua Homebrew (macOS)..."
-        brew install sdl3 || log_warn "brew install sdl3 fail, can install thu cong"
-        return 0
-    fi
-
-    # Linux: cai system dev libs TRUOC, sau do moi build SDL3 tu source.
-    # Neu thieu cac headers nay, SDL3 cmake configure se fail voi loi
-    # "could not find X11 or Wayland", "libdrm not found"...
-    ensure_linux_dev_libs
-
-    log_info "Build SDL3 tu source (Linux)..."
+    log_info "Build SDL3 $SDL3_VERSION cho WASM (lan dau, ~1-2 phut)..."
     mkdir -p "$THIRDPARTY_DIR"
-    if [[ ! -d "$THIRDPARTY_DIR/SDL" ]]; then
-        git clone --depth 1 --branch release-3.2.18 \
+
+    # Re-use thu muc SDL clone neu da co tu ensure_native_deps
+    if [ ! -d "$THIRDPARTY_DIR/SDL" ]; then
+        git clone --depth 1 --branch "release-$SDL3_VERSION" \
             https://github.com/libsdl-org/SDL "$THIRDPARTY_DIR/SDL"
     fi
 
-    # Bat dam bao co X11 va OpenGL. Tat ALSA/PulseAudio/Wayland tuy chon
-    # neu cmake detect duoc. SDL_DUMMYVIDEO=ON la fallback an toan cuoi cung.
-    cmake -S "$THIRDPARTY_DIR/SDL" -B "$THIRDPARTY_DIR/SDL/build" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DSDL_SHARED=ON \
-          -DSDL_X11=ON \
-          -DSDL_OPENGL=ON \
-          -DSDL_OPENGLES=ON
-    cmake --build "$THIRDPARTY_DIR/SDL/build" -j
-    $([ "$EUID" -ne 0 ] && command -v sudo &>/dev/null && echo sudo) \
-        cmake --install "$THIRDPARTY_DIR/SDL/build" || true
+    local sdl_build="$THIRDPARTY_DIR/SDL/build-wasm"
+
+    # SDL3 tu nhan Emscripten platform khi chay qua emcmake -- no tu
+    # disable X11/Wayland/ALSA va su dung backend html5/web audio.
+    # Chi can them flag chinh:
+    #   - SDL_SHARED=OFF + SDL_STATIC=ON: chi sinh .a (WASM khong support .so)
+    #   - SDL_TESTS=OFF: skip cac demo/test cua SDL, tiet kiem 80% thoi gian
+    #   - SDL_TEST_LIBRARY=OFF: khong sinh libSDL3_test.a (khong dung)
+    emcmake cmake -S "$THIRDPARTY_DIR/SDL" -B "$sdl_build" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DSDL_SHARED=OFF \
+        -DSDL_STATIC=ON \
+        -DSDL_TESTS=OFF \
+        -DSDL_TEST_LIBRARY=OFF \
+        -DCMAKE_INSTALL_PREFIX="$sdl_install"
+    cmake --build "$sdl_build" -j
+    cmake --install "$sdl_build"
+
+    log_ok "SDL3 WASM static da install vao $sdl_install"
 }
 
-# -----------------------------------------------------------------------------
-# Build native (macOS .app / Linux executable) qua CMake.
-# -----------------------------------------------------------------------------
+# =============================================================================
+# Linux dev libs cho SDL3 build tu source -- chi install package thieu
+# =============================================================================
+ensure_linux_dev_libs() {
+    [ "$(uname)" = "Linux" ] || return 0
+
+    if command -v apt-get &>/dev/null; then
+        log_info "Detect apt-get -> kiem tra dev libs Debian/Ubuntu..."
+        local pkgs=(
+            build-essential pkg-config cmake git curl python3
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev
+            libxi-dev libxinerama-dev libxxf86vm-dev libxss-dev
+            libwayland-dev libxkbcommon-dev wayland-protocols
+            libdrm-dev libgbm-dev
+            libgl1-mesa-dev libglu1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev
+            libpulse-dev libasound2-dev libsndio-dev
+            libudev-dev libdbus-1-dev libibus-1.0-dev
+            libunwind-dev
+        )
+        install_apt_packages_if_missing "${pkgs[@]}"
+        return 0
+    fi
+
+    if command -v dnf &>/dev/null; then
+        log_info "Detect dnf -> kiem tra dev libs Fedora/RHEL..."
+        local pkgs=(
+            gcc-c++ make pkgconf-pkg-config cmake git curl python3
+            libX11-devel libXext-devel libXrandr-devel libXcursor-devel
+            libXi-devel libXinerama-devel libXxf86vm-devel libXScrnSaver-devel
+            wayland-devel libxkbcommon-devel wayland-protocols-devel
+            libdrm-devel mesa-libgbm-devel
+            mesa-libGL-devel mesa-libGLU-devel mesa-libEGL-devel mesa-libGLES-devel
+            pulseaudio-libs-devel alsa-lib-devel
+            systemd-devel dbus-devel ibus-devel
+            libunwind-devel
+        )
+        install_dnf_packages_if_missing "${pkgs[@]}"
+        return 0
+    fi
+
+    if command -v yum &>/dev/null; then
+        log_info "Detect yum -> kiem tra dev libs RHEL7/CentOS7..."
+        local pkgs=(
+            gcc-c++ make pkgconfig cmake git curl python3
+            libX11-devel libXext-devel libXrandr-devel libXcursor-devel
+            libXi-devel libXinerama-devel libXxf86vm-devel libXScrnSaver-devel
+            wayland-devel libxkbcommon-devel
+            libdrm-devel mesa-libgbm-devel
+            mesa-libGL-devel mesa-libGLU-devel mesa-libEGL-devel
+            pulseaudio-libs-devel alsa-lib-devel
+            systemd-devel dbus-devel
+            libunwind-devel
+        )
+        install_yum_packages_if_missing "${pkgs[@]}"
+        return 0
+    fi
+
+    if command -v pacman &>/dev/null; then
+        log_info "Detect pacman -> kiem tra dev libs Arch/Manjaro..."
+        local pkgs=(
+            base-devel pkgconf cmake git curl python
+            libx11 libxext libxrandr libxcursor libxi libxinerama libxxf86vm libxss
+            wayland libxkbcommon wayland-protocols
+            libdrm mesa
+            alsa-lib libpulse
+            systemd dbus
+            libunwind
+        )
+        install_pacman_packages_if_missing "${pkgs[@]}"
+        return 0
+    fi
+
+    if command -v zypper &>/dev/null; then
+        log_info "Detect zypper -> kiem tra dev libs openSUSE..."
+        local pkgs=(
+            cmake git curl pkg-config python3
+            libX11-devel libXext-devel libXrandr-devel libXcursor-devel
+            libXi-devel libXinerama-devel libXxf86vm-devel
+            wayland-devel libxkbcommon-devel
+            libdrm-devel Mesa-libGL-devel Mesa-libEGL-devel Mesa-libgbm-devel
+            libpulse-devel alsa-devel
+            systemd-devel dbus-1-devel
+            libunwind-devel
+        )
+        install_zypper_packages_if_missing "${pkgs[@]}"
+        return 0
+    fi
+
+    if command -v apk &>/dev/null; then
+        log_info "Detect apk -> kiem tra dev libs Alpine..."
+        local pkgs=(
+            build-base cmake git curl pkgconfig python3
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev
+            libxi-dev libxinerama-dev libxxf86vm-dev libxscrnsaver-dev
+            wayland-dev libxkbcommon-dev wayland-protocols
+            libdrm-dev mesa-dev
+            pulseaudio-dev alsa-lib-dev
+            eudev-dev dbus-dev
+            libunwind-dev
+        )
+        install_apk_packages_if_missing "${pkgs[@]}"
+        return 0
+    fi
+
+    log_error "Khong nhan dien duoc package manager. Cai thu cong cac dev libs."
+    return 1
+}
+
+# =============================================================================
+# macOS deps: chi install brew formula thuc su thieu
+# =============================================================================
+ensure_macos_deps() {
+    [ "$(uname)" = "Darwin" ] || return 0
+
+    if ! command -v brew >/dev/null 2>&1; then
+        log_warn "Khong co Homebrew, vui long cai tu https://brew.sh/"
+        return 1
+    fi
+
+    # Build danh sach formula can co tu thieu (loai bo nhung gi da OK)
+    local pkgs=()
+    check_cmd_version cmake "$CMAKE_MIN_VERSION" || pkgs+=(cmake)
+    command -v git >/dev/null 2>&1               || pkgs+=(git)
+    command -v python3 >/dev/null 2>&1           || pkgs+=(python3)
+
+    # SDL3 phat hien qua pkg-config -- chi them vao list neu chua co
+    if ! ( command -v pkg-config >/dev/null 2>&1 && \
+           pkg-config --exists sdl3 2>/dev/null ); then
+        pkgs+=(sdl3)
+    fi
+
+    if [ ${#pkgs[@]} -eq 0 ]; then
+        log_ok "macOS deps deu OK (cmake, git, python3, sdl3)"
+        return 0
+    fi
+    log_info "macOS thieu: ${pkgs[*]}"
+    install_brew_formulas_if_missing "${pkgs[@]}"
+}
+
+# =============================================================================
+# Setup native dependencies (SDL3 san sang) cho Linux/macOS
+# =============================================================================
+ensure_native_deps() {
+    # Fast path: SDL3 da co tren he thong
+    if command -v sdl3-config &>/dev/null; then
+        log_ok "SDL3 da co (sdl3-config)"
+        return 0
+    fi
+    if command -v pkg-config >/dev/null 2>&1 && \
+       pkg-config --exists sdl3 2>/dev/null; then
+        log_ok "SDL3 da co qua pkg-config (version $(pkg-config --modversion sdl3))"
+        return 0
+    fi
+
+    if [ "$(uname)" = "Darwin" ]; then
+        ensure_macos_deps
+        # Sau khi brew install, kiem tra lai
+        if pkg-config --exists sdl3 2>/dev/null; then
+            log_ok "SDL3 san sang sau khi brew install"
+            return 0
+        fi
+        log_warn "SDL3 chua thay sau brew install -- thu build tu source"
+    fi
+
+    # Linux (hoac macOS fallback): cai dev libs roi build SDL3 tu source
+    ensure_linux_dev_libs
+
+    # Build SDL3 chi khi chua co source/build artifact
+    if [ -d "$THIRDPARTY_DIR/SDL/build" ] && \
+       find "$THIRDPARTY_DIR/SDL/build" -name 'libSDL3*' -print -quit | grep -q .; then
+        log_ok "SDL3 build artifact da co tai $THIRDPARTY_DIR/SDL/build"
+    else
+        log_info "Build SDL3 $SDL3_VERSION tu source..."
+        mkdir -p "$THIRDPARTY_DIR"
+        if [ ! -d "$THIRDPARTY_DIR/SDL" ]; then
+            git clone --depth 1 --branch "release-$SDL3_VERSION" \
+                https://github.com/libsdl-org/SDL "$THIRDPARTY_DIR/SDL"
+        fi
+        cmake -S "$THIRDPARTY_DIR/SDL" -B "$THIRDPARTY_DIR/SDL/build" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DSDL_SHARED=ON \
+              -DSDL_X11=ON \
+              -DSDL_OPENGL=ON \
+              -DSDL_OPENGLES=ON
+        cmake --build "$THIRDPARTY_DIR/SDL/build" -j
+    fi
+
+    local SUDO; SUDO=$(get_sudo)
+    $SUDO cmake --install "$THIRDPARTY_DIR/SDL/build" || true
+}
+
+# =============================================================================
+# Build entry points
+# =============================================================================
 build_native() {
     log_info "Build NATIVE mode"
     ensure_native_deps
@@ -340,43 +569,63 @@ build_native() {
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_WASM=OFF
     cmake --build "$BUILD_DIR/native" -j
-
     log_ok "Native build hoan tat: $BUILD_DIR/native"
 }
 
-# -----------------------------------------------------------------------------
-# Build WASM (cho web). Sinh ra cTetris.html / .js / .wasm + favicon.svg.
-# Khong sinh manifest PWA va khong dang ky service worker -- yeu cau v1
-# la disable PWA install prompt o thanh dia chi browser.
-# -----------------------------------------------------------------------------
 build_wasm() {
     log_info "Build WASM mode"
+
+    # WASM khong can SDL3 system, nhung SDL3 source CMake build-time can
+    # mot so headers cu ban (libc, etc.) -- thuong san co tren CI runner.
+    # Chi cai basic tools + emsdk + python3.
+    if [ "$(uname)" = "Linux" ]; then
+        if command -v apt-get &>/dev/null; then
+            install_apt_packages_if_missing \
+                build-essential cmake git curl python3 ca-certificates
+        elif command -v dnf &>/dev/null; then
+            install_dnf_packages_if_missing \
+                gcc-c++ make cmake git curl python3 ca-certificates
+        elif command -v pacman &>/dev/null; then
+            install_pacman_packages_if_missing \
+                base-devel cmake git curl python ca-certificates
+        fi
+    elif [ "$(uname)" = "Darwin" ]; then
+        if command -v brew >/dev/null 2>&1; then
+            local pkgs=()
+            check_cmd_version cmake "$CMAKE_MIN_VERSION" || pkgs+=(cmake)
+            command -v git >/dev/null 2>&1 || pkgs+=(git)
+            command -v python3 >/dev/null 2>&1 || pkgs+=(python3)
+            [ ${#pkgs[@]} -gt 0 ] && install_brew_formulas_if_missing "${pkgs[@]}" \
+                                  || log_ok "Basic tools cho WASM build da co"
+        fi
+    fi
+
     ensure_emsdk
+    ensure_sdl3_wasm    # Build SDL3 tinh cho WASM neu chua co
     ensure_nanosvg
     generate_logo_headers
+
+    # Truyen CMAKE_PREFIX_PATH den thu muc SDL3 da install de
+    # find_package(SDL3 CONFIG) trong CMakeLists.txt cua app tim duoc.
+    local sdl_prefix="$APP_DIR/.sdl3-wasm"
 
     mkdir -p "$BUILD_DIR/wasm"
     emcmake cmake -S "$APP_DIR" -B "$BUILD_DIR/wasm" \
                   -DCMAKE_BUILD_TYPE=Release \
-                  -DBUILD_WASM=ON
+                  -DBUILD_WASM=ON \
+                  -DCMAKE_PREFIX_PATH="$sdl_prefix"
     cmake --build "$BUILD_DIR/wasm" -j
 
-    # Copy SVG goc lam favicon de browser hien thi tab icon.
-    # Khong rasterize ra PNG -- yeu cau v1 la SVG-driven.
-    if [[ -f "$BRAND_LOGO_SVG" ]]; then
+    if [ -f "$BRAND_LOGO_SVG" ]; then
         cp "$BRAND_LOGO_SVG" "$BUILD_DIR/wasm/favicon.svg"
-        log_ok "Copy favicon.svg (SVG-driven, khong PNG)"
+        log_ok "Copy favicon.svg (SVG-driven)"
     else
         log_warn "Khong co brandkit/logo.svg cho favicon"
     fi
 
     log_ok "WASM build hoan tat: $BUILD_DIR/wasm"
-    log_info "Mo browser: cd $BUILD_DIR/wasm && python3 -m http.server 8080"
 }
 
-# -----------------------------------------------------------------------------
-# Entry point: dispatch theo BUILD_MODE
-# -----------------------------------------------------------------------------
 case "$BUILD_MODE" in
     native) build_native ;;
     wasm)   build_wasm ;;

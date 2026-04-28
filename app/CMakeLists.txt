@@ -11,6 +11,17 @@
 #   - WASM build chi can copy mot file favicon.svg duy nhat. Khong copy
 #     manifest.webmanifest va khong copy sw.js -- yeu cau v1 la disable
 #     PWA install prompt va dung SVG-driven favicon thay vi PNG.
+#
+# THAY DOI v3 (SDL3 self-built cho WASM):
+#   - DROP "-sUSE_SDL=3" (Emscripten port khong hoat dong on dinh tren
+#     moi version emsdk -- 3.1.72 thieu / loi port SDL3).
+#   - Thay vao do, cTetris find_package(SDL3 CONFIG) cho CA HAI branch:
+#     * Native: SDL3 cai tu Homebrew/distro/source vao /usr/local hoac
+#       /opt/homebrew (find_package tu nhan).
+#     * WASM:   build.sh tu build SDL3 tinh tai $APP_DIR/.sdl3-wasm/ va
+#       truyen vao -DCMAKE_PREFIX_PATH; find_package se tim duoc.
+#   - Loi the: dung cung mot trinh tu link SDL3::SDL3 cho moi platform,
+#     chi khac nhau o link options dac thu cua Emscripten.
 # =============================================================================
 
 cmake_minimum_required(VERSION 3.16)
@@ -47,7 +58,19 @@ add_executable(cTetris ${GAME_SOURCES})
 target_include_directories(cTetris PRIVATE ${GAME_INCLUDE_DIRS})
 
 # -----------------------------------------------------------------------------
-# Branching theo platform: WASM (Emscripten) vs Native (macOS/Linux/Windows)
+# SDL3 dependency: tim qua CMake config package.
+# Cho native build, SDL3 nam o /usr/local/lib/cmake/SDL3 hoac
+# /opt/homebrew/lib/cmake/SDL3 (Homebrew silicon). Cho WASM build, build.sh
+# install SDL3 tinh vao $APP_DIR/.sdl3-wasm/ va truyen
+# -DCMAKE_PREFIX_PATH=... khi goi emcmake.
+# -----------------------------------------------------------------------------
+find_package(SDL3 REQUIRED CONFIG)
+target_link_libraries(cTetris PRIVATE SDL3::SDL3)
+message(STATUS "[cTetris] SDL3 found: ${SDL3_DIR}")
+
+# -----------------------------------------------------------------------------
+# Branching theo platform: WASM vs Native (chi khac nhau o link options +
+# bundle properties; SDL3 link da o tren chung cho ca 2)
 # -----------------------------------------------------------------------------
 if(BUILD_WASM)
     # -------------------------------------------------------------------------
@@ -55,22 +78,14 @@ if(BUILD_WASM)
     # -------------------------------------------------------------------------
     message(STATUS "[cTetris] Build mode: WASM (Emscripten)")
 
-    # -------------------------------------------------------------------------
-    # SDL3 port cua Emscripten: PHAI pass -sUSE_SDL=3 o CA HAI giai doan
-    # COMPILE va LINK. O compile time, em++ them include path cua port
-    # (cho SDL3/SDL.h tim duoc); o link time, em++ build & link library
-    # SDL3 san co cua port.
-    # Ly do dung "SHELL:..." prefix:
-    #   - CMake mac dinh deduplicate args, va co the bo qua / merge cac
-    #     option co dau "=" theo cach khong mong muon. SHELL: bao CMake
-    #     pass nguyen ven 1 chuoi nhu the user go vao terminal.
-    #   - Ap dung nguyen tac nay cho moi -s* flag de tranh edge-case.
-    # -------------------------------------------------------------------------
-    target_compile_options(cTetris PRIVATE
-        "SHELL:-sUSE_SDL=3"
-    )
+    # Link options dac thu cua Emscripten:
+    #   - ALLOW_MEMORY_GROWTH=1: cho heap WASM tu cap phat them khi can,
+    #     tranh OOM khi runtime alloc nhieu.
+    #   - ASYNCIFY=1: cho phep dung vong lap dong bo + SDL_PollEvent
+    #     thay vi phai chia tach main loop qua emscripten_set_main_loop.
+    #   - shell-file: HTML wrapper tuy bien (favicon, title, no PWA).
+    # Dung "SHELL:..." prefix de CMake KHONG deduplicate / mangle args.
     target_link_options(cTetris PRIVATE
-        "SHELL:-sUSE_SDL=3"
         "SHELL:-sALLOW_MEMORY_GROWTH=1"
         "SHELL:-sASYNCIFY=1"
         "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
@@ -79,10 +94,6 @@ if(BUILD_WASM)
     # Sinh ra cTetris.html (kem .js + .wasm) thay vi binary mac dinh
     set_target_properties(cTetris PROPERTIES SUFFIX ".html")
 
-    # Copy favicon.svg ra cung cap voi cTetris.html. SVG-driven, khong PNG.
-    # File favicon.svg do build.sh / build.ps1 copy tu brandkit/logo.svg
-    # vao thu muc build SAU khi cmake --build hoan tat -- nen day chi can
-    # khai bao quy uoc, khong can custom_command.
     message(STATUS "[cTetris] Favicon: SVG-driven (logo.svg). PWA install prompt: DISABLED")
 
 else()
@@ -90,10 +101,6 @@ else()
     # Native build (macOS / Linux / Windows)
     # -------------------------------------------------------------------------
     message(STATUS "[cTetris] Build mode: NATIVE")
-
-    # Tim SDL3 thong qua sdl3-config / cmake config package
-    find_package(SDL3 REQUIRED CONFIG)
-    target_link_libraries(cTetris PRIVATE SDL3::SDL3)
 
     # ---------------------------------------------------------------------
     # macOS bundle: chi cau hinh ten bundle, KHONG copy .icns nua.
