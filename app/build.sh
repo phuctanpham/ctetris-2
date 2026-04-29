@@ -300,13 +300,12 @@ ensure_sdl3_native() {
             if command -v apt-get >/dev/null 2>&1; then
                 log_info "Thu cai libsdl3-dev qua apt..."
                 # Removed install_apt_packages_if_missing libsdl3-dev (no package install in CI)
-                    if pkg-config --exists sdl3 2>/dev/null; then
-                        local v; v=$(pkg-config --modversion sdl3)
-                        DETECTED_SDL3_VERSION="$v"
-                        log_ok "Found via apt libsdl3-dev (version $v)"
-                        log_info "WASM build se khop dung version $v"
-                        return 0
-                    fi
+                if pkg-config --exists sdl3 2>/dev/null; then
+                    local v; v=$(pkg-config --modversion sdl3)
+                    DETECTED_SDL3_VERSION="$v"
+                    log_ok "Found via apt libsdl3-dev (version $v)"
+                    log_info "WASM build se khop dung version $v"
+                    return 0
                 fi
                 log_info "apt khong co libsdl3-dev (Ubuntu < 24.04?), fallback source"
             fi
