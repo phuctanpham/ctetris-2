@@ -131,58 +131,8 @@ get_sudo() {
     else echo ""; fi
 }
 
-# =============================================================================
-# Package manager wrappers -- check truoc, install chi thieu, KHONG mu quang
-# update list
-# =============================================================================
-is_apt_pkg_installed()    { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"; }
-is_rpm_pkg_installed()    { rpm -q "$1" >/dev/null 2>&1; }
-is_pacman_pkg_installed() { pacman -Qi "$1" >/dev/null 2>&1; }
-is_apk_pkg_installed()    { apk info -e "$1" >/dev/null 2>&1; }
-is_brew_formula_installed() { brew list --formula "$1" >/dev/null 2>&1; }
 
-install_apt_packages_if_missing() {
-    local pkgs=("$@") missing=() p
-    for p in "${pkgs[@]}"; do is_apt_pkg_installed "$p" || missing+=("$p"); done
-    [ ${#missing[@]} -eq 0 ] && { log_ok "Tat ca ${#pkgs[@]} apt packages da co"; return 0; }
-    log_info "Thieu ${#missing[@]}/${#pkgs[@]} apt packages: ${missing[*]}"
-    local SUDO; SUDO=$(get_sudo)
-    $SUDO apt-get update -qq || log_warn "apt-get update fail"
-    $SUDO apt-get install -y --no-install-recommends "${missing[@]}"
-}
-
-install_dnf_packages_if_missing() {
-    local pkgs=("$@") missing=() p
-    for p in "${pkgs[@]}"; do is_rpm_pkg_installed "$p" || missing+=("$p"); done
-    [ ${#missing[@]} -eq 0 ] && { log_ok "Tat ca ${#pkgs[@]} dnf packages da co"; return 0; }
-    log_info "Thieu ${#missing[@]}/${#pkgs[@]} dnf packages: ${missing[*]}"
-    local SUDO; SUDO=$(get_sudo); $SUDO dnf install -y "${missing[@]}"
-}
-
-install_pacman_packages_if_missing() {
-    local pkgs=("$@") missing=() p
-    for p in "${pkgs[@]}"; do is_pacman_pkg_installed "$p" || missing+=("$p"); done
-    [ ${#missing[@]} -eq 0 ] && { log_ok "Tat ca ${#pkgs[@]} pacman packages da co"; return 0; }
-    log_info "Thieu ${#missing[@]}/${#pkgs[@]} pacman packages: ${missing[*]}"
-    local SUDO; SUDO=$(get_sudo); $SUDO pacman -Sy --needed --noconfirm "${missing[@]}"
-}
-
-install_apk_packages_if_missing() {
-    local pkgs=("$@") missing=() p
-    for p in "${pkgs[@]}"; do is_apk_pkg_installed "$p" || missing+=("$p"); done
-    [ ${#missing[@]} -eq 0 ] && { log_ok "Tat ca ${#pkgs[@]} apk packages da co"; return 0; }
-    log_info "Thieu ${#missing[@]}/${#pkgs[@]} apk packages: ${missing[*]}"
-    local SUDO; SUDO=$(get_sudo); $SUDO apk add --no-cache "${missing[@]}"
-}
-
-install_brew_formulas_if_missing() {
-    local pkgs=() missing=() p
-    for p in "$@"; do [ -n "$p" ] && pkgs+=("$p"); done
-    for p in "${pkgs[@]}"; do is_brew_formula_installed "$p" || missing+=("$p"); done
-    [ ${#missing[@]} -eq 0 ] && { log_ok "Tat ca ${#pkgs[@]} brew formulas da co"; return 0; }
-    log_info "Thieu ${#missing[@]}/${#pkgs[@]} brew formulas: ${missing[*]}"
-    brew install "${missing[@]}"
-}
+# (Removed all package manager wrappers and install logic)
 
 # =============================================================================
 # nanosvg -- tai vao $DOWNLOAD_DIR/nanosvg/, KHONG copy vao src/
@@ -479,107 +429,41 @@ build_sdl3_from_source() {
     log_ok "SDL3 $sdl_ver ($target) da install vao $install_prefix"
 }
 
-# =============================================================================
-# Desktop icon generation tu brandkit/logo.svg
-# -----------------------------------------------------------------------------
-# Chien luoc: KHONG commit file icon vao repo, sinh ON-THE-FLY trong build/.
-# OS-specific output:
-#   macOS   -> build/desktop/macos/cTetris.icns      (Apple icon set, multi-res)
-#   windows -> build/desktop/windows/cTetris.ico     (Windows icon, multi-res)
-#   linux/ubuntu/etc -> build/desktop/<os>/cTetris.svg (SVG truc tiep)
-# Tools can thiet:
-#   macOS   : iconutil + sips (built-in, KHONG can cai)
-#   linux   : khong can tool (chi copy SVG)
-#   windows : ImageMagick magick (qua choco/winget) HOAC inkscape
-# =============================================================================
 
-# Kiem tra & cai cong cu can thiet de generate icon. Tra ve 0 neu OK,
-# 1 neu thieu tool ma KHONG the cai (skip icon, dung default OS).
-ensure_icon_tools() {
-    case "$OS_NAME" in
-        macos)
-            # iconutil + sips la built-in cua macOS, khong can cai
-            if ! command -v iconutil >/dev/null 2>&1 || \
-               ! command -v sips      >/dev/null 2>&1; then
-                log_warn "Thieu iconutil/sips (built-in macOS) -- skip icon gen"
-                return 1
-            fi
-            # Can rsvg-convert (qua brew librsvg) de convert SVG -> PNG
-            if ! command -v rsvg-convert >/dev/null 2>&1; then
-                if command -v brew >/dev/null 2>&1; then
-                    log_info "Cai librsvg (rsvg-convert) qua brew cho SVG->PNG..."
-                    install_brew_formulas_if_missing librsvg
-                else
-                    log_warn "Khong co brew, khong the cai librsvg -- skip icon gen"
-                    return 1
-                fi
-            fi
-            log_ok "Icon tools macOS: iconutil + sips + rsvg-convert"
-            ;;
-        ubuntu|fedora|arch|alpine|opensuse|linux)
-            # Linux chi can copy SVG, khong cai gi them
-            log_ok "Icon tools Linux: khong can (chi copy SVG)"
-            ;;
-        *)
-            log_warn "OS $OS_NAME khong nhan dien -- skip icon gen"
-            return 1
-            ;;
-    esac
-    return 0
-}
-
-# Sinh icon cho desktop app. Tham so:
-#   $1 = output build dir (vd build/desktop/macos)
-generate_desktop_icon() {
+# Icon: Only copy pre-created icon from brandkit to build output
+copy_desktop_icon() {
     local out_dir="$1"
-    local logo_svg="$BRAND_LOGO_SVG"
-
-    if [ ! -f "$logo_svg" ]; then
-        log_warn "Khong co $logo_svg -- skip icon gen"
-        return 0
-    fi
-
-    if ! ensure_icon_tools; then
-        log_warn "Thieu tools, dung icon mac dinh OS"
-        return 0
-    fi
-
     mkdir -p "$out_dir"
-
     case "$OS_NAME" in
         macos)
-            # Quy trinh: SVG -> PNG nhieu kich thuoc -> .iconset/ -> .icns
-            local iconset="$out_dir/cTetris.iconset"
-            local icns="$out_dir/cTetris.icns"
-
-            # Skip neu .icns da fresh hon SVG
-            if [ -f "$icns" ] && [ "$icns" -nt "$logo_svg" ]; then
-                log_ok "Icon $icns da fresh, bo qua regenerate"
-                return 0
+            local icns_src="$BRANDKIT_DIR/cTetris.icns"
+            local icns_dst="$out_dir/cTetris.icns"
+            if [ -f "$icns_src" ]; then
+                cp "$icns_src" "$icns_dst"
+                log_ok "Copied icon: $icns_dst"
+            else
+                log_warn "No $icns_src found, using default OS icon."
             fi
-
-            mkdir -p "$iconset"
-            # Apple yeu cau cac size: 16, 32, 64, 128, 256, 512, 1024 (kem @2x)
-            for size in 16 32 64 128 256 512; do
-                rsvg-convert -w "$size" -h "$size" "$logo_svg" \
-                    -o "$iconset/icon_${size}x${size}.png"
-                local size2x=$((size * 2))
-                rsvg-convert -w "$size2x" -h "$size2x" "$logo_svg" \
-                    -o "$iconset/icon_${size}x${size}@2x.png"
-            done
-            iconutil -c icns "$iconset" -o "$icns"
-            rm -rf "$iconset"  # don dep PNG tam, chi giu .icns
-            log_ok "Sinh icon: $icns"
+            ;;
+        windows)
+            local ico_src="$BRANDKIT_DIR/cTetris.ico"
+            local ico_dst="$out_dir/cTetris.ico"
+            if [ -f "$ico_src" ]; then
+                cp "$ico_src" "$ico_dst"
+                log_ok "Copied icon: $ico_dst"
+            else
+                log_warn "No $ico_src found, using default OS icon."
+            fi
             ;;
         ubuntu|fedora|arch|alpine|opensuse|linux)
-            # Linux: copy SVG truc tiep, ten cTetris.svg
-            local svg_out="$out_dir/cTetris.svg"
-            if [ -f "$svg_out" ] && [ "$svg_out" -nt "$logo_svg" ]; then
-                log_ok "Icon $svg_out da fresh, bo qua regenerate"
-                return 0
+            local svg_src="$BRANDKIT_DIR/cTetris.svg"
+            local svg_dst="$out_dir/cTetris.svg"
+            if [ -f "$svg_src" ]; then
+                cp "$svg_src" "$svg_dst"
+                log_ok "Copied icon: $svg_dst"
+            else
+                log_warn "No $svg_src found, using default OS icon."
             fi
-            cp "$logo_svg" "$svg_out"
-            log_ok "Sinh icon: $svg_out (SVG truc tiep)"
             ;;
     esac
 }
@@ -718,17 +602,13 @@ validate_sources() {
 build_native() {
     log_info "Build NATIVE mode -> $BUILD_NATIVE_DIR"
     validate_sources
-    ensure_basic_tools
     ensure_sdl3_native
     ensure_nanosvg
 
-    # Sinh icon desktop tu brandkit/logo.svg vao $BUILD_NATIVE_DIR
-    # (cTetris.icns cho macOS, cTetris.svg cho Linux)
-    generate_desktop_icon "$BUILD_NATIVE_DIR"
+    # Copy icon from brandkit to build output
+    copy_desktop_icon "$BUILD_NATIVE_DIR"
 
     # Tim path SDL3Config.cmake de truyen truc tiep qua SDL3_DIR.
-    # Neu khong tim duoc (SDL3 cai he thong qua brew/distro), de cmake tu
-    # search qua CMAKE_PREFIX_PATH va default search paths.
     local sdl_dir_arg=()
     for candidate in \
         "$DOWNLOAD_DIR/sdl3-native/lib/cmake/SDL3" \
@@ -740,12 +620,16 @@ build_native() {
         fi
     done
 
-    # Truyen path icon (neu da sinh) cho CMake de embed vao bundle/exe
+    # Truyen path icon (neu da copy) cho CMake de embed vao bundle/exe
     local icon_arg=()
     case "$OS_NAME" in
         macos)
             local icns="$BUILD_NATIVE_DIR/cTetris.icns"
             [ -f "$icns" ] && icon_arg=(-DCTETRIS_ICON_PATH="$icns")
+            ;;
+        windows)
+            local ico="$BUILD_NATIVE_DIR/cTetris.ico"
+            [ -f "$ico" ] && icon_arg=(-DCTETRIS_ICON_PATH="$ico")
             ;;
         ubuntu|fedora|arch|alpine|opensuse|linux)
             local svg="$BUILD_NATIVE_DIR/cTetris.svg"

@@ -87,52 +87,8 @@ function Test-CommandVersion {
     return $false
 }
 
-# =============================================================================
-# Package managers (winget priority, choco fallback)
-# =============================================================================
-function Test-WingetPackageInstalled {
-    param([string]$Id)
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return $false }
-    & winget list --id $Id --exact 2>$null | Out-Null
-    return ($LASTEXITCODE -eq 0)
-}
 
-function Install-WingetPackagesIfMissing {
-    param([string[]]$Ids)
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return $false }
-    $missing = @()
-    foreach ($id in $Ids) { if (-not (Test-WingetPackageInstalled $id)) { $missing += $id } }
-    if ($missing.Count -eq 0) {
-        Write-Ok "Tat ca $($Ids.Count) winget packages da co"
-        return $true
-    }
-    Write-Info "Thieu $($missing.Count)/$($Ids.Count) winget: $($missing -join ', ')"
-    foreach ($id in $missing) {
-        & winget install --id $id --silent --accept-package-agreements --accept-source-agreements
-    }
-    return $true
-}
-
-function Test-ChocoPackageInstalled {
-    param([string]$Name)
-    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) { return $false }
-    $out = & choco list --local-only --exact --limit-output $Name 2>$null
-    return ($out -match "^$([regex]::Escape($Name))\|")
-}
-
-function Install-ChocoPackagesIfMissing {
-    param([string[]]$Packages)
-    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) { return $false }
-    $missing = @()
-    foreach ($p in $Packages) { if (-not (Test-ChocoPackageInstalled $p)) { $missing += $p } }
-    if ($missing.Count -eq 0) {
-        Write-Ok "Tat ca $($Packages.Count) choco packages da co"
-        return $true
-    }
-    Write-Info "Thieu $($missing.Count)/$($Packages.Count) choco: $($missing -join ', ')"
-    & choco install -y --no-progress @missing
-    return $?
-}
+# (Removed all package manager wrappers and install logic)
 
 # =============================================================================
 # nanosvg -- check committed -> check libs\downloads -> download
@@ -347,67 +303,18 @@ function Build-Sdl3FromSource {
     Write-Ok "SDL3 $Version ($Target) da install vao $InstallPrefix"
 }
 
-# =============================================================================
-# Desktop icon generation tu brandkit/logo.svg
-# -----------------------------------------------------------------------------
-# Windows: dung ImageMagick (magick.exe) de convert SVG -> ICO multi-size.
-# Tools install qua winget (ImageMagick.ImageMagick) hoac choco (imagemagick).
-# Output: build\desktop\windows\cTetris.ico
-# =============================================================================
-function Initialize-IconTools {
-    if (Get-Command magick -ErrorAction SilentlyContinue) {
-        Write-Ok 'Icon tools: magick (ImageMagick) da co'
-        return $true
-    }
 
-    Write-Info 'Thieu magick (ImageMagick) -- thu cai...'
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-        Install-WingetPackagesIfMissing -Ids @('ImageMagick.ImageMagick')
-    } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
-        Install-ChocoPackagesIfMissing -Packages @('imagemagick')
-    } else {
-        Write-Warn 'Khong co winget/choco, khong cai duoc ImageMagick -- skip icon'
-        return $false
-    }
-
-    if (Get-Command magick -ErrorAction SilentlyContinue) {
-        Write-Ok 'Icon tools: magick san sang sau khi cai'
-        return $true
-    }
-    Write-Warn 'magick van khong tim thay sau cai -- restart shell de PATH refresh'
-    return $false
-}
-
-function New-DesktopIcon {
+# Icon: Only copy pre-created icon from brandkit to build output
+function Copy-DesktopIcon {
     param([string]$OutDir)
-    if (-not (Test-Path $BrandLogoSvg)) {
-        Write-Warn "Khong co $BrandLogoSvg -- skip icon gen"
-        return
-    }
-    if (-not (Initialize-IconTools)) {
-        Write-Warn 'Thieu icon tools, dung icon mac dinh OS'
-        return
-    }
     New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-    $ico = Join-Path $OutDir 'cTetris.ico'
-
-    # Skip neu .ico da fresh hon SVG nguon
-    if (Test-Path $ico) {
-        $icoTime = (Get-Item $ico).LastWriteTime
-        $svgTime = (Get-Item $BrandLogoSvg).LastWriteTime
-        if ($icoTime -gt $svgTime) {
-            Write-Ok "Icon $ico da fresh, bo qua regenerate"
-            return
-        }
-    }
-
-    # ImageMagick convert SVG -> ICO multi-size (16, 32, 48, 64, 128, 256)
-    & magick convert -background none -density 384 $BrandLogoSvg `
-        -define icon:auto-resize='16,32,48,64,128,256' $ico
-    if ($LASTEXITCODE -eq 0) {
-        Write-Ok "Sinh icon: $ico"
+    $icoSrc = Join-Path $BrandkitDir 'cTetris.ico'
+    $icoDst = Join-Path $OutDir 'cTetris.ico'
+    if (Test-Path $icoSrc) {
+        Copy-Item -Force $icoSrc $icoDst
+        Write-Ok "Copied icon: $icoDst"
     } else {
-        Write-Warn 'magick convert fail, skip icon'
+        Write-Warn "No $icoSrc found, using default OS icon."
     }
 }
 function Initialize-WindowsTools {
@@ -491,12 +398,11 @@ function Test-Sources {
 function Build-Native {
     Write-Info "Build NATIVE -> $BuildNativeDir"
     Test-Sources
-    Initialize-WindowsTools
     Initialize-Sdl3Native
     Initialize-Nanosvg
 
-    # Sinh icon Windows .ico tu brandkit/logo.svg
-    New-DesktopIcon -OutDir $BuildNativeDir
+    # Copy icon from brandkit to build output
+    Copy-DesktopIcon -OutDir $BuildNativeDir
 
     # Tim path SDL3Config.cmake
     $sdlInstall = Join-Path $DownloadDir 'sdl3-native'
@@ -512,7 +418,7 @@ function Build-Native {
         }
     }
 
-    # Truyen icon path cho CMake (neu da sinh thanh cong)
+    # Truyen icon path cho CMake (neu da copy)
     $iconArg = @()
     $ico = Join-Path $BuildNativeDir 'cTetris.ico'
     if (Test-Path $ico) {

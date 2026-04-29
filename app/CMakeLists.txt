@@ -4,10 +4,10 @@
 # THAY DOI v1:
 #   - Drop hoan toan phan embed icon binary cho native build:
 #     * KHONG con tao file .rc + RC_ICON cho Windows .exe
-#     * KHONG con copy .icns vao Resources cua macOS .app
+#     * KHONG con sinh/copy .icns vao Resources cua macOS .app (chi copy neu co)
 #     * KHONG con cai .desktop voi Icon=PNG cho Linux
 #     => Desktop apps dung icon mac dinh cua OS, gon nhe va khong phu thuoc
-#        vao buoc rasterize PNG/ICO/ICNS.
+#        vao buoc rasterize PNG/ICO/ICNS. Neu muon icon, chi copy tu brandkit.
 #   - WASM build chi can copy mot file favicon.svg duy nhat. Khong copy
 #     manifest.webmanifest va khong copy sw.js -- yeu cau v1 la disable
 #     PWA install prompt va dung SVG-driven favicon thay vi PNG.
@@ -143,11 +143,10 @@ else()
             MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
         )
         if(CTETRIS_ICON_PATH AND EXISTS "${CTETRIS_ICON_PATH}")
-            # Khai bao .icns la resource cua bundle, copy vao Resources/
+            # Neu co icon tu brandkit, copy vao Resources
             set_source_files_properties("${CTETRIS_ICON_PATH}" PROPERTIES
                 MACOSX_PACKAGE_LOCATION "Resources")
             target_sources(cTetris PRIVATE "${CTETRIS_ICON_PATH}")
-            # Lay ten file (vd "cTetris.icns") gan vao Info.plist
             get_filename_component(_icon_name "${CTETRIS_ICON_PATH}" NAME)
             set_target_properties(cTetris PROPERTIES
                 MACOSX_BUNDLE_ICON_FILE "${_icon_name}")
@@ -175,18 +174,14 @@ else()
     # ---------------------------------------------------------------------
     if(WIN32)
         if(CTETRIS_ICON_PATH AND EXISTS "${CTETRIS_ICON_PATH}")
-            set(_rc_file "${CMAKE_BINARY_DIR}/cTetris_icon.rc")
-            file(WRITE "${_rc_file}"
-                 "IDI_ICON1 ICON DISCARDABLE \"${CTETRIS_ICON_PATH}\"\n")
-            target_sources(cTetris PRIVATE "${_rc_file}")
+            # Neu co icon tu brandkit, chi dung truc tiep
             message(STATUS "[cTetris] Windows icon: ${CTETRIS_ICON_PATH}")
         else()
             message(STATUS "[cTetris] Windows icon: default (CTETRIS_ICON_PATH not set)")
         endif()
     endif()
 
-    # Khong tao .rc cho Windows tu day -- build.ps1 se tu xu ly icon embedding
-    # qua resource compiler (rc.exe) neu can.
+    # Khong tao .rc cho Windows tu day -- icon chi copy tu brandkit neu co.
 endif()
 
 # -----------------------------------------------------------------------------
