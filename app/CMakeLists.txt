@@ -143,7 +143,7 @@ else()
             MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
         )
         if(CTETRIS_ICON_PATH AND EXISTS "${CTETRIS_ICON_PATH}")
-            # Neu co icon tu brandkit, copy vao Resources
+            # Embed .icns in Resources and set as bundle icon
             set_source_files_properties("${CTETRIS_ICON_PATH}" PROPERTIES
                 MACOSX_PACKAGE_LOCATION "Resources")
             target_sources(cTetris PRIVATE "${CTETRIS_ICON_PATH}")
@@ -163,7 +163,9 @@ else()
     # ---------------------------------------------------------------------
     if(UNIX AND NOT APPLE)
         if(CTETRIS_ICON_PATH AND EXISTS "${CTETRIS_ICON_PATH}")
-            message(STATUS "[cTetris] Linux icon SVG: ${CTETRIS_ICON_PATH}")
+            # Install/copy SVG icon next to binary for Linux desktop integration
+            install(FILES "${CTETRIS_ICON_PATH}" DESTINATION "." RENAME "cTetris.svg")
+            message(STATUS "[cTetris] Linux icon SVG installed: ${CTETRIS_ICON_PATH}")
         endif()
     endif()
 
@@ -174,8 +176,11 @@ else()
     # ---------------------------------------------------------------------
     if(WIN32)
         if(CTETRIS_ICON_PATH AND EXISTS "${CTETRIS_ICON_PATH}")
-            # Neu co icon tu brandkit, chi dung truc tiep
-            message(STATUS "[cTetris] Windows icon: ${CTETRIS_ICON_PATH}")
+            # Embed .ico in .exe via .rc resource file
+            set(_rc_file "${CMAKE_BINARY_DIR}/cTetris_icon.rc")
+            file(WRITE "${_rc_file}" "IDI_ICON1 ICON DISCARDABLE \"${CTETRIS_ICON_PATH}\"\n")
+            target_sources(cTetris PRIVATE "${_rc_file}")
+            message(STATUS "[cTetris] Windows icon embedded: ${CTETRIS_ICON_PATH}")
         else()
             message(STATUS "[cTetris] Windows icon: default (CTETRIS_ICON_PATH not set)")
         endif()

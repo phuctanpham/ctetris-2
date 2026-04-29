@@ -55,10 +55,8 @@ jobs:
 
       # -----------------------------------------------------------------
 
-      # -----------------------------------------------------------------
-      # Step 2: Cache OS-driven downloads (libs/ubuntu/downloads/) for build.sh
-      # -----------------------------------------------------------------
-      - name: Cache OS-driven downloads (libs/ubuntu/downloads/)
+      # Cache only heavy downloads for build.sh (libs/ubuntu/downloads/)
+      - name: Cache heavy downloads (libs/ubuntu/downloads/)
         uses: actions/cache@v4
         with:
           path: app/libs/ubuntu/downloads
@@ -66,23 +64,15 @@ jobs:
           restore-keys: |
             libs-ubuntu-
 
-      # -----------------------------------------------------------------
-
-      # -----------------------------------------------------------------
-      # Step 3: Run build.sh for WASM (all logic handled by build.sh)
-      # -----------------------------------------------------------------
-      - name: Build WASM (all logic in build.sh)
+      # Build WASM (all logic in build.sh, including dependency git clone and artifact generation)
+      - name: Build WASM
         working-directory: app
         run: |
           set -o pipefail
           chmod +x build.sh
           ./build.sh wasm 2>&1 | tee build.log
 
-      # -----------------------------------------------------------------
-
-      # -----------------------------------------------------------------
-      # Step 4: (Optional) Upload build.log for debugging
-      # -----------------------------------------------------------------
+      # Upload build log for debugging
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
@@ -91,10 +81,7 @@ jobs:
           path: app/build.log
           retention-days: 7
 
-      # -----------------------------------------------------------------
-      # Step 9: Stage Pages artifact (rename cTetris.html -> index.html,
-      # touch .nojekyll de Pages khong loai bo cTetris.wasm)
-      # -----------------------------------------------------------------
+      # Stage Pages artifact (just copy from build output, do not generate or verify icons)
       - name: Stage Pages artifact
         run: |
           mkdir -p public
@@ -107,24 +94,11 @@ jobs:
           touch public/.nojekyll
           ls -la public/
 
-      # -----------------------------------------------------------------
-      # Step 10: Upload Pages artifact
-      # -----------------------------------------------------------------
+      # Upload Pages artifact
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
-
-      # -----------------------------------------------------------------
-      # Step 11: Upload build.log lam artifact rieng (debug). Always run.
-      # -----------------------------------------------------------------
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: app/build.log
-          retention-days: 7
 
   # ---------------------------------------------------------------------------
   # Job 2: DEPLOY
@@ -140,3 +114,14 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Clean up all workflow artifacts except cache if deploy is successful
+      - name: Cleanup workflow artifacts (except cache)
+        if: ${{ success() }}
+        run: |
+          echo "Cleaning up workflow artifacts except cache..."
+          gh api repos/${{ github.repository }}/actions/artifacts \
+            --paginate -q '.artifacts[] | select(.expired==false) | select(.name!~"^cache") | .id' | \
+          xargs -r -n1 gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/{}/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
