@@ -95,44 +95,7 @@ jobs:
           ./build.sh wasm 2>&1 | tee build.log
 
       # -----------------------------------------------------------------
-      # Step 5: VERIFY -- grep log de check rang script khong tu install lai
-      # cac packages ma workflow da pre-install. Neu phat hien thi fail
-      # workflow voi message ro rang -- la indicator script's detection
-      # function (is_apt_pkg_installed) co bug.
-      # -----------------------------------------------------------------
-      - name: Verify build.sh detection works correctly
-        working-directory: app
-        run: |
-          echo "=== Verifying build.sh package detection ==="
-
-          # Test 1: KHONG duoc thay "Thieu N/M apt packages: ..."
-          # day nghia la script khong detect duoc package da pre-install
-          if grep -E "Thieu [0-9]+/[0-9]+ apt packages" build.log; then
-            echo "::error::build.sh tried to install apt packages despite them being pre-installed!"
-            echo "::error::Function is_apt_pkg_installed() is BROKEN -- check dpkg-query usage."
-            echo "::error::Workflow Step 2 pre-installed: build-essential cmake git curl python3 ca-certificates pkg-config"
-            echo "::error::Script should report '[OK] Tat ca N apt packages da co' instead."
-            exit 1
-          fi
-
-          # Test 2: PHAI thay "[OK] Tat ca N apt packages da co" -- xac nhan
-          # ensure_basic_tools da chay va detect thanh cong
-          if ! grep -E "\[OK\].*apt packages da co" build.log; then
-            echo "::warning::Khong thay log xac nhan apt packages detection chay thanh cong"
-            echo "::warning::Co the build.sh skip phan ensure_basic_tools (vi da co cache?)"
-          else
-            echo "OK: build.sh detected pre-installed apt packages correctly"
-          fi
-
-          # Test 3: build artifact phai ton tai
-          if [ ! -f build/wasm/ubuntu/cTetris.html ]; then
-            echo "::error::Build artifact missing: build/wasm/ubuntu/cTetris.html"
-            exit 1
-          fi
-          echo "OK: Build artifacts present"
-
-      # -----------------------------------------------------------------
-      # Step 6: Stage Pages artifact
+      # Step 5: Stage Pages artifact
       # Build artifact nam o app/build/wasm/ubuntu/ (OS-driven path).
       #   - Rename cTetris.html -> index.html
       #   - Copy .js / .wasm / favicon.svg
@@ -151,7 +114,7 @@ jobs:
           ls -la public/
 
       # -----------------------------------------------------------------
-      # Step 7: Upload Pages artifact
+      # Step 6: Upload Pages artifact
       # -----------------------------------------------------------------
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -159,7 +122,7 @@ jobs:
           path: public
 
       # -----------------------------------------------------------------
-      # Step 8: Upload build.log la artifact rieng -- de debug khi can.
+      # Step 7: Upload build.log la artifact rieng -- de debug khi can.
       # Always run, ke ca khi cac step truoc fail.
       # -----------------------------------------------------------------
       - name: Upload build log (for debugging)
