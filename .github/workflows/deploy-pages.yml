@@ -54,88 +54,9 @@ jobs:
         uses: actions/checkout@v4
 
       # -----------------------------------------------------------------
-      # Step 2: Pre-install APT packages (basic build tools).
-      # Danh sach KHOP CHINH XAC voi ensure_basic_tools()/ubuntu trong
-      # build.sh -- script se detect het va skip install.
-      # -----------------------------------------------------------------
-      - name: Pre-install required apt packages
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            build-essential \
-            cmake \
-            git \
-            curl \
-            python3 \
-            ca-certificates \
-            pkg-config
 
       # -----------------------------------------------------------------
-      # Step 3: Pre-install SDL3 dev lib qua apt (Ubuntu 24.04+ moi co).
-      # KHONG fail neu khong co goi (Ubuntu 22.04 chua co libsdl3-dev) --
-      # build.sh se fallback build SDL3 tu source.
-      # -----------------------------------------------------------------
-      - name: Pre-install SDL3 dev (best effort)
-        continue-on-error: true
-        run: |
-          if apt-cache show libsdl3-dev >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends libsdl3-dev
-            echo "::notice::libsdl3-dev installed via apt"
-            pkg-config --modversion sdl3 || true
-          else
-            echo "::notice::libsdl3-dev khong co trong apt repo (Ubuntu < 24.04?), build.sh se build tu source"
-          fi
-
-      # -----------------------------------------------------------------
-      # Step 4: Pre-install EMSDK (Q5: uu tien setup-emsdk action).
-      # Action mymindstorm/setup-emsdk@v14 cache emsdk va add vao PATH
-      # tu dong -- nhanh hon git clone manual.
-      # Neu action fail (vd network), step Step 4b (fallback) se xu ly.
-      # -----------------------------------------------------------------
-      - name: Pre-install emsdk (priority I -- via action)
-        id: setup-emsdk
-        continue-on-error: true
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: ${{ env.EMSDK_VERSION }}
-          actions-cache-folder: 'emsdk-cache-${{ env.EMSDK_VERSION }}'
-
-      # -----------------------------------------------------------------
-      # Step 4b: Fallback emsdk install neu setup-emsdk action fail.
-      # Manual git clone giong build.sh ensure_emsdk(), nhung lam SAN o
-      # workflow level -- de build.sh detect duoc emsdk co tren PATH va
-      # SKIP clone moi.
-      # -----------------------------------------------------------------
-      - name: Pre-install emsdk (priority II -- manual fallback)
-        if: steps.setup-emsdk.outcome == 'failure'
-        run: |
-          echo "::warning::setup-emsdk action fail, fallback ve git clone manual"
-          mkdir -p $HOME/emsdk-fallback
-          git clone --depth 1 https://github.com/emscripten-core/emsdk.git $HOME/emsdk-fallback
-          cd $HOME/emsdk-fallback
-          ./emsdk install $EMSDK_VERSION
-          ./emsdk activate $EMSDK_VERSION
-          # Add em++ vao PATH cho cac step sau (build.sh detect duoc)
-          echo "$HOME/emsdk-fallback" >> $GITHUB_PATH
-          echo "$HOME/emsdk-fallback/upstream/emscripten" >> $GITHUB_PATH
-          # Set env tuong duong source emsdk_env.sh
-          echo "EMSDK=$HOME/emsdk-fallback" >> $GITHUB_ENV
-          echo "EMSDK_NODE=$HOME/emsdk-fallback/node/$(ls $HOME/emsdk-fallback/node)/bin/node" >> $GITHUB_ENV
-
-      # -----------------------------------------------------------------
-      # Step 5: Verify emsdk pre-install thanh cong (em++ tren PATH)
-      # -----------------------------------------------------------------
-      - name: Verify emsdk on PATH
-        run: |
-          if ! command -v em++ >/dev/null; then
-            echo "::error::emsdk pre-install fail -- em++ khong co tren PATH"
-            exit 1
-          fi
-          echo "em++ version: $(em++ --version | head -n1)"
-
-      # -----------------------------------------------------------------
-      # Step 6: Cache OS-driven downloads (libs/ubuntu/downloads/) cho
-      # SDL3 WASM static build (lan dau build mat ~1-2 phut, lan sau cache).
+      # Step 2: Cache OS-driven downloads (libs/ubuntu/downloads/) for build.sh
       # -----------------------------------------------------------------
       - name: Cache OS-driven downloads (libs/ubuntu/downloads/)
         uses: actions/cache@v4
@@ -146,9 +67,11 @@ jobs:
             libs-ubuntu-
 
       # -----------------------------------------------------------------
-      # Step 7: Run build.sh + capture log de verify o step sau.
+
       # -----------------------------------------------------------------
-      - name: Build WASM (script should DETECT all pre-installed deps)
+      # Step 3: Run build.sh for WASM (all logic handled by build.sh)
+      # -----------------------------------------------------------------
+      - name: Build WASM (all logic in build.sh)
         working-directory: app
         run: |
           set -o pipefail
@@ -156,57 +79,17 @@ jobs:
           ./build.sh wasm 2>&1 | tee build.log
 
       # -----------------------------------------------------------------
-      # Step 8: VERIFY build.sh detection works (KHONG redundant install).
-      # Kiem tra log de phat hien luc nao script tu install lai dependencies
-      # ma workflow da pre-install -> indicator cua bug trong detection logic.
+
       # -----------------------------------------------------------------
-      - name: Verify build.sh skipped pre-installed deps
-        working-directory: app
-        run: |
-          echo "=== Verifying build.sh package detection ==="
-          FAIL=0
-
-          # Test 1: APT detection -- KHONG duoc tu install lai
-          if grep -E "Thieu [0-9]+/[0-9]+ apt packages" build.log; then
-            echo "::error::build.sh tried to install apt packages -- detection BROKEN"
-            echo "::error::Pre-installed: build-essential cmake git curl python3 ca-certificates pkg-config"
-            FAIL=1
-          else
-            echo "[OK] APT detection: skip install thanh cong"
-          fi
-
-          # Test 2: emsdk detection -- KHONG duoc clone moi vao libs/.../emsdk
-          if grep -E "Khong tim thay emsdk, clone vao" build.log; then
-            echo "::error::build.sh tried to clone emsdk -- detection BROKEN"
-            echo "::error::emsdk da pre-install qua setup-emsdk action o Step 4"
-            echo "::error::ensure_emsdk() phai detect em++ tren PATH va skip"
-            FAIL=1
-          else
-            echo "[OK] emsdk detection: skip clone thanh cong"
-          fi
-
-          # Test 3: cTetris.html artifact phai ton tai
-          if [ ! -f build/wasm/ubuntu/cTetris.html ]; then
-            echo "::error::Build artifact missing: build/wasm/ubuntu/cTetris.html"
-            FAIL=1
-          else
-            echo "[OK] Build artifact: build/wasm/ubuntu/cTetris.html present"
-          fi
-
-          # Test 4: SDL3 detection -- neu apt da cai libsdl3-dev (Ubuntu 24.04+)
-          # thi WASM build se MATCH version DO. Log it nhat phai co dong nay:
-          if grep -E "Found via apt libsdl3-dev|Found via pkg-config|Found via brew" build.log; then
-            echo "[OK] SDL3 native detection: thanh cong"
-          else
-            echo "::warning::SDL3 native khong detect duoc (Ubuntu < 24.04 hoac apt step fail)"
-            echo "::warning::WASM build se dung SDL3_VERSION pin trong build.sh"
-          fi
-
-          if [ "$FAIL" = "1" ]; then
-            echo "::error::Verification FAIL -- xem cac error o tren"
-            exit 1
-          fi
-          echo "=== All checks PASS ==="
+      # Step 4: (Optional) Upload build.log for debugging
+      # -----------------------------------------------------------------
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: app/build.log
+          retention-days: 7
 
       # -----------------------------------------------------------------
       # Step 9: Stage Pages artifact (rename cTetris.html -> index.html,

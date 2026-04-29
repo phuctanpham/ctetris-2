@@ -436,7 +436,7 @@ copy_desktop_icon() {
     mkdir -p "$out_dir"
     case "$OS_NAME" in
         macos)
-            local icns_src="$BRANDKIT_DIR/cTetris.icns"
+            local icns_src="$BRANDKIT_DIR/logo.icns"
             local icns_dst="$out_dir/cTetris.icns"
             if [ -f "$icns_src" ]; then
                 cp "$icns_src" "$icns_dst"
@@ -446,7 +446,7 @@ copy_desktop_icon() {
             fi
             ;;
         windows)
-            local ico_src="$BRANDKIT_DIR/cTetris.ico"
+            local ico_src="$BRANDKIT_DIR/logo.ico"
             local ico_dst="$out_dir/cTetris.ico"
             if [ -f "$ico_src" ]; then
                 cp "$ico_src" "$ico_dst"
@@ -456,7 +456,7 @@ copy_desktop_icon() {
             fi
             ;;
         ubuntu|fedora|arch|alpine|opensuse|linux)
-            local svg_src="$BRANDKIT_DIR/cTetris.svg"
+            local svg_src="$BRANDKIT_DIR/logo.svg"
             local svg_dst="$out_dir/cTetris.svg"
             if [ -f "$svg_src" ]; then
                 cp "$svg_src" "$svg_dst"
