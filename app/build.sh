@@ -299,7 +299,7 @@ ensure_sdl3_native() {
             # Ubuntu 24.04 da co libsdl3-dev trong universe (3.0+). Thu apt truoc.
             if command -v apt-get >/dev/null 2>&1; then
                 log_info "Thu cai libsdl3-dev qua apt..."
-                if install_apt_packages_if_missing libsdl3-dev 2>/dev/null; then
+                # Removed install_apt_packages_if_missing libsdl3-dev (no package install in CI)
                     if pkg-config --exists sdl3 2>/dev/null; then
                         local v; v=$(pkg-config --modversion sdl3)
                         DETECTED_SDL3_VERSION="$v"
@@ -481,7 +481,7 @@ ensure_linux_dev_libs() {
                 libudev-dev libdbus-1-dev libibus-1.0-dev
                 libunwind-dev
             )
-            install_apt_packages_if_missing "${pkgs[@]}"
+            # Removed install_apt_packages_if_missing (no package install in CI)
             ;;
         fedora)
             local pkgs=(
@@ -549,7 +549,7 @@ ensure_basic_tools() {
                                   || log_ok "Basic tools da co"
             ;;
         ubuntu)
-            install_apt_packages_if_missing build-essential cmake git curl python3 ca-certificates pkg-config
+            # Removed install_apt_packages_if_missing (no package install in CI)
             ;;
         fedora)
             install_dnf_packages_if_missing gcc-c++ make cmake git curl python3 ca-certificates pkgconf-pkg-config
