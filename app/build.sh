@@ -73,9 +73,16 @@ BRANDKIT_DIR="$APP_DIR/brandkit"
 BRAND_LOGO_SVG="$BRANDKIT_DIR/logo.svg"
 
 # Version pinning -- doi o day se tu invalidate cache CI
+# SDL3_VERSION_MIN: version toi thieu yeu cau (game can SDL3 >= 3.2.0)
+# SDL3_VERSION:     version dung khi build SDL3 tu source (pin de deterministic).
+# NEU detect duoc SDL3 cai san qua brew/apt (>= MIN), thi WASM build se tu
+# match dung version DO de tranh dij ban native vs wasm. Xem ensure_sdl3_native
+# va build_wasm.
 CMAKE_MIN_VERSION="3.16"
 EMSDK_VERSION="3.1.72"
-SDL3_VERSION="3.2.18"
+SDL3_VERSION_MIN="3.2.0"
+SDL3_VERSION="3.2.18"   # default pin neu native khong co SDL3
+DETECTED_SDL3_VERSION="" # se duoc set boi ensure_sdl3_native neu phat hien
 
 BUILD_MODE="${1:-native}"
 
@@ -298,7 +305,9 @@ ensure_sdl3_native() {
     log_info "  [1/4] Try pkg-config --exists sdl3..."
     if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists sdl3 2>/dev/null; then
         local v; v=$(pkg-config --modversion sdl3)
+        DETECTED_SDL3_VERSION="$v"
         log_ok "Found via pkg-config (version $v) -- skip install"
+        log_info "WASM build se khop dung version $v de tranh dij ban native vs wasm"
         return 0
     fi
     log_info "  ... pkg-config khong co SDL3 (hoac pkg-config khong co)"
@@ -306,7 +315,9 @@ ensure_sdl3_native() {
     # Priority 2: sdl3-config tren PATH (legacy, mot so distro van con)
     log_info "  [2/4] Try sdl3-config tren PATH..."
     if command -v sdl3-config >/dev/null 2>&1; then
-        log_ok "Found via sdl3-config -- skip install"
+        local v; v=$(sdl3-config --version 2>/dev/null)
+        DETECTED_SDL3_VERSION="$v"
+        log_ok "Found via sdl3-config (version $v) -- skip install"
         return 0
     fi
     log_info "  ... sdl3-config khong co"
@@ -322,11 +333,11 @@ ensure_sdl3_native() {
                     log_info "Cai SDL3 qua Homebrew..."
                     brew install sdl3
                 fi
-                # Brew co the install vao /opt/homebrew (silicon) hoac /usr/local (intel)
-                # pkg-config se tu pickup. Re-check lan nua.
                 if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists sdl3 2>/dev/null; then
                     local v; v=$(pkg-config --modversion sdl3)
-                    log_ok "Found via brew + pkg-config (version $v) -- skip source build"
+                    DETECTED_SDL3_VERSION="$v"
+                    log_ok "Found via brew + pkg-config (version $v)"
+                    log_info "WASM build se khop dung version $v de tranh dij ban"
                     return 0
                 fi
                 log_warn "Brew co cai sdl3 nhung pkg-config khong thay -- check PKG_CONFIG_PATH"
@@ -335,14 +346,29 @@ ensure_sdl3_native() {
             fi
             ;;
         ubuntu)
-            log_info "Ubuntu: SDL3 chua co binary o repo chinh (12.2024). Skip apt, di xuong source build."
+            # Ubuntu 24.04 da co libsdl3-dev trong universe (3.0+). Thu apt truoc.
+            if command -v apt-get >/dev/null 2>&1; then
+                log_info "Thu cai libsdl3-dev qua apt..."
+                if install_apt_packages_if_missing libsdl3-dev 2>/dev/null; then
+                    if pkg-config --exists sdl3 2>/dev/null; then
+                        local v; v=$(pkg-config --modversion sdl3)
+                        DETECTED_SDL3_VERSION="$v"
+                        log_ok "Found via apt libsdl3-dev (version $v)"
+                        log_info "WASM build se khop dung version $v"
+                        return 0
+                    fi
+                fi
+                log_info "apt khong co libsdl3-dev (Ubuntu < 24.04?), fallback source"
+            fi
             ;;
         fedora)
             if command -v dnf >/dev/null 2>&1; then
                 log_info "Thu cai SDL3 qua dnf..."
                 install_dnf_packages_if_missing SDL3-devel || true
                 if pkg-config --exists sdl3 2>/dev/null; then
-                    log_ok "Found via dnf -- skip source build"
+                    local v; v=$(pkg-config --modversion sdl3)
+                    DETECTED_SDL3_VERSION="$v"
+                    log_ok "Found via dnf (version $v)"
                     return 0
                 fi
             fi
@@ -352,7 +378,9 @@ ensure_sdl3_native() {
                 log_info "Thu cai SDL3 qua pacman..."
                 install_pacman_packages_if_missing sdl3 || true
                 if pkg-config --exists sdl3 2>/dev/null; then
-                    log_ok "Found via pacman -- skip source build"
+                    local v; v=$(pkg-config --modversion sdl3)
+                    DETECTED_SDL3_VERSION="$v"
+                    log_ok "Found via pacman (version $v)"
                     return 0
                 fi
             fi
@@ -361,9 +389,10 @@ ensure_sdl3_native() {
 
     # Priority 4: Build tu source local (last resort)
     log_info "  [4/4] Build tu source vao $DOWNLOAD_DIR/sdl3-native/..."
-    log_info "Lanh dao package manager khong co SDL3, fallback ve source build"
+    log_info "Package manager khong co SDL3, fallback ve source build version $SDL3_VERSION"
+    DETECTED_SDL3_VERSION="$SDL3_VERSION"
     ensure_linux_dev_libs   # X11/Wayland/OpenGL... can cho native build
-    build_sdl3_from_source "$DOWNLOAD_DIR/sdl3-native" "native"
+    build_sdl3_from_source "$DOWNLOAD_DIR/sdl3-native" "native" "$SDL3_VERSION"
 }
 
 # =============================================================================
@@ -372,47 +401,59 @@ ensure_sdl3_native() {
 # CMakeLists tim duoc qua CMAKE_PREFIX_PATH.
 # =============================================================================
 ensure_sdl3_wasm() {
-    local install_dir="$DOWNLOAD_DIR/sdl3-wasm"
+    # Quyet dinh version SDL3 cho WASM:
+    #   - Neu native da detect duoc SDL3 (DETECTED_SDL3_VERSION khac rong)
+    #     -> dung version DO de tranh dij ban native vs wasm.
+    #   - Neu khong (truong hop CI hoac he thong khong co SDL3) -> dung
+    #     SDL3_VERSION pin trong script.
+    local target_version="${DETECTED_SDL3_VERSION:-$SDL3_VERSION}"
+    log_info "WASM SDL3 target version: $target_version"
+
+    # Cache directory bind theo version: doi version -> cache key khac ->
+    # tu rebuild tinh tai vao thu muc rieng. Cho phep parallel cache nhieu version.
+    local install_dir="$DOWNLOAD_DIR/sdl3-wasm-$target_version"
 
     log_info "Checking SDL3 WASM cache tai $install_dir..."
 
-    # Priority 1: Cache tu lan build truoc -- check ca cmake config + .a
+    # Priority 1: Cache tu lan build truoc (cung version)
     if [ -d "$install_dir/lib/cmake/SDL3" ] || [ -d "$install_dir/lib64/cmake/SDL3" ]; then
         if find "$install_dir" -name 'libSDL3*.a' -print -quit 2>/dev/null | grep -q .; then
-            log_ok "SDL3 WASM cache HIT -- skip rebuild (~1-2 phut tiet kiem)"
+            log_ok "SDL3 WASM cache HIT version $target_version -- skip rebuild (~1-2 phut tiet kiem)"
             return 0
         fi
         log_warn "Cache co cmake config nhung thieu .a -- rebuild"
     else
-        log_info "Cache MISS -- chua build SDL3 cho WASM lan nao"
+        log_info "Cache MISS version $target_version -- chua build SDL3 cho WASM lan nay"
     fi
 
-    # Note quan trong: Brew SDL3 (neu da brew install sdl3 san) la binary
-    # native arch (x86_64/arm64), KHONG TUONG THICH voi WASM target (wasm32).
-    # Emscripten port -sUSE_SDL=3 cung khong on dinh tren emsdk 3.1.72.
-    # -> Phai build SDL3 RIENG voi Emscripten toolchain. Lan dau ~1-2 phut,
-    #    cache se tai $install_dir va lan sau skip nhanh.
-    log_info "Brew/system SDL3 (neu co) la native arch -- KHONG dung duoc cho wasm32"
-    log_info "Build SDL3 $SDL3_VERSION cho WASM target (lan dau, ~1-2 phut)..."
+    # Note quan trong: System SDL3 (brew/apt) la binary native arch
+    # (x86_64/arm64), KHONG TUONG THICH voi WASM target (wasm32).
+    # Phai build SDL3 RIENG voi Emscripten toolchain, MATCH dung version
+    # cua native de tranh dij ban API.
+    log_info "System SDL3 (neu co) la native arch -- KHONG dung duoc cho wasm32"
+    log_info "Build SDL3 $target_version cho WASM target (lan dau, ~1-2 phut)..."
 
-    build_sdl3_from_source "$install_dir" "wasm"
+    build_sdl3_from_source "$install_dir" "wasm" "$target_version"
 }
 
 # Helper: build SDL3 tu source. Tham so:
 #   $1 = install prefix
 #   $2 = "native" hoac "wasm"
+#   $3 = SDL3 version (vd "3.4.4" hoac "3.2.18")
 build_sdl3_from_source() {
-    local install_prefix="$1" target="$2"
-    local sdl_src="$DOWNLOAD_DIR/SDL"
+    local install_prefix="$1" target="$2" sdl_ver="$3"
+    # Clone source vao thu muc rieng theo version -- cho phep cache nhieu
+    # version song song neu can (vi du test version moi).
+    local sdl_src="$DOWNLOAD_DIR/SDL-$sdl_ver"
     local sdl_build="$sdl_src/build-$target"
 
     mkdir -p "$DOWNLOAD_DIR"
     if [ ! -d "$sdl_src" ]; then
-        log_info "Clone SDL3 source vao $sdl_src..."
-        git clone --depth 1 --branch "release-$SDL3_VERSION" \
+        log_info "Clone SDL3 release-$sdl_ver vao $sdl_src..."
+        git clone --depth 1 --branch "release-$sdl_ver" \
             https://github.com/libsdl-org/SDL "$sdl_src"
     else
-        log_ok "SDL3 source da co tai $sdl_src"
+        log_ok "SDL3 source $sdl_ver da co tai $sdl_src"
     fi
 
     # Cau hinh build:
@@ -435,12 +476,113 @@ build_sdl3_from_source() {
 
     # Install vao local prefix (khong can sudo)
     cmake --install "$sdl_build"
-    log_ok "SDL3 ($target) da install vao $install_prefix"
+    log_ok "SDL3 $sdl_ver ($target) da install vao $install_prefix"
 }
 
 # =============================================================================
-# Linux dev libs cho SDL3 build tu source -- detect distro va install thieu
+# Desktop icon generation tu brandkit/logo.svg
+# -----------------------------------------------------------------------------
+# Chien luoc: KHONG commit file icon vao repo, sinh ON-THE-FLY trong build/.
+# OS-specific output:
+#   macOS   -> build/desktop/macos/cTetris.icns      (Apple icon set, multi-res)
+#   windows -> build/desktop/windows/cTetris.ico     (Windows icon, multi-res)
+#   linux/ubuntu/etc -> build/desktop/<os>/cTetris.svg (SVG truc tiep)
+# Tools can thiet:
+#   macOS   : iconutil + sips (built-in, KHONG can cai)
+#   linux   : khong can tool (chi copy SVG)
+#   windows : ImageMagick magick (qua choco/winget) HOAC inkscape
 # =============================================================================
+
+# Kiem tra & cai cong cu can thiet de generate icon. Tra ve 0 neu OK,
+# 1 neu thieu tool ma KHONG the cai (skip icon, dung default OS).
+ensure_icon_tools() {
+    case "$OS_NAME" in
+        macos)
+            # iconutil + sips la built-in cua macOS, khong can cai
+            if ! command -v iconutil >/dev/null 2>&1 || \
+               ! command -v sips      >/dev/null 2>&1; then
+                log_warn "Thieu iconutil/sips (built-in macOS) -- skip icon gen"
+                return 1
+            fi
+            # Can rsvg-convert (qua brew librsvg) de convert SVG -> PNG
+            if ! command -v rsvg-convert >/dev/null 2>&1; then
+                if command -v brew >/dev/null 2>&1; then
+                    log_info "Cai librsvg (rsvg-convert) qua brew cho SVG->PNG..."
+                    install_brew_formulas_if_missing librsvg
+                else
+                    log_warn "Khong co brew, khong the cai librsvg -- skip icon gen"
+                    return 1
+                fi
+            fi
+            log_ok "Icon tools macOS: iconutil + sips + rsvg-convert"
+            ;;
+        ubuntu|fedora|arch|alpine|opensuse|linux)
+            # Linux chi can copy SVG, khong cai gi them
+            log_ok "Icon tools Linux: khong can (chi copy SVG)"
+            ;;
+        *)
+            log_warn "OS $OS_NAME khong nhan dien -- skip icon gen"
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+# Sinh icon cho desktop app. Tham so:
+#   $1 = output build dir (vd build/desktop/macos)
+generate_desktop_icon() {
+    local out_dir="$1"
+    local logo_svg="$BRAND_LOGO_SVG"
+
+    if [ ! -f "$logo_svg" ]; then
+        log_warn "Khong co $logo_svg -- skip icon gen"
+        return 0
+    fi
+
+    if ! ensure_icon_tools; then
+        log_warn "Thieu tools, dung icon mac dinh OS"
+        return 0
+    fi
+
+    mkdir -p "$out_dir"
+
+    case "$OS_NAME" in
+        macos)
+            # Quy trinh: SVG -> PNG nhieu kich thuoc -> .iconset/ -> .icns
+            local iconset="$out_dir/cTetris.iconset"
+            local icns="$out_dir/cTetris.icns"
+
+            # Skip neu .icns da fresh hon SVG
+            if [ -f "$icns" ] && [ "$icns" -nt "$logo_svg" ]; then
+                log_ok "Icon $icns da fresh, bo qua regenerate"
+                return 0
+            fi
+
+            mkdir -p "$iconset"
+            # Apple yeu cau cac size: 16, 32, 64, 128, 256, 512, 1024 (kem @2x)
+            for size in 16 32 64 128 256 512; do
+                rsvg-convert -w "$size" -h "$size" "$logo_svg" \
+                    -o "$iconset/icon_${size}x${size}.png"
+                local size2x=$((size * 2))
+                rsvg-convert -w "$size2x" -h "$size2x" "$logo_svg" \
+                    -o "$iconset/icon_${size}x${size}@2x.png"
+            done
+            iconutil -c icns "$iconset" -o "$icns"
+            rm -rf "$iconset"  # don dep PNG tam, chi giu .icns
+            log_ok "Sinh icon: $icns"
+            ;;
+        ubuntu|fedora|arch|alpine|opensuse|linux)
+            # Linux: copy SVG truc tiep, ten cTetris.svg
+            local svg_out="$out_dir/cTetris.svg"
+            if [ -f "$svg_out" ] && [ "$svg_out" -nt "$logo_svg" ]; then
+                log_ok "Icon $svg_out da fresh, bo qua regenerate"
+                return 0
+            fi
+            cp "$logo_svg" "$svg_out"
+            log_ok "Sinh icon: $svg_out (SVG truc tiep)"
+            ;;
+    esac
+}
 ensure_linux_dev_libs() {
     case "$OS_NAME" in
         ubuntu)
@@ -580,6 +722,10 @@ build_native() {
     ensure_sdl3_native
     ensure_nanosvg
 
+    # Sinh icon desktop tu brandkit/logo.svg vao $BUILD_NATIVE_DIR
+    # (cTetris.icns cho macOS, cTetris.svg cho Linux)
+    generate_desktop_icon "$BUILD_NATIVE_DIR"
+
     # Tim path SDL3Config.cmake de truyen truc tiep qua SDL3_DIR.
     # Neu khong tim duoc (SDL3 cai he thong qua brew/distro), de cmake tu
     # search qua CMAKE_PREFIX_PATH va default search paths.
@@ -594,13 +740,27 @@ build_native() {
         fi
     done
 
+    # Truyen path icon (neu da sinh) cho CMake de embed vao bundle/exe
+    local icon_arg=()
+    case "$OS_NAME" in
+        macos)
+            local icns="$BUILD_NATIVE_DIR/cTetris.icns"
+            [ -f "$icns" ] && icon_arg=(-DCTETRIS_ICON_PATH="$icns")
+            ;;
+        ubuntu|fedora|arch|alpine|opensuse|linux)
+            local svg="$BUILD_NATIVE_DIR/cTetris.svg"
+            [ -f "$svg" ] && icon_arg=(-DCTETRIS_ICON_PATH="$svg")
+            ;;
+    esac
+
     mkdir -p "$BUILD_NATIVE_DIR"
     cmake -S "$APP_DIR" -B "$BUILD_NATIVE_DIR" \
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_WASM=OFF \
           -DCMAKE_PREFIX_PATH="$DOWNLOAD_DIR/sdl3-native" \
           -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg" \
-          "${sdl_dir_arg[@]}"
+          "${sdl_dir_arg[@]}" \
+          "${icon_arg[@]}"
     cmake --build "$BUILD_NATIVE_DIR" -j
     log_ok "Native build hoan tat: $BUILD_NATIVE_DIR"
 }
@@ -609,14 +769,24 @@ build_wasm() {
     log_info "Build WASM mode -> $BUILD_WASM_DIR"
     validate_sources
     ensure_basic_tools
+
+    # Native va WASM dung CHUNG version SDL3 -- ensure_sdl3_native chay
+    # truoc de detect version brew/apt/dnf cai (set DETECTED_SDL3_VERSION),
+    # roi ensure_sdl3_wasm dung chinh version do build tinh tai cho wasm32.
+    # Neu khong tim duoc native (vd CI fresh), fallback ve SDL3_VERSION pin.
+    log_info "Detect SDL3 native version de match cho WASM..."
+    ensure_sdl3_native || true
+
     ensure_emsdk
     ensure_sdl3_wasm
     ensure_nanosvg
 
+    # Derive sdl_install path tu version da quyet dinh trong ensure_sdl3_wasm
+    local target_version="${DETECTED_SDL3_VERSION:-$SDL3_VERSION}"
+    local sdl_install="$DOWNLOAD_DIR/sdl3-wasm-$target_version"
+
     # Tim chinh xac thu muc chua SDL3Config.cmake -- truyen qua SDL3_DIR
-    # de bypass van de Emscripten root path mode (find_package mac dinh
-    # khong search ngoai sysroot khi cross-compile).
-    local sdl_install="$DOWNLOAD_DIR/sdl3-wasm"
+    # de bypass van de Emscripten root path mode.
     local sdl_dir=""
     for candidate in \
         "$sdl_install/lib/cmake/SDL3" \

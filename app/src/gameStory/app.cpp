@@ -11,12 +11,16 @@
 #include "nanosvgrast.h"
 
 // =========================================================
-// LUU Y QUAN TRONG VE 2 FILE SVG TRONG MODULE NAY:
-//   - gameStory_logo.svg  : LOGO CUA GAME cTetris (3x3 o vuong nhieu mau,
-//                           mo phong phong cach Tetris). Day la BRAND LOGO
-//                           cua game, KHONG phai logo UIT.
-//   - gameStory_corp.svg  : LOGO TRUONG DAI HOC UIT (corp credit) -- hien thi
-//                           kem dong "Powered up by ..." o cuoi man hinh intro.
+// LUU Y QUAN TRONG VE 2 LOGO SU DUNG TRONG MODULE NAY:
+//   - LOGO_SVG_DATA  : LOGO CUA GAME cTetris (3x3 o vuong nhieu mau,
+//                      mo phong phong cach Tetris). Day la BRAND LOGO
+//                      cua game, KHONG phai logo UIT.
+//   - CORP_SVG_DATA  : LOGO TRUONG DAI HOC UIT (corp credit) -- hien thi
+//                      kem dong "Powered up by ..." o cuoi man hinh intro.
+// CAC FILE SVG VAT LY (gameStory_logo.svg, gameStory_corp.svg) DA BI XOA
+// theo chien luoc moi: khong phat sinh them file hinh anh trong build.
+// Noi dung SVG da duoc embed truc tiep trong 2 header file ben duoi
+// duoi dang raw string literal -- compile-time, khong can I/O luc runtime.
 // =========================================================
 #include "gameStory_logo_svg.h"   // LOGO_SVG_DATA: logo cua GAME cTetris
 #include "gameStory_corp_svg.h"   // CORP_SVG_DATA: logo UIT (truong DH)
@@ -37,8 +41,8 @@ struct SvgTexture {
     int          w       = 0;
     int          h       = 0;
 };
-static SvgTexture g_logo;   // Texture logo cua GAME cTetris (gameStory_logo.svg)
-static SvgTexture g_corp;   // Texture logo UIT (gameStory_corp.svg)
+static SvgTexture g_logo;   // Texture logo cua GAME cTetris (LOGO_SVG_DATA)
+static SvgTexture g_corp;   // Texture logo UIT (CORP_SVG_DATA)
 
 // Helper chung: rasterize 1 SVG (raw string) ra SDL_Texture co chieu rong
 // = targetW pixel, giu aspect ratio cua SVG goc.
@@ -106,7 +110,7 @@ static SvgTexture createSvgTexture(SDL_Renderer* renderer,
     return result;
 }
 
-// Ve LOGO CUA GAME cTetris (gameStory_logo.svg) voi hieu ung fade-in
+// Ve LOGO CUA GAME cTetris (LOGO_SVG_DATA) voi hieu ung fade-in
 // (alpha tang dan theo thoi gian intro). Day KHONG phai logo UIT --
 // logo UIT la corp credit duoc ve boi drawCorpCredit() ben duoi.
 static void drawLogo(SDL_Renderer* renderer, Uint32 elapsedTime) {
@@ -133,10 +137,10 @@ static void drawLogo(SDL_Renderer* renderer, Uint32 elapsedTime) {
 
     // Tieu de game ngay duoi logo. Su dung mau hoi xam (220) thay vi trang
     // tinh (255) de font xuat hien "mong/nhe" hon (yeu cau giam thickness).
-    // Hau to "(C)" la ASCII-safe substitute cho ky tu copyright © vi
-    // SDL_RenderDebugText chi ho tro ASCII printable (0x20-0x7F).
+    // KHONG them "(C)" copyright vi SDL_RenderDebugText la bitmap ASCII font,
+    // "(C)" trong ngoac don nhin xau. Copyright chinh thuc o OS window title.
     SDL_SetRenderDrawColor(renderer, 220, 220, 220, alpha);
-    const char* title = "C T E T R I S (C)";
+    const char* title = "C T E T R I S";
     int titleLen = (int)SDL_strlen(title);
     SDL_RenderDebugText(renderer,
                         (STORY_SCREEN_WIDTH - titleLen * 8.0f) / 2.0f,
@@ -168,7 +172,7 @@ static float drawLoadingBar(SDL_Renderer* renderer, Uint32 elapsedTime) {
 }
 
 // gamestory-corp-credit-03
-// Hang chu "Powered up by" + LOGO UIT (gameStory_corp.svg) nho ben canh,
+// Hang chu "Powered up by" + LOGO UIT (CORP_SVG_DATA) nho ben canh,
 // can giua theo chieu ngang. Y duoc xac dinh ngay duoi loading bar.
 //
 // LUU Y: g_corp = logo UIT (truong dai hoc), KHONG phai logo cua game.

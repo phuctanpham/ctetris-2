@@ -129,8 +129,10 @@ else()
     message(STATUS "[cTetris] Build mode: NATIVE")
 
     # ---------------------------------------------------------------------
-    # macOS bundle: chi cau hinh ten bundle, KHONG copy .icns nua.
-    # OS se dung icon mac dinh cua macOS Finder.
+    # macOS bundle: embed icon .icns vao Resources cua .app neu duoc cung
+    # cap qua -DCTETRIS_ICON_PATH (do build.sh sinh tu brandkit/logo.svg
+    # bang iconutil + sips + rsvg-convert). Neu khong co, OS dung icon
+    # mac dinh.
     # ---------------------------------------------------------------------
     if(APPLE)
         set_target_properties(cTetris PROPERTIES
@@ -140,10 +142,51 @@ else()
             MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
         )
+        if(CTETRIS_ICON_PATH AND EXISTS "${CTETRIS_ICON_PATH}")
+            # Khai bao .icns la resource cua bundle, copy vao Resources/
+            set_source_files_properties("${CTETRIS_ICON_PATH}" PROPERTIES
+                MACOSX_PACKAGE_LOCATION "Resources")
+            target_sources(cTetris PRIVATE "${CTETRIS_ICON_PATH}")
+            # Lay ten file (vd "cTetris.icns") gan vao Info.plist
+            get_filename_component(_icon_name "${CTETRIS_ICON_PATH}" NAME)
+            set_target_properties(cTetris PROPERTIES
+                MACOSX_BUNDLE_ICON_FILE "${_icon_name}")
+            message(STATUS "[cTetris] macOS icon: ${CTETRIS_ICON_PATH}")
+        else()
+            message(STATUS "[cTetris] macOS icon: default (CTETRIS_ICON_PATH not set)")
+        endif()
     endif()
 
-    # Khong tao .rc cho Windows va khong cai .desktop cho Linux nua.
-    # Window title da bao gom "cTetris (c)" -- du nhan dien duoc.
+    # ---------------------------------------------------------------------
+    # Linux: SDL_SetWindowIcon co the load SVG runtime (qua nanosvg trong app),
+    # KHONG embed file vao binary -- de SVG nam canh executable trong build/.
+    # Khong tao .desktop, ten cua so se hien thi qua SDL_CreateWindow().
+    # ---------------------------------------------------------------------
+    if(UNIX AND NOT APPLE)
+        if(CTETRIS_ICON_PATH AND EXISTS "${CTETRIS_ICON_PATH}")
+            message(STATUS "[cTetris] Linux icon SVG: ${CTETRIS_ICON_PATH}")
+        endif()
+    endif()
+
+    # ---------------------------------------------------------------------
+    # Windows: embed icon .ico vao .exe qua resource compiler (rc.exe).
+    # Sinh file .rc tam tro den .ico, them vao source list cua target.
+    # CMake/MSVC se tu compile .rc -> .res va link vao executable.
+    # ---------------------------------------------------------------------
+    if(WIN32)
+        if(CTETRIS_ICON_PATH AND EXISTS "${CTETRIS_ICON_PATH}")
+            set(_rc_file "${CMAKE_BINARY_DIR}/cTetris_icon.rc")
+            file(WRITE "${_rc_file}"
+                 "IDI_ICON1 ICON DISCARDABLE \"${CTETRIS_ICON_PATH}\"\n")
+            target_sources(cTetris PRIVATE "${_rc_file}")
+            message(STATUS "[cTetris] Windows icon: ${CTETRIS_ICON_PATH}")
+        else()
+            message(STATUS "[cTetris] Windows icon: default (CTETRIS_ICON_PATH not set)")
+        endif()
+    endif()
+
+    # Khong tao .rc cho Windows tu day -- build.ps1 se tu xu ly icon embedding
+    # qua resource compiler (rc.exe) neu can.
 endif()
 
 # -----------------------------------------------------------------------------

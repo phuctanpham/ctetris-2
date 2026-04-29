@@ -34,10 +34,14 @@ $BuildWasmDir  = Join-Path $AppDir "build\wasm\$OS_NAME"
 $BrandkitDir   = Join-Path $AppDir 'brandkit'
 $BrandLogoSvg  = Join-Path $BrandkitDir 'logo.svg'
 
-# Version pinning
-$CmakeMinVersion = '3.16'
-$EmsdkVersion    = '3.1.72'
-$Sdl3Version     = '3.2.18'
+# Version pinning -- NEU detect duoc SDL3 native qua winget/choco/manual,
+# WASM build se MATCH dung version do (tranh dij ban). Neu khong, dung
+# Sdl3Version pin.
+$CmakeMinVersion   = '3.16'
+$EmsdkVersion      = '3.1.72'
+$Sdl3VersionMin    = '3.2.0'
+$Sdl3Version       = '3.2.18'   # default pin
+$DetectedSdl3Version = ''        # se duoc set boi Initialize-Sdl3Native
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -246,35 +250,44 @@ function Initialize-Emsdk {
 function Initialize-Sdl3Native {
     Write-Info 'Checking SDL3 cho native Windows (priority chain)...'
 
-    # Priority 1: pkg-config
+    # Priority 1: pkg-config (neu user co MSYS2 setup)
     Write-Info '  [1/4] Try pkg-config --exists sdl3...'
     if (Get-Command pkg-config -ErrorAction SilentlyContinue) {
         & pkg-config --exists sdl3 2>$null
         if ($LASTEXITCODE -eq 0) {
             $v = & pkg-config --modversion sdl3
+            $script:DetectedSdl3Version = $v
             Write-Ok "Found via pkg-config (version $v) -- skip install"
+            Write-Info "WASM build se khop dung version $v de tranh dij ban"
             return
         }
     }
     Write-Info '  ... pkg-config khong co SDL3'
 
-    # Priority 2: winget / choco install (rare cho SDL3 -- thuong khong co)
-    Write-Info '  [2/4] Skip package manager (SDL3 hiem co o winget/choco)'
+    # Priority 2: vcpkg
+    Write-Info '  [2/4] Skip vcpkg (chua implement)'
 
-    # Priority 3: vcpkg (neu user da setup)
-    Write-Info '  [3/4] Skip vcpkg (chua implement)'
+    # Priority 3: winget / choco install (rare cho SDL3)
+    Write-Info '  [3/4] Try winget Library.SDL3 (best effort)...'
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        # SDL3 chua co winget package chinh thuc, skip
+        Write-Info '  ... winget chua co SDL3 package'
+    }
 
-    # Priority 4: build tu source
-    Write-Info '  [4/4] Build tu source...'
+    # Priority 4: Build tu source
+    Write-Info "  [4/4] Build SDL3 $Sdl3Version tu source..."
+    $script:DetectedSdl3Version = $Sdl3Version
     Build-Sdl3FromSource -InstallPrefix (Join-Path $DownloadDir 'sdl3-native') `
-                         -Target 'native'
+                         -Target 'native' `
+                         -Version $Sdl3Version
 }
 
-# =============================================================================
-# SDL3 WASM -- tu build static lib, KHONG dung -sUSE_SDL=3
-# =============================================================================
 function Initialize-Sdl3Wasm {
-    $installDir = Join-Path $DownloadDir 'sdl3-wasm'
+    # Match version voi native (DetectedSdl3Version). Fallback ve Sdl3Version pin.
+    $targetVersion = if ($script:DetectedSdl3Version) { $script:DetectedSdl3Version } else { $Sdl3Version }
+    Write-Info "WASM SDL3 target version: $targetVersion"
+
+    $installDir = Join-Path $DownloadDir "sdl3-wasm-$targetVersion"
     $cmakeConf  = Join-Path $installDir 'lib\cmake\SDL3'
     $cmakeConf64= Join-Path $installDir 'lib64\cmake\SDL3'
 
@@ -284,35 +297,36 @@ function Initialize-Sdl3Wasm {
         $hasLib = Get-ChildItem -Path $installDir -Recurse -Filter 'libSDL3*.a' `
                                 -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($hasLib) {
-            Write-Ok "SDL3 WASM cache HIT -- skip rebuild (~1-2 phut tiet kiem)"
+            Write-Ok "SDL3 WASM cache HIT version $targetVersion -- skip rebuild"
             return
         }
         Write-Warn 'Cache co cmake config nhung thieu .a -- rebuild'
     } else {
-        Write-Info 'Cache MISS -- chua build SDL3 cho WASM lan nao'
+        Write-Info "Cache MISS version $targetVersion -- chua build SDL3 cho WASM"
     }
 
-    # Note: Win/system SDL3 (neu co) la binary native arch, KHONG dung duoc
-    # cho wasm32 target. Phai build rieng voi Emscripten toolchain.
     Write-Info 'System SDL3 (neu co) la native arch -- KHONG dung duoc cho wasm32'
-    Write-Info "Build SDL3 $Sdl3Version cho WASM target (lan dau, ~1-2 phut)..."
+    Write-Info "Build SDL3 $targetVersion cho WASM target (lan dau, ~1-2 phut)..."
 
-    Build-Sdl3FromSource -InstallPrefix $installDir -Target 'wasm'
+    Build-Sdl3FromSource -InstallPrefix $installDir -Target 'wasm' -Version $targetVersion
 }
 
+# =============================================================================
+# SDL3 WASM -- tu build static lib, KHONG dung -sUSE_SDL=3
+# =============================================================================
 function Build-Sdl3FromSource {
-    param([string]$InstallPrefix, [string]$Target)
+    param([string]$InstallPrefix, [string]$Target, [string]$Version)
 
-    $sdlSrc = Join-Path $DownloadDir 'SDL'
+    $sdlSrc   = Join-Path $DownloadDir "SDL-$Version"
     $sdlBuild = Join-Path $sdlSrc "build-$Target"
 
     New-Item -ItemType Directory -Force -Path $DownloadDir | Out-Null
     if (-not (Test-Path $sdlSrc)) {
-        Write-Info "Clone SDL3 source vao $sdlSrc..."
-        git clone --depth 1 --branch "release-$Sdl3Version" `
+        Write-Info "Clone SDL3 release-$Version vao $sdlSrc..."
+        git clone --depth 1 --branch "release-$Version" `
             https://github.com/libsdl-org/SDL $sdlSrc
     } else {
-        Write-Ok "SDL3 source da co tai $sdlSrc"
+        Write-Ok "SDL3 source $Version da co tai $sdlSrc"
     }
 
     $cfg = @(
@@ -330,12 +344,72 @@ function Build-Sdl3FromSource {
     }
     & cmake --build $sdlBuild -j
     & cmake --install $sdlBuild
-    Write-Ok "SDL3 ($Target) da install vao $InstallPrefix"
+    Write-Ok "SDL3 $Version ($Target) da install vao $InstallPrefix"
 }
 
 # =============================================================================
-# Basic tools: cmake, git, python -- uu tien winget, fallback choco
+# Desktop icon generation tu brandkit/logo.svg
+# -----------------------------------------------------------------------------
+# Windows: dung ImageMagick (magick.exe) de convert SVG -> ICO multi-size.
+# Tools install qua winget (ImageMagick.ImageMagick) hoac choco (imagemagick).
+# Output: build\desktop\windows\cTetris.ico
 # =============================================================================
+function Initialize-IconTools {
+    if (Get-Command magick -ErrorAction SilentlyContinue) {
+        Write-Ok 'Icon tools: magick (ImageMagick) da co'
+        return $true
+    }
+
+    Write-Info 'Thieu magick (ImageMagick) -- thu cai...'
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Install-WingetPackagesIfMissing -Ids @('ImageMagick.ImageMagick')
+    } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
+        Install-ChocoPackagesIfMissing -Packages @('imagemagick')
+    } else {
+        Write-Warn 'Khong co winget/choco, khong cai duoc ImageMagick -- skip icon'
+        return $false
+    }
+
+    if (Get-Command magick -ErrorAction SilentlyContinue) {
+        Write-Ok 'Icon tools: magick san sang sau khi cai'
+        return $true
+    }
+    Write-Warn 'magick van khong tim thay sau cai -- restart shell de PATH refresh'
+    return $false
+}
+
+function New-DesktopIcon {
+    param([string]$OutDir)
+    if (-not (Test-Path $BrandLogoSvg)) {
+        Write-Warn "Khong co $BrandLogoSvg -- skip icon gen"
+        return
+    }
+    if (-not (Initialize-IconTools)) {
+        Write-Warn 'Thieu icon tools, dung icon mac dinh OS'
+        return
+    }
+    New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+    $ico = Join-Path $OutDir 'cTetris.ico'
+
+    # Skip neu .ico da fresh hon SVG nguon
+    if (Test-Path $ico) {
+        $icoTime = (Get-Item $ico).LastWriteTime
+        $svgTime = (Get-Item $BrandLogoSvg).LastWriteTime
+        if ($icoTime -gt $svgTime) {
+            Write-Ok "Icon $ico da fresh, bo qua regenerate"
+            return
+        }
+    }
+
+    # ImageMagick convert SVG -> ICO multi-size (16, 32, 48, 64, 128, 256)
+    & magick convert -background none -density 384 $BrandLogoSvg `
+        -define icon:auto-resize='16,32,48,64,128,256' $ico
+    if ($LASTEXITCODE -eq 0) {
+        Write-Ok "Sinh icon: $ico"
+    } else {
+        Write-Warn 'magick convert fail, skip icon'
+    }
+}
 function Initialize-WindowsTools {
     $needCmake  = -not (Test-CommandVersion 'cmake' $CmakeMinVersion)
     $needGit    = -not (Get-Command git    -ErrorAction SilentlyContinue)
@@ -421,7 +495,10 @@ function Build-Native {
     Initialize-Sdl3Native
     Initialize-Nanosvg
 
-    # Tim path SDL3Config.cmake (uu tien lib\, fallback lib64\)
+    # Sinh icon Windows .ico tu brandkit/logo.svg
+    New-DesktopIcon -OutDir $BuildNativeDir
+
+    # Tim path SDL3Config.cmake
     $sdlInstall = Join-Path $DownloadDir 'sdl3-native'
     $sdlDirArgs = @()
     foreach ($cand in @(
@@ -435,13 +512,22 @@ function Build-Native {
         }
     }
 
+    # Truyen icon path cho CMake (neu da sinh thanh cong)
+    $iconArg = @()
+    $ico = Join-Path $BuildNativeDir 'cTetris.ico'
+    if (Test-Path $ico) {
+        $iconArg = @("-DCTETRIS_ICON_PATH=$ico")
+        Write-Info "CTETRIS_ICON_PATH = $ico"
+    }
+
     New-Item -ItemType Directory -Force -Path $BuildNativeDir | Out-Null
     cmake -S $AppDir -B $BuildNativeDir `
           -DCMAKE_BUILD_TYPE=Release `
           -DBUILD_WASM=OFF `
           -DCMAKE_PREFIX_PATH=$sdlInstall `
           -DNANOSVG_INCLUDE_DIR=(Join-Path $DownloadDir 'nanosvg') `
-          @sdlDirArgs
+          @sdlDirArgs `
+          @iconArg
     cmake --build $BuildNativeDir --config Release -j
     Write-Ok "Native build hoan tat: $BuildNativeDir"
 }
@@ -450,12 +536,19 @@ function Build-Wasm {
     Write-Info "Build WASM -> $BuildWasmDir"
     Test-Sources
     Initialize-WindowsTools
+
+    # Detect version SDL3 native truoc -- WASM build se MATCH version do
+    Write-Info 'Detect SDL3 native version de match cho WASM...'
+    Initialize-Sdl3Native
+
     Initialize-Emsdk
     Initialize-Sdl3Wasm
     Initialize-Nanosvg
 
-    # Tim chinh xac thu muc chua SDL3Config.cmake (bypass Emscripten root path)
-    $sdlInstall = Join-Path $DownloadDir 'sdl3-wasm'
+    # Derive sdl_install path tu version detect duoc
+    $targetVersion = if ($script:DetectedSdl3Version) { $script:DetectedSdl3Version } else { $Sdl3Version }
+    $sdlInstall = Join-Path $DownloadDir "sdl3-wasm-$targetVersion"
+
     $sdlDir = $null
     foreach ($cand in @(
         (Join-Path $sdlInstall 'lib\cmake\SDL3'),

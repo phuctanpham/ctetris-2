@@ -363,15 +363,15 @@ static void drawNextPreview(SDL_Renderer* renderer, const SDL_FRect& slot, const
     }
 }
 
-// Score: format "00000" 5 chu so (giam tu 6 -> 5), 1 dong, font scale vua 30x40
+// Score: format "00000" 5 chu so. Font scale = 0.65 (TUONG TU TIMER) de
+// 2 chi so co kich thuoc dong nhat -- truoc kia score dung 0.6 (~24px)
+// nhin nho hon timer 0.65 (~26px), gay cam giac chu kho doc.
 static void drawScoreInSlot(SDL_Renderer* renderer, const SDL_FRect& host, int score) {
     char buf[12];
     SDL_snprintf(buf, sizeof(buf), "%05d", score);
-    // Font 8px/char * 5 char = 40px goc. Scale 0.6 -> ~24 px, fit 30 thoai mai
-    // (truoc la 6 char * 0.55 -> 26.4 px, gan met).
-    const float SCALE = 0.6f;
-    float textW = 5 * 8.0f * SCALE;   // ~24 px
-    float textH = 8.0f * SCALE;        // ~4.8 px
+    const float SCALE = 0.65f;          // <- match TIMER scale
+    float textW = 5 * 8.0f * SCALE;     // ~26 px
+    float textH = 8.0f * SCALE;          // ~5.2 px
     float x = host.x + (host.w - textW) / 2.0f;
     float y = host.y + (host.h - textH) / 2.0f;
     SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
@@ -471,7 +471,9 @@ static int drawWrappedText(SDL_Renderer* renderer, const char* text,
 }
 
 // gamecore-popup-quit-08
-static void drawQuitPopup(SDL_Renderer* renderer, const GameState& state) {
+// THAY DOI: Bo sung tham so elapsedMs de hien thi "Total time: HH:MM:SS"
+// trong popup. Truoc kia popup chi co score, nay them dong total time.
+static void drawQuitPopup(SDL_Renderer* renderer, const GameState& state, Uint32 elapsedMs) {
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
     SDL_FRect screen = { 0, 0, (float)CORE_SCREEN_WIDTH, (float)CORE_SCREEN_HEIGHT };
@@ -493,10 +495,25 @@ static void drawQuitPopup(SDL_Renderer* renderer, const GameState& state) {
                         state.isGameOver ? "GAME OVER" : "PAUSED");
     drawWrappedText(renderer, "What do you want to do?",
                     POPUP_BG.x + 15, POPUP_BG.y + 60, 25, 2);
+
+    // Dong "Current score: N" -- giu nguyen
     char scoreLine[40];
     SDL_snprintf(scoreLine, sizeof(scoreLine), "Current score: %d", state.score);
     drawWrappedText(renderer, scoreLine,
                     POPUP_BG.x + 15, POPUP_BG.y + 95, 25, 2);
+
+    // BO SUNG: dong "Total time: HH:MM:SS" o duoi score, format chuan
+    // chia chinh xac giay/phut/gio tu elapsedMs (loai tru thoi gian pause)
+    Uint32 totalSec = elapsedMs / 1000;
+    int hours = (int)(totalSec / 3600);
+    int mins  = (int)((totalSec % 3600) / 60);
+    int secs  = (int)(totalSec % 60);
+    if (hours > 99) hours = 99;
+    char timeLine[40];
+    SDL_snprintf(timeLine, sizeof(timeLine), "Total time: %02d:%02d:%02d",
+                 hours, mins, secs);
+    drawWrappedText(renderer, timeLine,
+                    POPUP_BG.x + 15, POPUP_BG.y + 110, 25, 2);
 
     drawPopupButton(renderer, POPUP_RESTART, "Restart (new game)",     { 70, 130,  90, 255});
     drawPopupButton(renderer, POPUP_CONSOLE, "Console (back to menu)", { 70, 100, 160, 255});
@@ -528,8 +545,10 @@ static void drawWasmShutdownScreen(SDL_Renderer* renderer, const GameState& stat
                         RELOAD_BTN.y + (RELOAD_BTN.h - 8.0f) / 2.0f,
                         label);
 
-    // Hint duoi nut: ASCII-safe "(C)" thay vi ky tu copyright thuc su
-    const char* hint = "cTetris (C) -- press F5 or click RELOAD";
+    // Hint duoi nut: bo ky tu copyright vi SDL_RenderDebugText la bitmap
+    // ASCII font (0x20-0x7F), khong render duoc U+00A9 va "(C)" trong
+    // ngoac don nhin xau. Thay bang text don gian, ro nghia.
+    const char* hint = "cTetris -- press F5 or click RELOAD";
     int hl = (int)SDL_strlen(hint);
     SDL_RenderDebugText(renderer,
                         (CORE_SCREEN_WIDTH - hl * 8.0f) / 2.0f,
@@ -802,7 +821,7 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer) {
         SDL_RenderClear(renderer);
         renderBoard(renderer, state);
         drawSidebar(renderer, state, keys, elapsedMs);
-        if (state.showQuitPopup) drawQuitPopup(renderer, state);
+        if (state.showQuitPopup) drawQuitPopup(renderer, state, elapsedMs);
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }

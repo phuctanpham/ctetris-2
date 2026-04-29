@@ -310,10 +310,12 @@ static void drawBackground(SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 40, 44, 52, 255);
     SDL_RenderClear(renderer);
 
-    // Tieu de chinh: them suffix "(C)" la copyright marker (ASCII-safe).
-    // "C T E T R I S (C)" -- 17 ky tu * 8px = 136 px.
+    // Tieu de chinh: KHONG them "(C)" vi SDL_RenderDebugText la bitmap
+    // ASCII font, ky tu copyright "(C)" trong ngoac don nhin xau. Copyright
+    // hien o OS window title (UTF-8 © render dung).
+    // "C T E T R I S" -- 13 ky tu * 8px = 104 px.
     SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
-    const char* title = "C T E T R I S (C)";
+    const char* title = "C T E T R I S";
     int titleLen = (int)SDL_strlen(title);
     float titleX = (CONSOLE_SCREEN_WIDTH - titleLen * 8.0f) / 2.0f;
     SDL_RenderDebugText(renderer, titleX, 60.0f, title);
