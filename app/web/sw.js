@@ -11,17 +11,17 @@
 // CACHE_VERSION: doi de force update cache khi deploy phien ban moi.
 // Khi sw.js thay doi (vi du tang version), browser tu dong fetch sw.js moi
 // va activate -> phase activate xoa cache cu.
-const CACHE_VERSION = 'ctetris-v1';
+// v1 -> v2: fix full-height scaling + quit WASM behavior + text overflow
+const CACHE_VERSION = 'ctetris-v2';
 
 // Core assets cua game -- moi file deu can de chay offline.
-// Path tuong doi voi scope cua SW (./ tu manifest).
 const CORE_ASSETS = [
     './',
-    './index.html',         // GitHub Pages se serve cTetris.html duoi ten nay
-    './cTetris.html',       // backup neu access truc tiep
-    './cTetris.js',         // Emscripten loader
-    './cTetris.wasm',       // WebAssembly module chinh
-    './favicon.svg',        // logo
+    './index.html',
+    './cTetris.html',
+    './cTetris.js',
+    './cTetris.wasm',
+    './favicon.svg',
     './manifest.webmanifest'
 ];
 
@@ -30,9 +30,6 @@ self.addEventListener('install', function(event) {
     console.log('[SW] install:', CACHE_VERSION);
     event.waitUntil(
         caches.open(CACHE_VERSION).then(function(cache) {
-            // addAll fail toan bo neu MOT trong cac asset fail.
-            // Dung addAll cho core assets de dam bao tinh nhat quan.
-            // Neu asset thieu (vd dev mode khong co index.html) thi log warn.
             return Promise.all(
                 CORE_ASSETS.map(function(url) {
                     return cache.add(url).catch(function(err) {
@@ -42,7 +39,7 @@ self.addEventListener('install', function(event) {
             );
         })
     );
-    // Skip waiting de SW moi active ngay khong can cho tab dong
+    // Skip waiting de SW moi active ngay, khong can cho tab dong
     self.skipWaiting();
 });
 
@@ -67,33 +64,26 @@ self.addEventListener('activate', function(event) {
 
 // Phase 3: fetch -> CACHE-FIRST strategy
 self.addEventListener('fetch', function(event) {
-    // Chi handle GET request cua cung domain (same-origin)
     if (event.request.method !== 'GET') return;
     var url = new URL(event.request.url);
     if (url.origin !== self.location.origin) return;
 
     event.respondWith(
         caches.match(event.request).then(function(cachedResponse) {
-            // Hit cache -> serve ngay (offline-ready)
             if (cachedResponse) {
                 return cachedResponse;
             }
-            // Miss cache -> fetch network, add vao cache de offline lan sau
             return fetch(event.request).then(function(networkResponse) {
-                // Chi cache response thanh cong (status 200, basic type)
                 if (!networkResponse || networkResponse.status !== 200 ||
                     networkResponse.type !== 'basic') {
                     return networkResponse;
                 }
-                // Clone vi response stream chi doc duoc 1 lan
                 var responseToCache = networkResponse.clone();
                 caches.open(CACHE_VERSION).then(function(cache) {
                     cache.put(event.request, responseToCache);
                 });
                 return networkResponse;
             }).catch(function() {
-                // Network fail va khong co cache -> tra ve undefined
-                // (browser hien default offline page)
                 console.warn('[SW] fetch fail (offline?):', event.request.url);
             });
         })
