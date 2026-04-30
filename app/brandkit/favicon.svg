@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    File nay la LOGO CUA GAME cTetris (3x3 o vuong vang/teal mo phong khoi
-    Tetris). KHONG phai logo cua truong dai hoc UIT (logo UIT nam o file
-    rieng: gameStory_corp.svg, hien thi kem dong "Powered up by ...").
+    File brandkit/logo.svg = LOGO CHINH HONG cua game cTetris.
+    Day la SOURCE-OF-TRUTH duy nhat cho moi noi can hien thi logo:
+      - WASM favicon (build/wasm/<os>/favicon.svg)
+      - Desktop app icon (build/desktop/<os>/cTetris.icns / .ico / .svg)
+      - In-game logo render (qua header gameStory_logo_svg.h da embed san)
+    Quy tac: NEU thay logo -> chi can sua file nay, build.sh / build.ps1
+    se tu re-process cho moi target.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
   <rect x="0" y="0" width="100" height="100" fill="#D5A305"/>

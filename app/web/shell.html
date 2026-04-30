@@ -2,43 +2,61 @@
 <!--
     shell.html -- Emscripten shell template cho cTetris (WASM build)
     ==============================================================
-    THAY DOI v1:
-      - Da loai bo HOAN TOAN co che PWA install:
-          * Khong link <link rel="manifest" ...>
-          * Khong dang ky service worker (sw.js)
-          * Khong co button "Cai dat" / "Install" trong UI
-          * Khong co cac the meta apple-mobile-web-app-* va apple-touch-icon
-        => Browser SE KHONG hien thi icon "cai app" o thanh dia chi nua,
-           dung dau yeu cau v1.
-      - Favicon: chi su dung mot file SVG duy nhat (favicon.svg) duoc copy
-        boi build.sh tu brandkit/logo.svg. Khong PNG fallback nua.
+    THAY DOI v3 (KHOI PHUC PWA):
+      - Khoi phuc <link rel="manifest"> -> browser hien icon "Install"
+        o thanh dia chi.
+      - Khoi phuc service worker registration -> cho phep cai dat va
+        chay offline. SW cache cTetris.html/.js/.wasm + favicon.
+      - Them <meta name="apple-mobile-web-app-capable" content="yes">
+        + theme-color cho iOS Safari standalone mode.
+      - Them <meta name="viewport" content="...viewport-fit=cover">
+        de tan dung notch area khi standalone tren mobile.
+      - Khi user "Add to Home Screen" / "Install app", PWA chay full-height
+        khong co address bar -> giai quyet van de mat full-height.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
 
-<!-- Tieu de tab: hau to (c) thay vi ky tu copyright vi can ASCII-safe
-     trong mot so trinh duyet/font cu. Tag <title> nay HTML thoa man UTF-8
-     nen dung truc tiep ky tu (c) thuong duoc -- nhung de chac, dung
-     entity &copy; cho dam bao moi browser hien thi dung. -->
+<!-- Tab title -->
 <title>cTetris &copy;</title>
 
-<!-- Favicon SVG-driven: SVG don gian hon nhieu kich thuoc PNG va modern
-     browser deu ho tro. Khong khai bao type=image/png nua. -->
+<!-- Favicon SVG-driven (single source-of-truth tu brandkit/logo.svg) -->
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
+<!-- PWA manifest -- browser doc file nay de hien nut "Install" -->
+<link rel="manifest" href="manifest.webmanifest">
+
+<!-- iOS Safari: bat che do standalone (full-height, an Safari UI khi launch
+     tu Home Screen). Chrome/Edge dung manifest.display="standalone" thay vi
+     meta tag nay, nhung iOS van can apple-mobile-web-app-* legacy meta. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="cTetris">
+<link rel="apple-touch-icon" href="favicon.svg">
+
+<!-- Theme color cho address bar (Chrome mobile) va splash screen (iOS) -->
+<meta name="theme-color" content="#000000">
+
 <style>
-    /* Reset co ban + chiem toan vung view */
+    /* Reset co ban + chiem toan vung view (100vh + safe-area cho iOS notch) */
     html, body {
         margin: 0;
         padding: 0;
         background: #000;
+        /* 100vh tren mobile bao gom address bar -- dung 100dvh (dynamic vh)
+           neu browser ho tro de tu fit theo state moi cua address bar.
+           Fallback 100vh cho browser cu. */
         height: 100vh;
+        height: 100dvh;
         overflow: hidden;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        /* Padding theo safe-area cho iPhone notch / Dynamic Island */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        box-sizing: border-box;
     }
-    /* Container can giua canvas trong viewport */
     #game-container {
         display: flex;
         align-items: center;
@@ -46,15 +64,12 @@
         width: 100%;
         height: 100%;
     }
-    /* Canvas Emscripten render game vao */
     #canvas {
         display: block;
         background: #000;
         outline: none;
-        /* Bo border mac dinh cua canvas, cho cam giac fullscreen */
         border: none;
     }
-    /* Loading text hien thi truoc khi WASM ready */
     #loading {
         color: #fff;
         font-size: 14px;
@@ -63,13 +78,16 @@
         left: 50%;
         transform: translate(-50%, -50%);
     }
+    /* Khi PWA chay che do standalone (sau khi user Install), CSS media
+       query nay activate. Co the dung de tat splash screen, etc. */
+    @media all and (display-mode: standalone) {
+        body { background: #000; }
+    }
 </style>
 </head>
 <body>
     <div id="game-container">
-        <!-- Canvas thiet bi cua Emscripten -->
         <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
-        <!-- Text trong khi tai WASM module -->
         <div id="loading">Loading cTetris &copy;...</div>
     </div>
 
@@ -77,42 +95,43 @@
         // ==============================================
         // Emscripten Module config (bat buoc)
         // ==============================================
-        // Cau hinh nay duoc Emscripten generated code doc de
-        // - lay reference den canvas
-        // - in log/error ra console
-        // - an "loading" text khi runtime san sang
         var Module = {
             canvas: (function() {
                 var canvas = document.getElementById('canvas');
-                // Nhan focus de phim chuc nang (Esc, F5...) van duoc capture
                 canvas.addEventListener('webglcontextlost', function(e) {
                     alert('WebGL context lost. Vui long reload.');
                     e.preventDefault();
                 }, false);
                 return canvas;
             })(),
-            print: function(text) {
-                console.log('[wasm]', text);
-            },
-            printErr: function(text) {
-                console.error('[wasm]', text);
-            },
+            print: function(text)    { console.log('[wasm]', text); },
+            printErr: function(text) { console.error('[wasm]', text); },
             onRuntimeInitialized: function() {
-                // An loading text khi WASM san sang
                 var loading = document.getElementById('loading');
                 if (loading) loading.style.display = 'none';
             }
         };
 
         // ==============================================
-        // KHONG dang ky service worker -- de browser khong
-        // hien thi prompt "cai dat ung dung" o thanh dia chi
-        // (yeu cau disable PWA install).
+        // PWA: Service Worker registration
         // ==============================================
-        // (Co tinh khong navigator.serviceWorker.register(...) o day)
+        // SW cache cTetris.html / .js / .wasm + favicon -> chay offline.
+        // KHONG load tren localhost (file://) vi SW yeu cau secure context
+        // (https hoac localhost). Tren GitHub Pages tu dong la https.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('sw.js')
+                    .then(function(reg) {
+                        console.log('[PWA] Service Worker registered:', reg.scope);
+                    })
+                    .catch(function(err) {
+                        console.warn('[PWA] Service Worker registration fail:', err);
+                    });
+            });
+        }
     </script>
 
-    <!-- Emscripten se chen script tag tro den cTetris.js o vi tri sau -->
+    <!-- Emscripten chen script tag tro den cTetris.js o vi tri sau -->
     {{{ SCRIPT }}}
 </body>
 </html>
