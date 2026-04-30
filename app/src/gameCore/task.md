@@ -4,7 +4,7 @@
     - Định nghĩa các cấu trúc dữ liệu cơ bản như Point, Tetromino, GameState.
 [x] Task 1.2: viết v1 gameCore/app.cpp - tạo layout.h và build .exe đảm bảo màn hình 9:16 trước khi viết code tiếp
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tao-giao-dien-169-00
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau các khai báo và cài đặt thư viện cần thiết.
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau các khai báo và trên 01.
     - Cấu hình layout chi tiết: bảng game 240x480 và một sidebar 30x480 bên phải.
 [x] Task 1.3: viết v1 gameCore/app.cpp - tạo 6 khối hình học cơ bản (L, I, T, S, Z, O)
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tao-cac-khoi-xep-hinh-LITZO-01
@@ -30,56 +30,76 @@
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 05 và trên 07.
 [x] Task 1.9: viết v1 gameCore/app.cpp - tính điểm với quy tắc định dạng 6 chữ số
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tinh-diem-07
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 06 và trên 08.
     - Quy tắc điểm: mỗi dòng xoá = 1 điểm. Giới hạn điểm số tối đa là 999999.
     - Điểm được hiển thị ở định dạng chuỗi 6 chữ số (ví dụ "000005").
 [x] Task 1.10: viết v1 gameCore/app.cpp - xây dựng Sidebar UI và Procedural Icons
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-sidebar-ui-08
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 07 và trên 09.
     - Chia sidebar 30x480 thành 12 component đồng nhất (30x40).
     - Các icon (Quit, Pause, Arrows, Speed Boost) phải được vẽ thủ công bằng code (hình học SDL) thay vì dùng ảnh tĩnh bitmap.
 [x] Task 1.11: viết v1 gameCore/app.cpp - tương tác UI bằng chuột (Click & Hold)
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-mouse-interaction-09
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 08 và trên 10.
     - Cho phép click/giữ chuột lên các icon ở sidebar để điều khiển khối tương tự phím cứng.
     - Nút đang được giữ (chuột hoặc phím) phải đổi sang màu vàng highlight để báo hiệu trạng thái active.
 [x] Task 1.12: viết v1 gameCore/app.cpp - tính năng rơi nhanh (Soft Drop)
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-soft-drop-10
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 09 và trên 11.
     - Sử dụng phím SPACE hoặc giữ chuột vào nút Speed Booster trên sidebar để tăng tốc độ rơi của khối.
 [x] Task 1.13: viết v1 gameCore/app.cpp - đồng hồ tính giờ chơi (Play Timer)
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-play-timer-11
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 10 và trên 12.
     - Hiển thị tổng thời gian chơi thực tế (loại trừ thời gian Pause) dưới định dạng HH:MM trên ô số 4 của sidebar.
 [x] Task 1.14: viết v1 gameCore/app.cpp - hiển thị trước 1 khối tiếp theo (Preview Next Block)
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-preview-next-block-12
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 11 và trên 13.
     - Hiển thị khối sắp rơi tiếp theo ở ô NEXT-1 trên sidebar.
 [x] Task 1.15: viết v1 gameCore/app.cpp - tính năng Pause / Play
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-pause-vs-play-13
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 12 và trên 14.
     - Tạm dừng/tiếp tục trò chơi bằng phím Enter, phím KP_ENTER hoặc click vào icon Pause.
     - Thay đổi icon tương ứng (Vuông: Stop/Đang chạy, Tam giác: Play/Đang dừng).
     - Ngừng đếm thời gian chơi khi đang Pause.
 [x] Task 1.16: viết v1 gameCore/app.cpp - popup Quit / Game Over (Lightbox)
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-popup-quit-14
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 13 và trên 15.
     - Kích hoạt bằng phím ESC, click icon Nguồn, hoặc khi Game Over.
     - Áp dụng kỹ thuật lightbox (phủ mờ nền đen) để hiển thị popup xác nhận.
     - Cung cấp 4 nút chức năng: Restart (chơi lại), Console (về menu), Quit (thoát app), và Cancel.
-[x] Task 1.17: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
+[x] Task 1.17: tích hợp v1 với các modules khác trong app/src
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameCore/app.cpp là: integration/v1
-    - Khởi động chương trình luôn bắt đầu bằng màn hình của gameStory.
+    - Khởi động chương trình luôn bắt đầu bằng màn hình của module gameStory.
     - Sau khi kết thúc màn hình gameStory sẽ chuyển tiếp qua gameConsole.
-    - Sau khi bấm nút start bên màn hình gameConsole chuyển tiếp qua gameCore.
-    - Đưa về 1 file CMakeLists.txt để hỗ trợ build wasm từ macOS / Ubuntu / Window. 
-    - Viết và kiểm tra build.sh và build.ps1 để tự động xác định môi trường và build file.
+    - Sau khi bấm nút start bên màn hình gameConsole chuyển tiếp qua màn hình gameCore. Ngược lại, từ màn hình gameCore vẫn có thể về lại màn hình gameConsole qua cơ chế bên trong của nút có biểu tượng poweroff.
+    - Đưa về 1 file CMakeLists.txt để hỗ trợ progressive web application và desktop application.
+    - Viết và kiểm tra build.sh (macOS/Linux) và build.ps1 (Windows) để tự động xác định thư viện phù hợp với hệ điều hành tạo ứng dụng, validate môi trường, kiểm tra version các công cụ (cmake, emsdk, SDL3, git, python, curl), và hướng dẫn cài đặt nếu thiếu.
+    - Chuyển toàn bộ code từ SFML sang SDL3 để đảm bảo chạy đa nền tảng (desktop, web/wasm).
+    - Viết deploy-pages.yml để dùng GitHub Actions CI/CD build và deploy bản WASM lên GitHub Pages, kiểm tra cache, validate log, và cảnh báo nếu thiếu dependency.
+    - Biên dịch từ C++ qua wasm để chạy trên môi trường đám mây, đảm bảo các asset (favicon, manifest, sw.js) được copy đúng vào build output.
+    - Thống nhất bộ nhận diện thương hiệu (logo, icon, màu sắc, tên game) cho toàn bộ ứng dụng và cho phép tuỳ chỉnh cho từng nền tảng nếu cần.
+    - Đảm bảo các file header SVG, layout, asset cần thiết đã được commit sẵn, không sinh động trong script build.
+    - Kiểm tra lại flow chuyển đổi giữa các màn hình, đảm bảo không bị deadlock hoặc lỗi logic khi chuyển cảnh.
+    - Viết hướng dẫn sử dụng/tích hợp cho developer mới (README hoặc comment chi tiết trong code).
 ### V2
 [ ] Task 2.1: viết v2 gameCore/app.cpp - nhạc nền trong suốt tiến trình
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-chen-nhac-nen-15
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 14 và trên 16.
 [ ] Task 2.2: viết v2 gameCore/app.cpp - tốc độ rơi nhanh dần theo điểm số.
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tang-do-kho-16
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 15 và trên 17.
     - Logic tăng độ khó linh động dựa trên mốc điểm thay vì rơi đều đặn với `FALL_INTERVAL_NORMAL = 500`.
 [ ] Task 2.3: viết v3 gameCore/app.cpp - dự báo 3 khối liên tiếp
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-du-bao-ba-khoi-xep-hinh-lien-tiep-17
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 16 và trên 18.
     - Nâng cấp từ dự báo 1 khối (v1) lên hiển thị 3 khối ở các slot NEXT-1, NEXT-2, NEXT-3.
 [ ] Task 2.4: viết v3 gameCore/app.cpp - hiệu ứng chớp tắt khi xoá dòng
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-hieu-ung-khi-xoa-dong-18
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 17 và trên 19.
     - tạo hiệu ứng chớp tắt 3 lần báo hiệu để người chơi cảm nhận là dòng sắp bị xoá.
 [ ] Task 2.5: viết v3 gameCore/app.cpp - tăng điểm thưởng khi xoá nhiều dòng cùng thời điểm.
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-diem-thuong-khi-xoa-nhieu-dong-19
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 18 và trên 20.
     - tổng số hàng được được xoá nhân với tổng số hàng được xoá. Ví dụ: mỗi hàng đang 1 điểm, xoá 2 hàng cùng lúc là (2x2) 4 điểm, xoá 3 hàng cùng lúc là (3x3) 9 điểm, xoá 4 hàng cùng lúc là (3x3) 16 điểm.
 [ ] Task 2.6: tích hợp v3 với các modules còn lại trong app/src qua file app/main.cpp
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameCore/app.cpp là: integration/v2
@@ -87,9 +107,11 @@
 ### V3
 [ ] Task 3.1: viết v3 gameCore/app.cpp - cho phép nhập tên khi game over
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-game-over-screen-20
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 19 và trên 21.
     - Bổ sung ô nhập ký tự (text input) vào lightbox Game Over để lưu lại tên người chơi với điểm số tương ứng. Thoát game là mất data nếu không ghi.
 [ ] Task 3.2: viết v3 gameCore/app.cpp - gọi API và gửi tên và điểm lên Mongo atlas
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tich-hop-backend-21
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 20 và trên 22.
     - Chỉ cần quan tâm bài toán ghi dữ liệu. Thêm nút retry hoặc resync ở màn hình game over nếu ghi không thành công.
 [ ] Task 3.3: tích hợp v3 với các modules còn lại trong app/src qua file app/main.cpp
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameCore/app.cpp là: integration/v3
