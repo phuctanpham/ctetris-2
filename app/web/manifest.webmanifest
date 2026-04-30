@@ -2,7 +2,7 @@
   "name": "cTetris",
   "short_name": "cTetris",
   "description": "A SDL3-driven Tetris clone built for the web (Emscripten WASM).",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
@@ -14,7 +14,13 @@
       "src": "favicon.svg",
       "type": "image/svg+xml",
       "sizes": "any",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ]
 }
