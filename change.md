@@ -23,7 +23,14 @@
 - `appTree.md` cho thấy `app/libs/macos/downloads/` chứa `SDL-3.4.4/` (full source clone) và `sdl3-wasm-3.4.4/` (built artifacts).
 - `ensure_emsdk()`, `build_sdl3_from_source()` clone trực tiếp vào `$DOWNLOAD_DIR`, không qua `brew`/`apt`.
 
-## 2. Root cause của 2 lỗi (Install PWA + full-height)
+## 2. Hiện tượng của lỗi cần fix
+
+- ở trình duyệt có login tài khoản, khi tôi mở trang https://phuctanpham.github.io/ctetris-2/ctetris.html và load ra như web như commit cũ (be8068b) trong khi tôi mở trình duyệt ẩn danh thì nó hiển thị lỗi 404. 
+- ở trình duyệt có login tài khoản, Khi tôi thay đổi thành https://phuctanpham.github.io/ctetris-2/ thì nó tự động redirect thành trang https://phuctanpham.github.io/ctetris-2/ctetris.html và load ra như web như commit cũ (be8068b) trong khi tôi mở trình duyệt ẩn danh thì nó không redirect mà hiển hiển web nhưng bị các lỗi như bên dưới:
+    - Mất nút Install PWA: Phiên bản hiện tại đã chủ động gỡ bỏ hoàn toàn cơ chế Progressive Web App (PWA) để trình duyệt không hiển thị icon "cài đặt ứng dụng" nữa.
+    - Mất hiển thị full-height: Vì không còn được cài đặt như một PWA độc lập (chế độ standalone/fullscreen), ứng dụng giờ đây chạy như một trang web bình thường trên tab. Do đó, thanh địa chỉ (address bar) của trình duyệt xuất hiện và chiếm mất một phần không gian, khiến ứng dụng không thể hiển thị chiều cao toàn màn hình một cách thực thụ. 
+
+## 3. Root cause của 2 lỗi (Install PWA + full-height)
 
 Bạn đã push file `web/shell.html`, `web/manifest.webmanifest`, `web/sw.js` của tôi (đầy đủ PWA). NHƯNG:
 
@@ -99,9 +106,10 @@ Sau khi fix và deploy, các browser **đã từng truy cập** site sẽ vẫn 
 
 ---
 
-**Xác nhận giúp tôi:**
+**Xác nhận kỳ vọng giúp tôi:**
 1. Bạn hiểu **đúng** 3 nguyên tắc của bạn?
 2. Bạn xác định **đúng** root cause?
 3. Bạn đã phân tích 3 mong muốn thay đổi tối thiểu ở trên của tôi dưới góc nhìn 1 chuyên gia để đề xuất kế hoạch thay đổi tối ưu hơn.
+4. Commit hiện tại đã khắc phục rất nhiều lỗi, tuy nhiên sau khi khắc phục nó lại bị hai lỗi trên mà tôi đã khắc phục trước đó.
 
 Sau khi bạn confirm với tôi và đưa ra kế hoạch thay đổi rồi hãy tiến hành xử lý từng files.
