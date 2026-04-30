@@ -1,30 +1,23 @@
-# =============================================================================
-# .github/workflows/deploy-pages.yml
-# Workflow build cTetris (WASM) + deploy len GitHub Pages
-# =============================================================================
-# Triet ly v3 (full pre-install + verify):
-#   - Workflow PRE-INSTALL day du tat ca dependencies cho WASM build:
-#       * APT packages (compiler, cmake, etc.)
-#       * SDL3 dev libs (libsdl3-dev neu Ubuntu 24.04+ co, fallback build source)
-#       * EMSDK (uu tien setup-emsdk action, fallback git clone neu fail)
-#   - Sau do build.sh chay -- script PHAI detect tat ca da co va SKIP install.
-#   - Step "Verify build.sh detection" sau khi build se grep log:
-#       * KHONG duoc thay "Khong tim thay emsdk, clone vao..."
-#       * KHONG duoc thay "Thieu N/M apt packages"
-#       * KHONG duoc thay "Cache MISS" cho SDL3 (lan build #2 tro di)
-#     Neu thay -> FAIL workflow voi error message ro rang.
-#
-# Yeu cau cau hinh repo (mot lan):
-#   Settings > Pages > Source = "GitHub Actions"
-#   Settings > Actions > General > Workflow permissions = "Read and write"
-# =============================================================================
-
-name: Deploy cTetris to GitHub Pages
+name: Deploy WASM to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - phucpt/github-pages
+    paths:
+      - 'app/src/**'
+      - 'app/main.cpp'
+      - 'app/web/**'
+      - 'app/brandkit/**'
+      - 'app/CMakeLists.txt'
+      - 'app/build.sh'
+      - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
+
+# ✅ Opt into Node.js 24 for all jobs before June 2 deadline
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
@@ -32,12 +25,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
-# Version pinning -- match voi build.sh de detection logic khop
-env:
-  EMSDK_VERSION: '3.1.72'
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -123,13 +112,12 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # Clean up all workflow artifacts except cache if deploy is successful
       - name: Cleanup workflow artifacts (except cache)
         if: ${{ success() }}
         run: |
           echo "Cleaning up workflow artifacts except cache..."
           gh api repos/${{ github.repository }}/actions/artifacts \
-            --paginate -q '.artifacts[] | select(.expired==false) | select(.name!~"^cache") | .id' | \
-          xargs -r -n1 gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/{}/
+            --paginate -q '.artifacts[] | select(.expired==false) | select(.name | test("^cache") | not) | .id' | \
+          xargs -r -I{} gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/{}/
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
