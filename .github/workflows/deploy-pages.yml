@@ -81,17 +81,25 @@ jobs:
           path: app/build.log
           retention-days: 7
 
-      # Stage Pages artifact (just copy from build output, do not generate or verify icons)
+      # Stage Pages artifact
+      # build.sh da copy favicon.svg, manifest.webmanifest, sw.js vao BUILD_WASM_DIR
+      # chi can stage toan bo vao public/ de deploy
       - name: Stage Pages artifact
         run: |
           mkdir -p public
           cp app/build/wasm/ubuntu/cTetris.html  public/index.html
           cp app/build/wasm/ubuntu/cTetris.js    public/
           cp app/build/wasm/ubuntu/cTetris.wasm  public/
-          if [ -f app/build/wasm/ubuntu/favicon.svg ]; then
-            cp app/build/wasm/ubuntu/favicon.svg public/
-          fi
+          # Static assets -- copy neu ton tai (build.sh da copy tu web/ va brandkit/)
+          for asset in favicon.svg manifest.webmanifest sw.js; do
+            if [ -f "app/build/wasm/ubuntu/$asset" ]; then
+              cp "app/build/wasm/ubuntu/$asset" "public/$asset"
+            else
+              echo "[WARN] $asset khong co trong build output -- PWA co the bi anh huong"
+            fi
+          done
           touch public/.nojekyll
+          echo "--- Kiem tra noi dung public/ ---"
           ls -la public/
 
       # Upload Pages artifact

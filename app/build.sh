@@ -72,6 +72,9 @@ BUILD_WASM_DIR="$APP_DIR/build/wasm/$OS_NAME"
 BRANDKIT_DIR="$APP_DIR/brandkit"
 BRAND_LOGO_SVG="$BRANDKIT_DIR/logo.svg"
 
+# Web assets (PWA) -- da commit san trong repo, chi can copy
+WEB_DIR="$APP_DIR/web"
+
 # Version pinning -- doi o day se tu invalidate cache CI
 # SDL3_VERSION_MIN: version toi thieu yeu cau (game can SDL3 >= 3.2.0)
 # SDL3_VERSION:     version dung khi build SDL3 tu source (pin de deterministic).
@@ -702,6 +705,20 @@ build_wasm() {
     else
         log_warn "Khong co $BRAND_LOGO_SVG, favicon se thieu"
     fi
+
+    # PWA assets -- copy tu web/ (da commit san, khong sinh on-the-fly)
+    # manifest.webmanifest + sw.js can thiet de browser hien nut Install
+    # va Service Worker hoat dong (offline + full-height standalone mode).
+    for asset in manifest.webmanifest sw.js; do
+        local src="$WEB_DIR/$asset"
+        if [ -f "$src" ]; then
+            cp "$src" "$BUILD_WASM_DIR/$asset"
+            log_ok "Copy PWA asset: $asset"
+        else
+            log_warn "Khong co $src -- PWA se thieu $asset"
+        fi
+    done
+
     log_ok "WASM build hoan tat: $BUILD_WASM_DIR"
 }
 

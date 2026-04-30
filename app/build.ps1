@@ -33,6 +33,7 @@ $BuildNativeDir= Join-Path $AppDir "build\desktop\$OS_NAME"
 $BuildWasmDir  = Join-Path $AppDir "build\wasm\$OS_NAME"
 $BrandkitDir   = Join-Path $AppDir 'brandkit'
 $BrandLogoSvg  = Join-Path $BrandkitDir 'logo.svg'
+$WebDir        = Join-Path $AppDir 'web'
 
 # Version pinning -- NEU detect duoc SDL3 native qua winget/choco/manual,
 # WASM build se MATCH dung version do (tranh dij ban). Neu khong, dung
@@ -317,6 +318,24 @@ function Copy-DesktopIcon {
         Write-Warn "No $icoSrc found, using default OS icon."
     }
 }
+
+# PWA assets -- copy tu web/ (da commit san, khong sinh on-the-fly)
+# manifest.webmanifest + sw.js can thiet de browser hien nut Install
+# va Service Worker hoat dong (offline + full-height standalone mode).
+function Copy-PwaAssets {
+    param([string]$OutDir)
+    foreach ($asset in @('manifest.webmanifest', 'sw.js')) {
+        $src = Join-Path $WebDir $asset
+        $dst = Join-Path $OutDir $asset
+        if (Test-Path $src) {
+            Copy-Item -Force $src $dst
+            Write-Ok "Copy PWA asset: $asset"
+        } else {
+            Write-Warn "Khong co $src -- PWA se thieu $asset"
+        }
+    }
+}
+
 function Initialize-WindowsTools {
     $needCmake  = -not (Test-CommandVersion 'cmake' $CmakeMinVersion)
     $needGit    = -not (Get-Command git    -ErrorAction SilentlyContinue)
@@ -486,6 +505,10 @@ function Build-Wasm {
     } else {
         Write-Warn "Khong co $BrandLogoSvg"
     }
+
+    # PWA assets -- copy tu web/ (da commit san, khong sinh on-the-fly)
+    Copy-PwaAssets -OutDir $BuildWasmDir
+
     Write-Ok "WASM build hoan tat: $BuildWasmDir"
 }
 
