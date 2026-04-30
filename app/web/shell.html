@@ -2,17 +2,15 @@
 <!--
     shell.html -- Emscripten shell template cho cTetris (WASM build)
     ==============================================================
-    THAY DOI v3 (KHOI PHUC PWA):
-      - Khoi phuc <link rel="manifest"> -> browser hien icon "Install"
-        o thanh dia chi.
-      - Khoi phuc service worker registration -> cho phep cai dat va
-        chay offline. SW cache cTetris.html/.js/.wasm + favicon.
-      - Them <meta name="apple-mobile-web-app-capable" content="yes">
-        + theme-color cho iOS Safari standalone mode.
-      - Them <meta name="viewport" content="...viewport-fit=cover">
-        de tan dung notch area khi standalone tren mobile.
-      - Khi user "Add to Home Screen" / "Install app", PWA chay full-height
-        khong co address bar -> giai quyet van de mat full-height.
+    SCALING STRATEGY:
+      - SDL tao canvas pixel buffer 270x480 (9:16) -- khong doi.
+      - CSS + JS scale canvas len de fill chieu cao viewport (100dvh)
+        trong khi giu DUNG ti le 9:16. Neu chieu rong viewport nho hon
+        chieu rong tinh theo ti le, doi sang width-constrained mode.
+      - resizeCanvas() duoc goi khi: load, resize, orientationchange,
+        va sau khi Emscripten runtime init xong (de override style SDL set).
+      - devicePixelRatio KHONG can quan tam vi SDL renderer co pixel buffer
+        co dinh 270x480; chi CSS display size la thay doi.
 -->
 <html lang="en">
 <head>
@@ -25,61 +23,90 @@
 <!-- Favicon SVG-driven (single source-of-truth tu brandkit/logo.svg) -->
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
-<!-- PWA manifest -- browser doc file nay de hien nut "Install" -->
+<!-- PWA manifest -->
 <link rel="manifest" href="manifest.webmanifest">
 
-<!-- iOS Safari: bat che do standalone (full-height, an Safari UI khi launch
-     tu Home Screen). Chrome/Edge dung manifest.display="standalone" thay vi
-     meta tag nay, nhung iOS van can apple-mobile-web-app-* legacy meta. -->
+<!-- iOS Safari standalone mode -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="cTetris">
 <link rel="apple-touch-icon" href="favicon.svg">
 
-<!-- Theme color cho address bar (Chrome mobile) va splash screen (iOS) -->
+<!-- Theme color -->
 <meta name="theme-color" content="#000000">
 
 <style>
-    /* Reset co ban + chiem toan vung view (100vh + safe-area cho iOS notch) */
-    html, body {
+    /* ------------------------------------------------------------------ */
+    /* Reset + full viewport                                                */
+    /* ------------------------------------------------------------------ */
+    *, *::before, *::after {
+        box-sizing: border-box;
         margin: 0;
         padding: 0;
-        background: #000;
-        /* 100vh tren mobile bao gom address bar -- dung 100dvh (dynamic vh)
-           neu browser ho tro de tu fit theo state moi cua address bar.
-           Fallback 100vh cho browser cu. */
-        height: 100vh;
+    }
+
+    html, body {
+        width: 100%;
+        height: 100%;
+        /* 100dvh = dynamic viewport height: tu co khi address bar an/hien */
         height: 100dvh;
         overflow: hidden;
+        background: #000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        /* Padding theo safe-area cho iPhone notch / Dynamic Island */
+        /* Safe area inset cho iPhone notch / Dynamic Island */
         padding-top: env(safe-area-inset-top);
         padding-bottom: env(safe-area-inset-bottom);
-        box-sizing: border-box;
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Container: can giua canvas (ca ngang lan doc)                       */
+    /* ------------------------------------------------------------------ */
     #game-container {
         display: flex;
         align-items: center;
         justify-content: center;
         width: 100%;
         height: 100%;
+        background: #000;
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Canvas scaling:                                                      */
+    /*   - SDL set canvas.width=270, canvas.height=480 (pixel buffer).     */
+    /*   - CSS chi dieu chinh display size, KHONG thay doi pixel buffer.   */
+    /*   - JS resizeCanvas() tinh w/h phu hop va set style.width/height.   */
+    /*   - image-rendering: pixelated giu sac net khi scale up (khong blur)*/
+    /* ------------------------------------------------------------------ */
     #canvas {
         display: block;
         background: #000;
         outline: none;
         border: none;
+        /* Giu ti le 9:16 qua CSS (fallback truoc khi JS chay) */
+        aspect-ratio: 9 / 16;
+        /* Chieu cao = 100% container (= 100dvh), bi gioi han boi max-width */
+        height: 100%;
+        max-height: 100dvh;
+        max-width: 100vw;
+        /* Pixel art scaling: khong blur khi phong to */
+        image-rendering: pixelated;
+        image-rendering: crisp-edges; /* Firefox */
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Loading overlay                                                      */
+    /* ------------------------------------------------------------------ */
     #loading {
-        color: #fff;
+        color: #ccc;
         font-size: 14px;
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
+        pointer-events: none;
     }
-    /* Khi PWA chay che do standalone (sau khi user Install), CSS media
-       query nay activate. Co the dung de tat splash screen, etc. */
+
+    /* PWA standalone mode */
     @media all and (display-mode: standalone) {
         body { background: #000; }
     }
@@ -92,9 +119,59 @@
     </div>
 
     <script>
-        // ==============================================
-        // Emscripten Module config (bat buoc)
-        // ==============================================
+        // ==============================================================
+        // resizeCanvas: tinh display size giu dung ti le 9:16 (270:480)
+        // va set canvas.style.width / canvas.style.height.
+        //
+        // Logic:
+        //   availH = window.innerHeight (khong dung 100dvh vi JS khong
+        //            doc duoc CSS unit truc tiep -- innerHeight la gia tri
+        //            thuc sau khi address bar an/hien)
+        //   availW = window.innerWidth
+        //   targetW = availH * (9/16)
+        //   if targetW <= availW  -> height-constrained: h = availH, w = targetW
+        //   else                  -> width-constrained : w = availW, h = availW * (16/9)
+        // ==============================================================
+        var GAME_RATIO = 9 / 16; // width / height
+
+        function resizeCanvas() {
+            var canvas = document.getElementById('canvas');
+            if (!canvas) return;
+
+            var availW = window.innerWidth;
+            var availH = window.innerHeight;
+
+            var targetW = availH * GAME_RATIO;
+            var w, h;
+            if (targetW <= availW) {
+                // Height-constrained: fill chieu cao, padding ngang
+                h = availH;
+                w = targetW;
+            } else {
+                // Width-constrained: fill chieu rong, padding doc
+                w = availW;
+                h = availW / GAME_RATIO;
+            }
+
+            canvas.style.width  = w + 'px';
+            canvas.style.height = h + 'px';
+            // Xoa aspect-ratio CSS de JS hoan toan kiem soat
+            canvas.style.aspectRatio = 'unset';
+        }
+
+        // Goi ngay khi DOM san sang (truoc khi WASM load)
+        resizeCanvas();
+
+        // Re-scale khi cua so thay doi kich thuoc hoac xoay man hinh
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', function() {
+            // Doi 1 tick de iOS cap nhat innerHeight truoc khi tinh
+            setTimeout(resizeCanvas, 100);
+        });
+
+        // ==============================================================
+        // Emscripten Module config
+        // ==============================================================
         var Module = {
             canvas: (function() {
                 var canvas = document.getElementById('canvas');
@@ -107,17 +184,22 @@
             print: function(text)    { console.log('[wasm]', text); },
             printErr: function(text) { console.error('[wasm]', text); },
             onRuntimeInitialized: function() {
+                // An loading overlay
                 var loading = document.getElementById('loading');
                 if (loading) loading.style.display = 'none';
+
+                // Emscripten co the reset canvas.style khi init SDL --
+                // goi lai resizeCanvas de dam bao display size dung.
+                resizeCanvas();
+
+                // Double-check sau 1 frame (SDL window creation async)
+                requestAnimationFrame(resizeCanvas);
             }
         };
 
-        // ==============================================
+        // ==============================================================
         // PWA: Service Worker registration
-        // ==============================================
-        // SW cache cTetris.html / .js / .wasm + favicon -> chay offline.
-        // KHONG load tren localhost (file://) vi SW yeu cau secure context
-        // (https hoac localhost). Tren GitHub Pages tu dong la https.
+        // ==============================================================
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('sw.js')
