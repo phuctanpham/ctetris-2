@@ -2,10 +2,13 @@
 #include "gameConsole_layout.h"
 #include <SDL3/SDL.h>
 #include <cstdlib>
+#include <cmath>
 
-// Mau text "nhe" -- 220 thay vi 255 -- de font xuat hien mong/it dam hon.
-// Yeu cau "less thickness" duoc thuc hien bang cach giam do sang text vi
-// SDL_RenderDebugText la bitmap font co dinh khong the doi font weight.
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+// Mau text "nhe" -- 220 thay vi 255
 static const SDL_Color SOFT_WHITE  = {220, 220, 220, 255};
 static const SDL_Color HIGHLIGHT_Y = {255, 215,   0, 255};
 
@@ -41,7 +44,7 @@ static void drawButton(SDL_Renderer* renderer, const Button& b, bool focused) {
 }
 
 // =========================================================
-// Scrollbar tuong tac (dung chung cho guide va board)
+// Scrollbar tuong tac
 // =========================================================
 struct SBLayout {
     SDL_FRect upBtn;
@@ -183,15 +186,68 @@ static void sbAutoRepeat(SBInteraction& sbi, int& scrollPos, int total, int visi
     }
 }
 
+// =========================================================
+// WASM Shutdown screen
+// =========================================================
+// Nut RELOAD giua man hinh -- kich thuoc dong nhat voi gameCore
+static const SDL_FRect CONSOLE_RELOAD_BTN = {
+    (CONSOLE_SCREEN_WIDTH  - 160.0f) / 2.0f,
+    (CONSOLE_SCREEN_HEIGHT - 50.0f)  / 2.0f,
+    160.0f, 50.0f
+};
+
+static void drawConsoleWasmShutdown(SDL_Renderer* renderer, bool reloadHover) {
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
+    SDL_Color btnBg = reloadHover ? SDL_Color{ 90, 130, 200, 255}
+                                  : SDL_Color{ 60, 100, 170, 255};
+    SDL_SetRenderDrawColor(renderer, btnBg.r, btnBg.g, btnBg.b, 255);
+    SDL_RenderFillRect(renderer, &CONSOLE_RELOAD_BTN);
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderRect(renderer, &CONSOLE_RELOAD_BTN);
+
+    const char* label = "RELOAD";
+    int ll = (int)SDL_strlen(label);
+    SDL_RenderDebugText(renderer,
+                        CONSOLE_RELOAD_BTN.x + (CONSOLE_RELOAD_BTN.w - ll * 8.0f) / 2.0f,
+                        CONSOLE_RELOAD_BTN.y + (CONSOLE_RELOAD_BTN.h - 8.0f) / 2.0f,
+                        label);
+
+    // Hint 2 dong ngan -- dam bao <= CONSOLE_SCREEN_WIDTH (270px)
+    // Dong 1: "Press F5 or click RELOAD"   25 chars x 8px = 200px
+    // Dong 2: "to start a new game"        19 chars x 8px = 152px
+    float hintY = CONSOLE_RELOAD_BTN.y + CONSOLE_RELOAD_BTN.h + 16.0f;
+    const char* hint1 = "Press F5 or click RELOAD";
+    const char* hint2 = "to start a new game";
+    int h1l = (int)SDL_strlen(hint1);
+    int h2l = (int)SDL_strlen(hint2);
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderDebugText(renderer,
+                        (CONSOLE_SCREEN_WIDTH - h1l * 8.0f) / 2.0f,
+                        hintY, hint1);
+    SDL_RenderDebugText(renderer,
+                        (CONSOLE_SCREEN_WIDTH - h2l * 8.0f) / 2.0f,
+                        hintY + 14.0f, hint2);
+}
+
+// =========================================================
+// AppState
+// =========================================================
 struct AppState {
-    bool showGuide  = false;
-    bool showBoard  = false;
-    bool isRunning  = true;
-    int  nextScene  = 0;
-    int  boardScroll = 0;
-    int  guideScroll = 0;
-    int  focusIndex  = 0;
+    bool showGuide    = false;
+    bool showBoard    = false;
+    bool isRunning    = true;
+    int  nextScene    = 0;
+    int  boardScroll  = 0;
+    int  guideScroll  = 0;
+    int  focusIndex   = 0;
     SBInteraction sb;
+
+    // WASM-only: khi QUIT duoc chon, hien shutdown screen thay vi
+    // tra ve 0 lam canvas trang (khong co SDL_DestroyWindow phu hop)
+    bool wasmShutdown = false;
+    bool reloadHover  = false;
 };
 
 struct BoardEntry { const char* user; int score; const char* time; };
@@ -310,10 +366,6 @@ static void drawBackground(SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 40, 44, 52, 255);
     SDL_RenderClear(renderer);
 
-    // Tieu de chinh: KHONG them "(C)" vi SDL_RenderDebugText la bitmap
-    // ASCII font, ky tu copyright "(C)" trong ngoac don nhin xau. Copyright
-    // hien o OS window title (UTF-8 © render dung).
-    // "C T E T R I S" -- 13 ky tu * 8px = 104 px.
     SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
     const char* title = "C T E T R I S";
     int titleLen = (int)SDL_strlen(title);
@@ -422,7 +474,15 @@ static void activateButton(AppState& state, int index) {
         case 1: state.showBoard = true; state.boardScroll = 0;
                 sbResetInteraction(state.sb); break;
         case 2: state.isRunning = false; state.nextScene = 1; break;
-        case 3: state.isRunning = false; state.nextScene = 0; break;
+        case 3:
+            // QUIT: tren WASM hien shutdown screen thay vi thoat lam canvas trang.
+            // Tren native tra ve 0 binh thuong.
+#ifdef __EMSCRIPTEN__
+            state.wasmShutdown = true;
+#else
+            state.isRunning = false; state.nextScene = 0;
+#endif
+            break;
         default: break;
     }
 }
@@ -433,9 +493,47 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer) {
     SDL_Event event;
     playBackgroundMusic();
 
-    while (state.isRunning) {
+    while (state.isRunning || state.wasmShutdown) {
         Uint32 nowMs = SDL_GetTicks();
 
+        // ============= WASM shutdown screen =============
+        if (state.wasmShutdown) {
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_EVENT_QUIT) {
+                    state.wasmShutdown = false;
+                    state.isRunning = false;
+                    state.nextScene = 0;
+                    break;
+                }
+                if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                    state.reloadHover = hitTest(CONSOLE_RELOAD_BTN,
+                                                event.motion.x, event.motion.y);
+                }
+                if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                    event.button.button == SDL_BUTTON_LEFT) {
+                    if (hitTest(CONSOLE_RELOAD_BTN, event.button.x, event.button.y)) {
+#ifdef __EMSCRIPTEN__
+                        emscripten_run_script("window.location.reload();");
+#endif
+                    }
+                }
+                if (event.type == SDL_EVENT_KEY_DOWN) {
+                    SDL_Keycode k = event.key.key;
+                    if (k == SDLK_F5 || k == SDLK_RETURN ||
+                        k == SDLK_KP_ENTER || k == SDLK_SPACE) {
+#ifdef __EMSCRIPTEN__
+                        emscripten_run_script("window.location.reload();");
+#endif
+                    }
+                }
+            }
+            drawConsoleWasmShutdown(renderer, state.reloadHover);
+            SDL_RenderPresent(renderer);
+            SDL_Delay(16);
+            continue;
+        }
+
+        // ============= Game thuong =============
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) {
                 state.isRunning = false; state.nextScene = 0; break;
@@ -572,7 +670,6 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer) {
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
     SDL_Init(SDL_INIT_VIDEO);
-    // Standalone window title: them suffix copyright (UTF-8: \xC2\xA9 = ©)
     SDL_Window* window = SDL_CreateWindow("Game Console \xC2\xA9 - Standalone",
                                           CONSOLE_SCREEN_WIDTH, CONSOLE_SCREEN_HEIGHT, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
