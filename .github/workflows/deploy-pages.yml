@@ -107,6 +107,10 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+      actions: write        # ✅ required to list + delete artifacts
     steps:
       - name: Deploy
         id: deployment
@@ -116,8 +120,15 @@ jobs:
         if: ${{ success() }}
         run: |
           echo "Cleaning up workflow artifacts except cache..."
-          gh api repos/${{ github.repository }}/actions/artifacts \
-            --paginate -q '.artifacts[] | select(.expired==false) | select(.name | test("^cache") | not) | .id' | \
-          xargs -r -I{} gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/{}/
+          ids=$(gh api "repos/${{ github.repository }}/actions/artifacts" \
+            --paginate -q '.artifacts[] | select(.expired==false) | select(.name | test("^cache") | not) | .id' 2>/dev/null || true)
+
+          if [ -z "$ids" ]; then
+            echo "No artifacts to delete."
+            exit 0
+          fi
+
+          echo "$ids" | xargs -r -I{} gh api --method DELETE \
+            "repos/${{ github.repository }}/actions/artifacts/{}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
