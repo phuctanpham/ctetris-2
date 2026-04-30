@@ -1,47 +1,87 @@
 ## Tasks:
-[x] Task 1.1: viết v1 gameStory/app.cpp - tạo layout.h và file build trên macOS đảm bảo màn hình 9:16 trước khi viết code tiếp
-    - Comment codeblock này trong gamestory/app.cpp là: gameconsole-tao-giao-dien-169-00
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau các khai báo và cài đặt thư viện cần thiét
-[x] Task 1.2: viết v1 gameStory/app.cpp - làm hiển thị logo UIT có hiệu ứng tự chọn hiển thị và âm thanh
-    - Comment codeblock này trong gamestory/app.cpp là: gameconsole-logo-intro-01
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 00 và trước 02
-[x] Task 1.3: viết v1 gameStory/app.cpp - tạo loading bar theo theo thời gian hiệu ứng của logo
+### V1
+[x] Task 1.1: viết v1 gameStory/app.cpp - tạo layout.h đảm bảo màn hình 9:16 và thiết lập chế độ BUILD_STANDALONE để test độc lập module trên macOS.
+    - Comment codeblock này trong gamestory/app.cpp là: gamestory-tao-giao-dien-169-00
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau các khai báo và cài đặt thư viện cần thiết.
+
+[x] Task 1.2: viết v1 gameStory/app.cpp - tích hợp thư viện nanosvg để đọc/rasterize file SVG trực tiếp (không dùng ảnh bitmap) và áp dụng cơ chế Caching (Lazy Init) cho texture để tối ưu hiệu năng.
+    - Comment codeblock này trong gamestory/app.cpp là: gamestory-xu-ly-svg-caching-00b
+    - Đặt ngay sau khai báo thư viện nanosvg và trước các logic UI chính.
+
+[x] Task 1.3: viết v1 gameStory/app.cpp - làm hiển thị logo UIT (dùng raw SVG) có hiệu ứng fade-in tự chọn, âm thanh và hiển thị tên game "C T E T R I S" ngay bên dưới logo.
+    - Comment codeblock này trong gamestory/app.cpp là: gamestory-logo-intro-01
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 00b và trước 02.
+
+[x] Task 1.4: viết v1 gameStory/app.cpp - tạo loading bar theo thời gian hiệu ứng của logo.
     - Comment codeblock này trong gamestory/app.cpp là: gamestory-loading-bar-02
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 01 và trước 03
-[x] Task 1.4: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
-    - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là:  integration/v1
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí trên 00
-    - Khơi động chương trình luôn bắt đầu bằng màn hình của gameStory.
-    - Sau khi kết thúc màn hình của phần gameStory sẽ chuyển tiếp qua khởi động màn hình gameConsole
-    - Sau khi bấm nút start bên màn hình gameConsole chuyển tiếp qua khởi động màn hình gameCore
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 01 và trước 03.
+
+[x] Task 1.5: viết v1 gameStory/app.cpp - hiển thị dòng credit "Powered up by" kèm logo công ty phụ (corp logo) căn giữa, nằm ngay dưới thanh loading bar.
+    - Comment codeblock này trong gamestory/app.cpp là: gamestory-corp-credit-03
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 02.
+
+[x] Task 1.6: tích hợp v1 với các modules còn lại trong app/src qua file app/main.cpp
+    - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là: integration/v1
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí trên cùng của main.cpp.
+    - Khởi động chương trình luôn bắt đầu bằng màn hình của gameStory.
+    - Sau khi kết thúc màn hình của phần gameStory sẽ chuyển tiếp qua khởi động màn hình gameConsole.
+    - Sau khi bấm nút start bên màn hình gameConsole chuyển tiếp qua khởi động màn hình gameCore.
     - Đưa về 1 file CMakeLists.txt để hỗ trợ build wasm từ macOS / Ubuntu / Window. 
-    - viết và kiểm tra build.sh và build.ps1 để:
-        + hỏi build đơn lẻ từng module hay tích hợp toàn bộ.
-        + với build.sh tự xác định hệ điều hành  (macos hay ubuntu) , build.ps1 thì mặc định là windown rồi chạy chạy các cài đặt tiếp 
-        + kiểm tra môi trường hệ điều hành hiện tại đã cài các công cụ cần thiết đúng version trên hệ điều hành chưa? nếu chưa hoặc thấp hơn version tối thiếu thì dừng script yêu cầu cài đặt.
-        + nếu các công cụ cài đặt đầy đủ thì tiến hành build và để trong build/wasm, kết thúc có hướng dẫn cách chạy trên file build trên local host.
-[ ] Task 2.1: viết v2 gameStory/app.cpp - tạo dialogue story đơn giản để giới thiệu game kèm nhạc nền phù hợp
-    - Comment codeblock này trong gamestory/app.cpp là: gamestory-phan-cot-game-03
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 02 và trước 04
-    - Cần hỗ trợ phím enter và space thay vì chỉ click next để chuyển tiếp cảnh
-    - Cần đa dạng chuyển cảnh, ví dụ làm 2 route đơn giản cho kịch bản truyện, chọn A thì ra phân cảnh khác khác, chọn B thì ra phân cảnh khác. Hỗ trợ phím tab để chuyển đổi các option.
-[ ] Task 2.2:  viết v2 gameStory/app.cpp - nút skip để bỏ qua phần cốt truyện
-    - Comment codeblock này trong gamestory/app.cpp là: gamestory-nut-bo-qua-cot-truyen-04
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí trước 03 và sau 05
+    - Viết và kiểm tra build.sh và build.ps1 để:
+        + Hỏi build đơn lẻ từng module hay tích hợp toàn bộ.
+        + Với build.sh tự xác định hệ điều hành (macos hay ubuntu), build.ps1 thì mặc định là window rồi chạy các cài đặt tiếp. 
+        + Kiểm tra môi trường hệ điều hành hiện tại đã cài các công cụ cần thiết đúng version chưa? Nếu chưa hoặc thấp hơn version tối thiểu thì dừng script yêu cầu cài đặt.
+        + Nếu các công cụ cài đặt đầy đủ thì tiến hành build và để trong build/wasm, kết thúc có hướng dẫn cách chạy trên file build trên localhost.
+### V2
+[ ] Task 2.1: viết v2 gameStory/app.cpp - tạo dialogue story đơn giản để giới thiệu game kèm nhạc nền phù hợp.
+    - Comment codeblock này trong gamestory/app.cpp là: gamestory-phan-cot-game-04
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 03 và trước 05.
+    - Cần hỗ trợ phím enter và space thay vì chỉ click next để chuyển tiếp cảnh.
+    - Cần đa dạng chuyển cảnh, ví dụ làm 2 route đơn giản cho kịch bản truyện, chọn A thì ra phân cảnh khác, chọn B thì ra phân cảnh khác. Hỗ trợ phím tab để chuyển đổi các option.
+[ ] Task 2.2: viết v2 gameStory/app.cpp - nút skip để bỏ qua phần cốt truyện.
+    - Comment codeblock này trong gamestory/app.cpp là: gamestory-nut-bo-qua-cot-truyen-05
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 04 và trước 06.
     - Sau khi skip chuyển qua nhịp nhàng phần game console.
-[ ] Task 3.1: viết v3 gameStory/app.cpp - download âm thanh và các hình ảnh trong story mỗi lần khởi động qua API thay vì build trực tiếp vào .exe file
-    - Comment codeblock này trong gamestory/app.cpp là: gamestory-tich-hop-backend-04
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 04 và trước 06
-    - Trừ loading bar, Không để các file ảnh nặng và nhạc nền trong file .exe nữa mà sẽ phải gọi API để download các hình ảnh rồi mới chạy được phần cốt game
-    - Tự động skip nếu không kêt nối internet.
-[ ] Task 3.2: viết v3 gameStory/app.cpp - thay tốc độ loading bar bằng tốc độ download và repeat hiệu ứng logo cho đến khi download xong hết
-    - Comment codeblock này trong gamestory/app.cpp là: gamestory-hieu-chinh-loading-bar-theo-download-speed-06
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí cuối cùng
-    - Như tên task, tác vụ này nhằm đảm bảo cốt chuyện đầy đủ rồi mới chạy
-    - Mục tiêu đưa các media lên đám mây để lưu trữ không build trực tiếp vào file
+[ ] Task 2.3: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp
+    - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là: integration/v2
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v1
+### V3
+[ ] Task 3.1: viết v3 gameStory/app.cpp - download âm thanh và các hình ảnh trong story mỗi lần khởi động qua API thay vì build trực tiếp vào .exe file.
+    - Comment codeblock này trong gamestory/app.cpp là: gamestory-tich-hop-backend-06
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau 05 và trước 07.
+    - Trừ loading bar, không để các file ảnh nặng và nhạc nền trong file .exe nữa mà sẽ phải gọi API để download các hình ảnh rồi mới chạy được phần cốt game.
+    - Tự động skip nếu không kết nối internet.
+[ ] Task 3.2: viết v3 gameStory/app.cpp - thay tốc độ loading bar bằng tốc độ download, hiển thị phần dowload và tốc độ download và repeat hiệu ứng logo cho đến khi download xong hết.
+    - Comment codeblock này trong gamestory/app.cpp là: gamestory-hieu-chinh-loading-bar-theo-download-speed-07
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí cuối cùng.
+    - Như tên task, tác vụ này nhằm đảm bảo cốt truyện tải đầy đủ rồi mới chạy.
+    - Mục tiêu đưa các media lên đám mây để lưu trữ, không build trực tiếp vào file.
+[ ] Task 3.3: tích hợp v3 với các modules còn lại trong app/src qua file app/main.cpp
+    - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là: integration/v3
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v2
+## Issues (Changes, Bugs and Usabilities)
+### V1
+[x] Issue 1.1: Cơ chế tự động sinh file header SVG (gameStory_corp_svg.h, gameStory_logo_svg.h) thông qua build.sh.
+    - Code thực tế đã nhúng cứng mã SVG (raw string literal) tại thời điểm compile-time thay vì load file vật lý lúc runtime.
+    - Các file `gameStory_logo.svg` và `gameStory_corp.svg` đã bị xóa để thực thi chiến lược không phát sinh file hình ảnh khi build.
+[x] Issue 1.2: Bổ sung ký tự Copyright (©) trên thanh tiêu đề của hệ điều hành.
+    - Tên cửa sổ được ghép mã UTF-8 `\xC2\xA9` (thành "cTetris ©" và "Game Story © - Standalone").
+    - Ký tự này được đẩy cho window manager của hệ điều hành xử lý trực tiếp thay vì vẽ bằng SDL_RenderDebugText (do giới hạn chỉ hỗ trợ bảng mã ASCII).
+[x] Issue 1.3: Tinh chỉnh độ dày font chữ (Thinning Effect) bằng màu sắc.
+    - Text hiển thị tên game ("C T E T R I S") và credit ("Powered up by ") sử dụng màu xám nhạt (RGB: 220, 220, 220) thay vì màu trắng (255, 255, 255).
+    - Kỹ thuật này được áp dụng để tạo cảm giác nét chữ "mỏng" và "nhẹ" hơn khi render bằng font mặc định của hệ thống SDL.
+[x] Issue 1.4: Tăng thời lượng Loading Bar (INTRO_DURATION) lên 8 giây.
+    - Hằng số INTRO_DURATION được thiết lập là 8000ms thay vì 3000ms như dự kiến ban đầu.
+    - Sự thay đổi này nhằm đáp ứng thời gian hiển thị cốt truyện dài hơn, đồng thời đảm bảo đủ thời gian chờ tải assets/network khi chạy trên môi trường WASM.
+[x] Issue 1.5: Sai lệch vai trò giữa Logo Game và Logo UIT so với Task 1.3.
+    - Task 1.3 ghi nhận Logo UIT là logo chính ở giữa màn hình.
+    - Tuy nhiên, mã nguồn thiết lập `LOGO_SVG_DATA` (logo game cTetris - 3x3 ô vuông) làm logo chính cho hiệu ứng intro, trong khi `CORP_SVG_DATA` (logo trường đại học UIT) bị đẩy xuống làm logo phụ đính kèm ở phần credit "Powered up by".
+### V2
+[ ] bổ sung sau
+### V3
+[ ] bổ sung sau
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.
     - Các *.h phải để trong thư mục include của ứng dụng (app/src/gameStory/include).
-    - Cần tách 1 file layout.h (app/src/gameStory/include/layout.h) để đảm bảo ứng dụng chạy theo khung hình có tỷ lệ 9:16 trên windown.
-    - Cần tạo thành công build file từ app.cpp để chạy trên macos và ubuntu.
-    - Các file hình ảnh, âm thanh, phim ... phải để trong chính thư mục đang làm việc và đặt tên bắt đầu bằng tiền tố là tên thư mục. VD: cần thêm 1 file nhạc nền tên music.mp3 cho gameStory thì phải để trong app/src/gameStory/gameStory_music.mp3
+    - Cần tách 1 file layout.h (app/src/gameStory/include/layout.h) để đảm bảo ứng dụng chạy theo khung hình có tỷ lệ 9:16.
+    - Các file hình ảnh, âm thanh, phim... phải để trong chính thư mục đang làm việc và đặt tên bắt đầu bằng tiền tố là tên thư mục. VD: cần thêm 1 file nhạc nền tên music.mp3 cho gameStory thì phải để trong app/src/gameStory/gameStory_music.mp3.
