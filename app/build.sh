@@ -325,7 +325,15 @@ build_sdl3_from_source() {
         cmake_cmd="emcmake cmake"
         extra_flags=(-DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TESTS=OFF -DSDL_TEST_LIBRARY=OFF)
     else
-        extra_flags=(-DSDL_SHARED=ON -DSDL_X11=ON -DSDL_OPENGL=ON -DSDL_OPENGLES=ON)
+        # FIX: Force disable optional features khong dung trong cTetris -- giam
+        # mat ~12 dev packages khi build CI Ubuntu (dbus/udev/wayland/pulse/alsa/ibus).
+        # Game chi can X11 + OpenGL + dummy audio (chua co audio system).
+        # Neu sau nay can audio: doi SDL_DUMMYAUDIO=OFF + SDL_PULSEAUDIO=ON.
+        extra_flags=(-DSDL_SHARED=ON
+                     -DSDL_X11=ON -DSDL_OPENGL=ON -DSDL_OPENGLES=ON
+                     -DSDL_PULSEAUDIO=ON -DSDL_ALSA=ON
+                     -DSDL_WAYLAND=OFF -DSDL_KMSDRM=OFF
+                     -DSDL_SNDIO=OFF -DSDL_IBUS=OFF -DSDL_HIDAPI_LIBUSB=OFF)
     fi
 
     eval "$cmake_cmd" -S "$sdl_src" -B "$sdl_build" \

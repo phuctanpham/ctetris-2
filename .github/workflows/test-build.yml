@@ -61,11 +61,10 @@ jobs:
             build-essential pkg-config ninja-build
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev
             libxi-dev libxinerama-dev
-            libwayland-dev libxkbcommon-dev wayland-protocols
-            libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev
+            libgl1-mesa-dev libgles2-mesa-dev
             libpulse-dev libasound2-dev
-            libdbus-1-dev libudev-dev libibus-1.0-dev
-          version: 3.0
+            libdbus-1-dev libudev-dev
+          version: 5.0
           execute_install_scripts: true
 
       # ---------- Windows setup ----------
