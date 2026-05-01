@@ -244,106 +244,14 @@ ensure_emsdk() {
 }
 
 # =============================================================================
-# SDL3 native -- uu tien package manager truoc, build tu source la fallback
-# Priority chain:
-#   1. pkg-config --exists sdl3 (da cai qua brew/apt/distro)
-#   2. sdl3-config tren PATH (cu hon, mot so distro van con)
-#   3. Cai qua brew (macos) hoac qua apt-get/dnf/pacman (linux)
-#   4. Build tu source vao $DOWNLOAD_DIR/sdl3-native/, install local
+# SDL3 native -- always source-build to match Windows behavior.
+# (Removed: pkg-config detection, sdl3-config detection, brew/apt/dnf/pacman
+#  package manager paths. All OSes now use $DOWNLOAD_DIR/sdl3-native/.)
 # =============================================================================
 ensure_sdl3_native() {
-    log_info "Checking SDL3 cho native build (priority chain)..."
-
-    # Priority 1: pkg-config --exists sdl3 (chuan moi nhat, brew + distro deu cap)
-    log_info "  [1/4] Try pkg-config --exists sdl3..."
-    if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists sdl3 2>/dev/null; then
-        local v; v=$(pkg-config --modversion sdl3)
-        DETECTED_SDL3_VERSION="$v"
-        log_ok "Found via pkg-config (version $v) -- skip install"
-        log_info "WASM build se khop dung version $v de tranh dij ban native vs wasm"
-        return 0
-    fi
-    log_info "  ... pkg-config khong co SDL3 (hoac pkg-config khong co)"
-
-    # Priority 2: sdl3-config tren PATH (legacy, mot so distro van con)
-    log_info "  [2/4] Try sdl3-config tren PATH..."
-    if command -v sdl3-config >/dev/null 2>&1; then
-        local v; v=$(sdl3-config --version 2>/dev/null)
-        DETECTED_SDL3_VERSION="$v"
-        log_ok "Found via sdl3-config (version $v) -- skip install"
-        return 0
-    fi
-    log_info "  ... sdl3-config khong co"
-
-    # Priority 3: package manager (brew/apt/dnf/pacman)
-    log_info "  [3/4] Try install qua package manager..."
-    case "$OS_NAME" in
-        macos)
-            if command -v brew >/dev/null 2>&1; then
-                if is_brew_formula_installed sdl3; then
-                    log_ok "Brew formula 'sdl3' da cai (re-check pkg-config sau install path)"
-                else
-                    log_info "Cai SDL3 qua Homebrew..."
-                    brew install sdl3
-                fi
-                if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists sdl3 2>/dev/null; then
-                    local v; v=$(pkg-config --modversion sdl3)
-                    DETECTED_SDL3_VERSION="$v"
-                    log_ok "Found via brew + pkg-config (version $v)"
-                    log_info "WASM build se khop dung version $v de tranh dij ban"
-                    return 0
-                fi
-                log_warn "Brew co cai sdl3 nhung pkg-config khong thay -- check PKG_CONFIG_PATH"
-            else
-                log_warn "Khong co Homebrew tren macOS"
-            fi
-            ;;
-        ubuntu)
-            # Ubuntu 24.04 da co libsdl3-dev trong universe (3.0+). Thu apt truoc.
-            if command -v apt-get >/dev/null 2>&1; then
-                log_info "Thu cai libsdl3-dev qua apt..."
-                # Removed install_apt_packages_if_missing libsdl3-dev (no package install in CI)
-                if pkg-config --exists sdl3 2>/dev/null; then
-                    local v; v=$(pkg-config --modversion sdl3)
-                    DETECTED_SDL3_VERSION="$v"
-                    log_ok "Found via apt libsdl3-dev (version $v)"
-                    log_info "WASM build se khop dung version $v"
-                    return 0
-                fi
-                log_info "apt khong co libsdl3-dev (Ubuntu < 24.04?), fallback source"
-            fi
-            ;;
-        fedora)
-            if command -v dnf >/dev/null 2>&1; then
-                log_info "Thu cai SDL3 qua dnf..."
-                install_dnf_packages_if_missing SDL3-devel || true
-                if pkg-config --exists sdl3 2>/dev/null; then
-                    local v; v=$(pkg-config --modversion sdl3)
-                    DETECTED_SDL3_VERSION="$v"
-                    log_ok "Found via dnf (version $v)"
-                    return 0
-                fi
-            fi
-            ;;
-        arch)
-            if command -v pacman >/dev/null 2>&1; then
-                log_info "Thu cai SDL3 qua pacman..."
-                install_pacman_packages_if_missing sdl3 || true
-                if pkg-config --exists sdl3 2>/dev/null; then
-                    local v; v=$(pkg-config --modversion sdl3)
-                    DETECTED_SDL3_VERSION="$v"
-                    log_ok "Found via pacman (version $v)"
-                    return 0
-                fi
-            fi
-            ;;
-    esac
-
-    # Priority 4: Build tu source local (last resort)
-    log_info "  [4/4] Build tu source vao $DOWNLOAD_DIR/sdl3-native/..."
-    log_info "Package manager khong co SDL3, fallback ve source build version $SDL3_VERSION"
+    log_info "SDL3 native -> source-build $SDL3_VERSION vao $DOWNLOAD_DIR/sdl3-native/"
     DETECTED_SDL3_VERSION="$SDL3_VERSION"
-    ensure_linux_dev_libs   # X11/Wayland/OpenGL... can cho native build
+    ensure_linux_dev_libs   # no-op tren macOS; cai X11/Wayland/GL dev libs tren Linux
     build_sdl3_from_source "$DOWNLOAD_DIR/sdl3-native" "native" "$SDL3_VERSION"
 }
 
@@ -654,7 +562,6 @@ build_native() {
 build_wasm() {
     log_info "Build WASM mode -> $BUILD_WASM_DIR"
     validate_sources
-    ensure_basic_tools
 
     # Native va WASM dung CHUNG version SDL3 -- ensure_sdl3_native chay
     # truoc de detect version brew/apt/dnf cai (set DETECTED_SDL3_VERSION),
