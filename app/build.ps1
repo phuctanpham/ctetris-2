@@ -119,6 +119,26 @@ function Initialize-Nanosvg {
 }
 
 # =============================================================================
+# FIX: Import-EmsdkEnv -- source emsdk_env.bat vao PowerShell session hien tai.
+# emsdk chi ship emsdk_env.bat (KHONG co emsdk_env.ps1). Phai chay qua
+# cmd /c de bat ENV vars tu .bat vao process PowerShell hien tai.
+# =============================================================================
+function Import-EmsdkEnv {
+    param([string]$EmsdkRoot)
+    $bat = Join-Path $EmsdkRoot 'emsdk_env.bat'
+    if (-not (Test-Path $bat)) {
+        Write-Warn "Khong tim thay $bat -- bo qua source env"
+        return
+    }
+    Write-Info "Source emsdk env tu $bat..."
+    cmd /c "call `"$bat`" > nul 2>&1 && set" | ForEach-Object {
+        if ($_ -match '^([^=]+)=(.*)$') {
+            [System.Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+        }
+    }
+}
+
+# =============================================================================
 # emsdk -- multi-source detection priority
 #   1. em++ on PATH + version OK
 #   2. $env:USERPROFILE\emsdk (user install)
@@ -138,11 +158,11 @@ function Initialize-Emsdk {
     }
 
     # Priority 2: ~/emsdk
+    # FIX: kiem tra emsdk_env.bat (khong phai .ps1 -- file do khong ton tai)
     $userEmsdk = Join-Path $env:USERPROFILE 'emsdk'
-    $userEnv   = Join-Path $userEmsdk 'emsdk_env.ps1'
-    if (Test-Path $userEnv) {
+    if (Test-Path (Join-Path $userEmsdk 'emsdk_env.bat')) {
         Write-Info "Phat hien $userEmsdk -- dung emsdk cua user"
-        & $userEnv | Out-Null
+        Import-EmsdkEnv $userEmsdk
         if (Get-Command em++ -ErrorAction SilentlyContinue) {
             $cur = (em++ --version 2>$null | Select-Object -First 1) `
                     -replace '.*?(\d+\.\d+\.\d+).*','$1'
@@ -156,17 +176,17 @@ function Initialize-Emsdk {
                 & .\emsdk.bat install $EmsdkVersion
                 & .\emsdk.bat activate $EmsdkVersion
             } finally { Pop-Location }
-            & $userEnv | Out-Null
+            Import-EmsdkEnv $userEmsdk
             return
         }
     }
 
     # Priority 3: managed download
-    $managed    = Join-Path $DownloadDir 'emsdk'
-    $managedEnv = Join-Path $managed 'emsdk_env.ps1'
-    if (Test-Path $managedEnv) {
+    # FIX: kiem tra emsdk_env.bat (khong phai .ps1)
+    $managed = Join-Path $DownloadDir 'emsdk'
+    if (Test-Path (Join-Path $managed 'emsdk_env.bat')) {
         Write-Info "Phat hien managed emsdk tai $managed"
-        & $managedEnv | Out-Null
+        Import-EmsdkEnv $managed
         if (Get-Command em++ -ErrorAction SilentlyContinue) {
             $cur = (em++ --version 2>$null | Select-Object -First 1) `
                     -replace '.*?(\d+\.\d+\.\d+).*','$1'
@@ -181,7 +201,7 @@ function Initialize-Emsdk {
             & .\emsdk.bat install $EmsdkVersion
             & .\emsdk.bat activate $EmsdkVersion
         } finally { Pop-Location }
-        & $managedEnv | Out-Null
+        Import-EmsdkEnv $managed
         return
     }
 
@@ -194,7 +214,7 @@ function Initialize-Emsdk {
         & .\emsdk.bat install $EmsdkVersion
         & .\emsdk.bat activate $EmsdkVersion
     } finally { Pop-Location }
-    & $managedEnv | Out-Null
+    Import-EmsdkEnv $managed   # FIX: dung Import-EmsdkEnv thay vi & .ps1
     Write-Ok "emsdk active: $(em++ --version | Select-Object -First 1)"
 }
 
@@ -309,7 +329,8 @@ function Build-Sdl3FromSource {
 function Copy-DesktopIcon {
     param([string]$OutDir)
     New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-    $icoSrc = Join-Path $BrandkitDir 'cTetris.ico'
+    # FIX: dung 'logo.ico' (ten file trong brandkit), khong phai 'cTetris.ico'
+    $icoSrc = Join-Path $BrandkitDir 'logo.ico'
     $icoDst = Join-Path $OutDir 'cTetris.ico'
     if (Test-Path $icoSrc) {
         Copy-Item -Force $icoSrc $icoDst
@@ -499,11 +520,21 @@ function Build-Wasm {
                   -DNANOSVG_INCLUDE_DIR=(Join-Path $DownloadDir 'nanosvg')
     cmake --build $BuildWasmDir -j
 
+    # Favicon SVG-driven
     if (Test-Path $BrandLogoSvg) {
         Copy-Item -Force $BrandLogoSvg (Join-Path $BuildWasmDir 'favicon.svg')
         Write-Ok 'Copy favicon.svg (SVG-driven)'
     } else {
         Write-Warn "Khong co $BrandLogoSvg"
+    }
+
+    # FIX: Fallback favicon.ico cho browser khong ho tro SVG favicon
+    $brandIco = Join-Path $BrandkitDir 'logo.ico'
+    if (Test-Path $brandIco) {
+        Copy-Item -Force $brandIco (Join-Path $BuildWasmDir 'favicon.ico')
+        Write-Ok 'Copy favicon.ico (ICO fallback)'
+    } else {
+        Write-Warn "Khong co $brandIco, favicon.ico fallback se thieu"
     }
 
     # PWA assets -- copy tu web/ (da commit san, khong sinh on-the-fly)
