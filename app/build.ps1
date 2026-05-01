@@ -41,7 +41,7 @@ $WebDir        = Join-Path $AppDir 'web'
 $CmakeMinVersion   = '3.16'
 $EmsdkVersion      = '3.1.72'
 $Sdl3VersionMin    = '3.2.0'
-$Sdl3Version       = '3.2.18'   # default pin
+$Sdl3Version       = '3.4.4'   # default pin
 $DetectedSdl3Version = ''        # se duoc set boi Initialize-Sdl3Native
 
 # -----------------------------------------------------------------------------
@@ -320,8 +320,11 @@ function Build-Sdl3FromSource {
         $cfg += @('-DSDL_SHARED=ON')
         & cmake @cfg
     }
-    & cmake --build $sdlBuild --config Release -j   # FIX: multi-config MSVC can --config
-    & cmake --install $sdlBuild --config Release     # FIX: install dung config Release
+    if ($LASTEXITCODE -ne 0) { throw "SDL3 $Target configure failed" }
+    & cmake --build $sdlBuild --config Release -j
+    if ($LASTEXITCODE -ne 0) { throw "SDL3 $Target build failed" }
+    & cmake --install $sdlBuild --config Release
+    if ($LASTEXITCODE -ne 0) { throw "SDL3 $Target install failed" }
     Write-Ok "SDL3 $Version ($Target) da install vao $InstallPrefix"
 }
 
@@ -477,7 +480,9 @@ function Build-Native {
         "-DNANOSVG_INCLUDE_DIR=$(Join-Path $DownloadDir 'nanosvg')"
     ) + $sdlDirArgs + $iconArg
     & cmake @nativeArgs
-    cmake --build $BuildNativeDir --config Release -j
+    if ($LASTEXITCODE -ne 0) { throw "Native configure failed (exit $LASTEXITCODE)" }
+    & cmake --build $BuildNativeDir --config Release -j
+    if ($LASTEXITCODE -ne 0) { throw "Native build failed (exit $LASTEXITCODE)" }
     Write-Ok "Native build hoan tat: $BuildNativeDir"
 }
 
@@ -528,6 +533,17 @@ function Build-Wasm {
         "-DNANOSVG_INCLUDE_DIR=$(Join-Path $DownloadDir 'nanosvg')"
     )
     & emcmake cmake @wasmArgs
+    if ($LASTEXITCODE -ne 0) { throw "emcmake configure failed (exit $LASTEXITCODE)" }
+
+    # FIX: build step (parity voi build.sh line 699: `cmake --build "$BUILD_WASM_DIR" -j`)
+    & cmake --build $BuildWasmDir --parallel
+    if ($LASTEXITCODE -ne 0) { throw "WASM cmake --build failed (exit $LASTEXITCODE)" }
+
+    # Verify deploy-pages.yml expected artifacts
+    foreach ($f in @('cTetris.html','cTetris.js','cTetris.wasm')) {
+        $p = Join-Path $BuildWasmDir $f
+        if (-not (Test-Path $p)) { throw "Missing build artifact: $p" }
+    }
 
     # Favicon SVG-driven
     if (Test-Path $BrandLogoSvg) {
