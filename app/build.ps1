@@ -468,13 +468,15 @@ function Build-Native {
     }
 
     New-Item -ItemType Directory -Force -Path $BuildNativeDir | Out-Null
-    cmake -S $AppDir -B $BuildNativeDir `
-          -DCMAKE_BUILD_TYPE=Release `
-          -DBUILD_WASM=OFF `
-          -DCMAKE_PREFIX_PATH=$sdlInstall `
-          -DNANOSVG_INCLUDE_DIR=(Join-Path $DownloadDir 'nanosvg') `
-          @sdlDirArgs `
-          @iconArg
+        $nativeArgs = @(
+        '-S', $AppDir,
+        '-B', $BuildNativeDir,
+        '-DCMAKE_BUILD_TYPE=Release',
+        '-DBUILD_WASM=OFF',
+        "-DCMAKE_PREFIX_PATH=$sdlInstall",
+        "-DNANOSVG_INCLUDE_DIR=$(Join-Path $DownloadDir 'nanosvg')"
+    ) + $sdlDirArgs + $iconArg
+    & cmake @nativeArgs
     cmake --build $BuildNativeDir --config Release -j
     Write-Ok "Native build hoan tat: $BuildNativeDir"
 }
@@ -515,14 +517,17 @@ function Build-Wasm {
     Write-Info "SDL3_DIR = $sdlDir"
 
     New-Item -ItemType Directory -Force -Path $BuildWasmDir | Out-Null
-    emcmake cmake -S $AppDir -B $BuildWasmDir `
-                  -DCMAKE_BUILD_TYPE=Release `
-                  -DBUILD_WASM=ON `
-                  -G Ninja `                         # FIX: bat buoc Ninja cho Emscripten
-                  -DSDL3_DIR=$sdlDir `
-                  -DCMAKE_PREFIX_PATH=$sdlInstall `
-                  -DNANOSVG_INCLUDE_DIR=(Join-Path $DownloadDir 'nanosvg')
-    cmake --build $BuildWasmDir -j
+    $wasmArgs = @(
+        '-S', $AppDir,
+        '-B', $BuildWasmDir,
+        '-DCMAKE_BUILD_TYPE=Release',
+        '-DBUILD_WASM=ON',
+        '-G', 'Ninja',
+        "-DSDL3_DIR=$sdlDir",
+        "-DCMAKE_PREFIX_PATH=$sdlInstall",
+        "-DNANOSVG_INCLUDE_DIR=$(Join-Path $DownloadDir 'nanosvg')"
+    )
+    & emcmake cmake @wasmArgs
 
     # Favicon SVG-driven
     if (Test-Path $BrandLogoSvg) {
