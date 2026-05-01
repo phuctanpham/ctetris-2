@@ -11,14 +11,14 @@
 #   - WASM build chi can copy mot file favicon.svg duy nhat. Khong copy
 #     manifest.webmanifest va khong copy sw.js -- yeu cau v1 la disable
 #     PWA install prompt va dung SVG-driven favicon thay vi PNG.
-#
+#f
 # THAY DOI v3 (SDL3 self-built cho WASM):
 #   - DROP "-sUSE_SDL=3" (Emscripten port khong hoat dong on dinh tren
 #     moi version emsdk -- 3.1.72 thieu / loi port SDL3).
 #   - Thay vao do, cTetris find_package(SDL3 CONFIG) cho CA HAI branch:
 #     * Native: SDL3 cai tu Homebrew/distro/source vao /usr/local hoac
 #       /opt/homebrew (find_package tu nhan).
-#     * WASM:   build.sh tu build SDL3 tinh tai $APP_DIR/.sdl3-wasm/ va
+#     * WASM:   build.sh hoặc build.ps1 tu build SDL3 tinh tai $APP_DIR/.sdl3-wasm/ va
 #       truyen vao -DCMAKE_PREFIX_PATH; find_package se tim duoc.
 #   - Loi the: dung cung mot trinh tu link SDL3::SDL3 cho moi platform,
 #     chi khac nhau o link options dac thu cua Emscripten.
@@ -58,7 +58,7 @@ add_executable(cTetris ${GAME_SOURCES})
 target_include_directories(cTetris PRIVATE ${GAME_INCLUDE_DIRS})
 
 # -----------------------------------------------------------------------------
-# nanosvg headers: build.sh truyen path qua -DNANOSVG_INCLUDE_DIR.
+# nanosvg headers: build.sh hoặc build.ps1 truyen path qua -DNANOSVG_INCLUDE_DIR.
 # Neu khong co (vi du user mo project trong IDE truc tiep), thu tim trong
 # source tree (vendored) hoac libs/<OS>/downloads/nanosvg/.
 # -----------------------------------------------------------------------------
@@ -74,7 +74,7 @@ endif()
 # -----------------------------------------------------------------------------
 # SDL3 dependency: tim qua CMake config package.
 # Cho native build, SDL3 nam o /usr/local/lib/cmake/SDL3 hoac
-# /opt/homebrew/lib/cmake/SDL3 (Homebrew silicon). Cho WASM build, build.sh
+# /opt/homebrew/lib/cmake/SDL3 (Homebrew silicon). Cho WASM build, build.sh hoặc build.ps1
 # install SDL3 tinh vao $APP_DIR/libs/<OS>/downloads/sdl3-wasm/ va truyen
 # -DSDL3_DIR=... + -DCMAKE_PREFIX_PATH=... khi goi emcmake.
 # -----------------------------------------------------------------------------
@@ -130,7 +130,7 @@ else()
 
     # ---------------------------------------------------------------------
     # macOS bundle: embed icon .icns vao Resources cua .app neu duoc cung
-    # cap qua -DCTETRIS_ICON_PATH (do build.sh sinh tu brandkit/logo.svg
+    # cap qua -DCTETRIS_ICON_PATH (do build.sh hoặc build.ps1 sinh tu brandkit/logo.svg
     # bang iconutil + sips + rsvg-convert). Neu khong co, OS dung icon
     # mac dinh.
     # ---------------------------------------------------------------------

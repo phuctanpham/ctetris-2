@@ -311,16 +311,17 @@ function Build-Sdl3FromSource {
         '-DCMAKE_BUILD_TYPE=Release',
         "-DCMAKE_INSTALL_PREFIX=$InstallPrefix"
     )
-    if ($Target -eq 'wasm') {
+        if ($Target -eq 'wasm') {
         $cfg += @('-DSDL_SHARED=OFF', '-DSDL_STATIC=ON',
-                  '-DSDL_TESTS=OFF', '-DSDL_TEST_LIBRARY=OFF')
+                  '-DSDL_TESTS=OFF', '-DSDL_TEST_LIBRARY=OFF',
+                  '-G', 'Ninja')   # FIX: Emscripten tren Windows bat buoc Ninja
         & emcmake cmake @cfg
     } else {
         $cfg += @('-DSDL_SHARED=ON')
         & cmake @cfg
     }
-    & cmake --build $sdlBuild -j
-    & cmake --install $sdlBuild
+    & cmake --build $sdlBuild --config Release -j   # FIX: multi-config MSVC can --config
+    & cmake --install $sdlBuild --config Release     # FIX: install dung config Release
     Write-Ok "SDL3 $Version ($Target) da install vao $InstallPrefix"
 }
 
@@ -484,8 +485,10 @@ function Build-Wasm {
     Initialize-WindowsTools
 
     # Detect version SDL3 native truoc -- WASM build se MATCH version do
-    Write-Info 'Detect SDL3 native version de match cho WASM...'
-    Initialize-Sdl3Native
+    # FIX: wrap try/catch -- neu khong co native SDL3 thi dung pin $Sdl3Version
+    Write-Info 'Detect SDL3 native version de match cho WASM (best effort)...'
+    try { Initialize-Sdl3Native }
+    catch { Write-Warn "Khong detect duoc SDL3 native -- dung version pin $Sdl3Version" }
 
     Initialize-Emsdk
     Initialize-Sdl3Wasm
@@ -515,6 +518,7 @@ function Build-Wasm {
     emcmake cmake -S $AppDir -B $BuildWasmDir `
                   -DCMAKE_BUILD_TYPE=Release `
                   -DBUILD_WASM=ON `
+                  -G Ninja `                         # FIX: bat buoc Ninja cho Emscripten
                   -DSDL3_DIR=$sdlDir `
                   -DCMAKE_PREFIX_PATH=$sdlInstall `
                   -DNANOSVG_INCLUDE_DIR=(Join-Path $DownloadDir 'nanosvg')
