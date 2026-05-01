@@ -80,7 +80,7 @@ jobs:
           cp app/build/wasm/ubuntu/cTetris.js    public/
           cp app/build/wasm/ubuntu/cTetris.wasm  public/
           # Static assets -- copy neu ton tai (build.sh da copy tu web/ va brandkit/)
-          for asset in favicon.svg manifest.webmanifest sw.js; do
+          for asset in favicon.svg favicon.ico manifest.webmanifest sw.js; do
             if [ -f "app/build/wasm/ubuntu/$asset" ]; then
               cp "app/build/wasm/ubuntu/$asset" "public/$asset"
             else

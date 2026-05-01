@@ -705,6 +705,14 @@ build_wasm() {
     else
         log_warn "Khong co $BRAND_LOGO_SVG, favicon se thieu"
     fi
+    # Fallback favicon.ico cho browser khong ho tro SVG favicon
+    local brand_ico="$BRANDKIT_DIR/logo.ico"
+    if [ -f "$brand_ico" ]; then
+        cp "$brand_ico" "$BUILD_WASM_DIR/favicon.ico"
+        log_ok "Copy favicon.ico (ICO fallback)"
+    else
+        log_warn "Khong co $brand_ico, favicon.ico fallback se thieu"
+    fi
 
     # PWA assets -- copy tu web/ (da commit san, khong sinh on-the-fly)
     # manifest.webmanifest + sw.js can thiet de browser hien nut Install
