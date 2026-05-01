@@ -176,11 +176,14 @@ else()
     # ---------------------------------------------------------------------
     if(WIN32)
         if(CTETRIS_ICON_PATH AND EXISTS "${CTETRIS_ICON_PATH}")
-            # Embed .ico in .exe via .rc resource file
+            # FIX: rc.exe interprets \a \b \t \n... nhu C escape sequences trong
+            # quoted strings. Raw Windows backslash path -> path mangled.
+            # Convert sang forward slashes (rc.exe accept ca 2 dang).
+            file(TO_CMAKE_PATH "${CTETRIS_ICON_PATH}" _icon_rc_path)
             set(_rc_file "${CMAKE_BINARY_DIR}/cTetris_icon.rc")
-            file(WRITE "${_rc_file}" "IDI_ICON1 ICON DISCARDABLE \"${CTETRIS_ICON_PATH}\"\n")
+            file(WRITE "${_rc_file}" "IDI_ICON1 ICON DISCARDABLE \"${_icon_rc_path}\"\n")
             target_sources(cTetris PRIVATE "${_rc_file}")
-            message(STATUS "[cTetris] Windows icon embedded: ${CTETRIS_ICON_PATH}")
+            message(STATUS "[cTetris] Windows icon embedded: ${_icon_rc_path}")
         else()
             message(STATUS "[cTetris] Windows icon: default (CTETRIS_ICON_PATH not set)")
         endif()
