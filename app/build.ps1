@@ -41,7 +41,7 @@ $WebDir        = Join-Path $AppDir 'web'
 $CmakeMinVersion   = '3.16'
 $EmsdkVersion      = '3.1.72'
 $Sdl3VersionMin    = '3.2.0'
-$Sdl3Version       = '3.4.4'   # default pin
+$Sdl3Version       = '3.2.18'   # default pin
 $DetectedSdl3Version = ''        # se duoc set boi Initialize-Sdl3Native
 
 # -----------------------------------------------------------------------------
