@@ -113,7 +113,7 @@ jobs:
           exit ${PIPESTATUS[0]}
 
       # ===================================================================
-      # Debug: dump build/ tree va upload logs khi fail
+      # Debug: dump build/ tree & upload logs khi fail
       # ===================================================================
       - name: List build output
         if: always()
