@@ -357,6 +357,14 @@ static const char* GUIDE_LINES[] = {
     "Tip: hold SPEED BOOST",
     "to make piece drop 5x faster.",
     "",
+    "Mobile swipe gestures:",
+    " - Swipe piece L: move L",
+    " - Swipe piece R: move R",
+    " - Swipe board U: rotate CCW",
+    " - Swipe board D: rotate CW",
+    " (piece = falling block)",
+    " (board = empty cells)",
+    "",
     "Press X or ESC to close.",
 };
 static const int GUIDE_LINE_COUNT = (int)(sizeof(GUIDE_LINES)/sizeof(GUIDE_LINES[0]));

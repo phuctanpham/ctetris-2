@@ -212,6 +212,20 @@ static bool hitTest(const SDL_FRect& r, float x, float y) {
     return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 }
 
+// Touch swipe: returns true if screen point (mx,my) lands on any cell of the falling block
+static bool isTouchOnFallingBlock(const GameState& state, float mx, float my) {
+    for (int i = 0; i < 4; i++) {
+        int gx = state.currentBlock.x + state.currentBlock.blocks[i].x;
+        int gy = state.currentBlock.y + state.currentBlock.blocks[i].y;
+        float cellX = (float)(gx * BLOCK_SIZE);
+        float cellY = (float)(gy * BLOCK_SIZE);
+        if (mx >= cellX && mx < cellX + BLOCK_SIZE &&
+            my >= cellY && my < cellY + BLOCK_SIZE)
+            return true;
+    }
+    return false;
+}
+
 static void drawSmallText(SDL_Renderer* renderer, float x, float y, float scale, const char* text) {
     SDL_SetRenderScale(renderer, scale, scale);
     SDL_RenderDebugText(renderer, x / scale, y / scale, text);
@@ -579,6 +593,12 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer) {
     const Uint32 FALL_INTERVAL_FAST   = 500 / 5;
 
     bool quitRequested = false;
+    // Swipe gesture state (touch / mobile)
+    bool  swipeActive    = false;
+    float swipeStartX    = 0.0f;
+    float swipeStartY    = 0.0f;
+    bool  swipeOnBlock   = false;   // true = finger started on falling block
+    const float SWIPE_THRESHOLD = 15.0f;
 
     while (true) {
         Uint32 nowMs = SDL_GetTicks();
@@ -681,11 +701,36 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer) {
                     } else if (hitTest(RECT_SPEED_BTN, mx, my)) {
                         state.speedHeld = true;
                     }
+                    // Board-zone swipe start: record only when game is live and touch is left of sidebar
+                    if (mx < (float)BOARD_W && !state.showQuitPopup &&
+                        !state.isPaused && !state.isGameOver) {
+                        swipeActive  = true;
+                        swipeStartX  = mx;
+                        swipeStartY  = my;
+                        swipeOnBlock = isTouchOnFallingBlock(state, mx, my);
+                    }
                 }
             }
 
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
                 event.button.button == SDL_BUTTON_LEFT) {
+                // Swipe gesture recognition — fires on finger lift
+                if (swipeActive) {
+                        float dx  = event.button.x - swipeStartX;
+                    float dy  = event.button.y - swipeStartY;
+                    float adx = (dx < 0) ? -dx : dx;
+                    float ady = (dy < 0) ? -dy : dy;
+                    if (swipeOnBlock) {
+                        // Finger started on falling block -> horizontal swipe = move
+                        if (adx > SWIPE_THRESHOLD && adx > ady)
+                            onAction(state, dx < 0 ? SDLK_LEFT : SDLK_RIGHT);
+                    } else {
+                        // Finger started on board background -> vertical swipe = rotate
+                        if (ady > SWIPE_THRESHOLD && ady > adx)
+                            onAction(state, dy < 0 ? SDLK_UP : SDLK_DOWN);
+                    }
+                    swipeActive = false;
+                }
                 state.speedHeld         = false;
                 state.mouseHeldQuit     = false;
                 state.mouseHeldPause    = false;
