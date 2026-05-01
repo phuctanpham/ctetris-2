@@ -1,0 +1,118 @@
+name: Test Build (cross-platform)
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - phucpt/github-pages
+    paths:
+      - 'app/**'
+      - '.github/workflows/test-build.yml'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-build:
+    name: ${{ matrix.os_label }} / ${{ matrix.mode }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os_label: [windows, ubuntu, macos]
+        mode: [native, wasm]
+        include:
+          - os_label: windows
+            runner: windows-latest
+            shell: pwsh
+            script: app/build.ps1
+          - os_label: ubuntu
+            runner: ubuntu-latest
+            shell: bash
+            script: app/build.sh
+          - os_label: macos
+            runner: macos-latest
+            shell: bash
+            script: app/build.sh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Cache dung chung cho native + wasm cua cung 1 OS
+      # (SDL-3.2.8/, sdl3-native/, sdl3-wasm-3.2.8/, emsdk/, nanosvg/)
+      - name: Cache heavy downloads
+        uses: actions/cache@v4
+        with:
+          path: app/libs/${{ matrix.os_label }}/downloads
+          key: libs-${{ matrix.os_label }}-${{ hashFiles(matrix.script) }}
+          restore-keys: |
+            libs-${{ matrix.os_label }}-
+
+      # Ubuntu: ensure_linux_dev_libs trong build.sh la no-op cho CI
+      # (comment: "Removed install_apt_packages_if_missing -- no package install in CI")
+      # nen phai cai dev libs thu cong o day truoc khi source-build SDL3
+      - name: Install Ubuntu dev libs
+        if: matrix.os_label == 'ubuntu'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config ninja-build \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxinerama-dev libxxf86vm-dev libxss-dev \
+            libwayland-dev libxkbcommon-dev wayland-protocols \
+            libdrm-dev libgbm-dev \
+            libgl1-mesa-dev libglu1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev \
+            libpulse-dev libasound2-dev libsndio-dev \
+            libudev-dev libdbus-1-dev libibus-1.0-dev libunwind-dev
+
+      # Windows: build.ps1 bat buoc Ninja generator cho Emscripten
+      # (Initialize-WindowsTools khong cai Ninja; choco co san tren windows-latest)
+      - name: Install Ninja (Windows)
+        if: matrix.os_label == 'windows'
+        shell: pwsh
+        run: choco install ninja -y --no-progress
+
+      - name: Build (Windows)
+        if: matrix.shell == 'pwsh'
+        working-directory: app
+        shell: pwsh
+        run: |
+          .\build.ps1 ${{ matrix.mode }} 2>&1 | Tee-Object -FilePath build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build (Linux/macOS)
+        if: matrix.shell == 'bash'
+        working-directory: app
+        shell: bash
+        run: |
+          bash build.sh ${{ matrix.mode }} 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+
+      # In cay file build/ de debug nhanh khi pass/fail
+      - name: List build output
+        if: always()
+        working-directory: app
+        shell: bash
+        run: |
+          if [ -d build ]; then
+            echo "=== build/ tree ==="
+            find build -maxdepth 4 -type f | head -80 || true
+          fi
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-build-log-${{ matrix.os_label }}-${{ matrix.mode }}
+          path: app/build.log
+          retention-days: 7
+          if-no-files-found: warn
