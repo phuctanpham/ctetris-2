@@ -89,15 +89,15 @@
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tang-do-kho-16
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 15 và trên 17.
     - Logic tăng độ khó linh động dựa trên mốc điểm thay vì rơi đều đặn với `FALL_INTERVAL_NORMAL = 500`.
-[ ] Task 2.3: viết v3 gameCore/app.cpp - dự báo 3 khối liên tiếp
+[ ] Task 2.3: viết v2 gameCore/app.cpp - dự báo 3 khối liên tiếp với góc xoay ngẫu nhiên.
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-du-bao-ba-khoi-xep-hinh-lien-tiep-17
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 16 và trên 18.
     - Nâng cấp từ dự báo 1 khối (v1) lên hiển thị 3 khối ở các slot NEXT-1, NEXT-2, NEXT-3.
-[ ] Task 2.4: viết v3 gameCore/app.cpp - hiệu ứng chớp tắt khi xoá dòng
+[ ] Task 2.4: viết v2 gameCore/app.cpp - hiệu ứng chớp tắt khi xoá dòng
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-hieu-ung-khi-xoa-dong-18
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 17 và trên 19.
     - tạo hiệu ứng chớp tắt 3 lần báo hiệu để người chơi cảm nhận là dòng sắp bị xoá.
-[ ] Task 2.5: viết v3 gameCore/app.cpp - tăng điểm thưởng khi xoá nhiều dòng cùng thời điểm.
+[ ] Task 2.5: viết v2 gameCore/app.cpp - tăng điểm thưởng khi xoá nhiều dòng cùng thời điểm.
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-diem-thuong-khi-xoa-nhieu-dong-19
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 18 và trên 20.
     - tổng số hàng được được xoá nhân với tổng số hàng được xoá. Ví dụ: mỗi hàng đang 1 điểm, xoá 2 hàng cùng lúc là (2x2) 4 điểm, xoá 3 hàng cùng lúc là (3x3) 9 điểm, xoá 4 hàng cùng lúc là (3x3) 16 điểm.
