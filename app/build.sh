@@ -308,14 +308,17 @@ build_sdl3_from_source() {
     local sdl_build="$sdl_src/build-$target"
 
     mkdir -p "$DOWNLOAD_DIR"
-    if [ ! -d "$sdl_src" ]; then
-        log_info "Clone SDL3 release-$sdl_ver vao $sdl_src..."
-        git clone --depth 1 --branch "release-$sdl_ver" \
-            https://github.com/libsdl-org/SDL "$sdl_src"
+    if [ ! -f "$sdl_src/CMakeLists.txt" ]; then
+    if [ -d "$sdl_src" ]; then
+        log_warn "SDL3 source dir ton tai nhung thieu CMakeLists.txt (cache bi hong) -- xoa va re-clone"
+        rm -rf "$sdl_src"
+    fi
+    log_info "Clone SDL3 release-$sdl_ver vao $sdl_src..."
+    git clone --depth 1 --branch "release-$sdl_ver" \
+        https://github.com/libsdl-org/SDL "$sdl_src"
     else
         log_ok "SDL3 source $sdl_ver da co tai $sdl_src"
     fi
-
     # Cau hinh build:
     #   - native: shared lib, install vao prefix
     #   - wasm:   static lib (Emscripten khong support .so), tat tests
