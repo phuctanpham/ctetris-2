@@ -1,0 +1,35 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - tính năng cấu hình: Đặc tả yêu cầu}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{03-gameConsoleRequirements.tex}{LastPageGameConsoleRequirements}
+\onehalfspacing
+
+\section{Đặc tả yêu cầu tính năng cấu hình}
+
+// tự viết thêm: Mô tả vai trò điều phối vòng đời ứng dụng bên ngoài gameplay chính (UI Menu, Cài đặt người dùng, Leaderboard).
+
+\subsection{Mục tiêu (Objective)}
+// tự viết thêm: Quản lý State của ứng dụng ngoài luồng chơi, cung cấp UI để giao tiếp với người dùng và khởi tạo các thiết lập hệ thống trước khi gọi module Core.
+
+\subsection{Phạm vi (Scope)}
+// tự viết thêm: In-scope: Màn hình Main Menu, Pop-up Settings (Âm lượng, Đồ họa), UI kết quả Game Over. API gọi lấy Leaderboard.
+// tự viết thêm: Out-scope: Không xử lý logic va chạm hay tính toán điểm số (do Core tính và truyền sang qua tham số).
+
+\subsection{Đặc tả chức năng (Functional List)}
+// tự viết thêm: - Quản lý Cấu hình: Ghi/đọc thiết lập (Config) xuống file local.
+// tự viết thêm: - Điều hướng UI: Logic Stack/Queue để pop/push các màn hình Menu chồng lên nhau mà không bị lỗi đè nút.
+
+\subsection{Giới hạn kỹ thuật (Constraints)}
+// tự viết thêm: UI phải scale đúng và không bị vỡ layout trên các tỷ lệ màn hình (16:9, 18:9, 4:3). Thời gian gọi API Leaderboard không được block Main Thread quá 2 giây.
+
+\label{LastPageGameConsoleRequirements}
+\end{document}

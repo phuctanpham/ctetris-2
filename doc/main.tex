@@ -1,0 +1,97 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\input{src/libs/body.tex}
+\input{src/libs/header.tex}
+\input{src/libs/footer.tex}
+\usepackage{docmute}
+\usepackage{etoolbox} % Cần thiết để map tên file sang tiêu đề
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp}}
+\def\MainDocumentBuildFlag{1}
+
+% Fix lỗi cảnh báo \headheight is too small trong file log
+\setlength{\headheight}{16pt} 
+
+\begin{document}
+
+% ==============================================
+% 1. Cover pages
+% ==============================================
+\input{src/cover.tex}
+
+% ==============================================
+% 2. Table of Content
+% ==============================================
+\setcounter{tocdepth}{2}
+\input{src/libs/index.tex}
+
+% ==============================================
+% 3. Main Content
+% ==============================================
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\input{src/content.tex}
+
+% ==============================================
+% 4. Appendix
+% ==============================================
+\clearpage
+\appendix
+
+% Fix cảnh báo vàng của Header từ log
+\setlength{\headheight}{16pt} 
+
+% Ngăn TOC quét tự động các thẻ \section bên trong file phụ lục
+\addtocontents{toc}{\protect\setcounter{tocdepth}{0}}
+
+% Thêm tiêu đề "Phụ lục" vào TOC như một heading riêng (không số, có bookmark)
+\pdfbookmark[0]{Phụ lục}{appendix-toc-heading}
+\addtocontents{toc}{%
+    \protect\vspace{1em}%
+    \protect\noindent{\protect\large\protect\bfseries Phụ lục}\protect\par%
+    \protect\vspace{0.3em}%
+}
+
+% Hàm ánh xạ tên file thành Tiêu đề hiển thị (dành cho TOC và Bookmark)
+\newcommand{\getAppTitle}[1]{%
+  \ifstrequal{#1}{01-teamContract.tex}{Hợp đồng làm việc nhóm}{%
+  \ifstrequal{#1}{02-teamContractValidation.tex}{Biên bản đánh giá hợp đồng làm việc nhóm}{%
+  \ifstrequal{#1}{03-meetingMinute.tex}{Biên bản họp}{%
+  \ifstrequal{#1}{04-teamConflictSolving.tex}{Mô tả quá trình làm việc nhóm}{#1}}}}%
+}
+
+\makeatletter
+% 1. Lưu lại lệnh tạo footer gốc của bạn trong footer.tex
+\let\oldApplyStandardFooter\ApplyStandardFooter
+
+% 2. Dùng \newcommand (Vì appendix.tex đã dùng \providecommand nên sẽ không bị đè)
+\newcommand{\InputAppendixUnit}[1]{%
+    \clearpage
+    \pagenumbering{arabic}
+    \setcounter{page}{1}
+    
+    % --- XỬ LÝ MỤC LỤC & BOOKMARK PDF (Đúng yêu cầu của bạn) ---
+    \hypertarget{app-#1}{}
+    \pdfbookmark[1]{\getAppTitle{#1}}{app-#1} 
+    \addtocontents{toc}{%
+        \protect\vspace{0.2em}%
+        \protect\noindent\protect\hspace*{2em}%
+        \protect\hyperlink{app-#1}{\textnormal{\getAppTitle{#1}}}\protect\par
+    }
+    
+    % --- ĐÁNH CHẶN LỆNH FOOTER TỪ FILE CON ---
+    % Khi file con gọi \ApplyStandardFooter{ID}{LastPage}, lệnh này sẽ đánh tráo "LastPage" thành "lastpage-#1"
+    \renewcommand{\ApplyStandardFooter}[2]{%
+        \oldApplyStandardFooter{##1}{lastpage-#1}%
+    }
+    
+    % Nạp file con và tự động gắn nhãn kết thúc
+    \InputAppendixFile{#1}
+    \label{lastpage-#1}
+}
+\makeatother
+
+\input{src/appendix.tex}
+
+\end{document}

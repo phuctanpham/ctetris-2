@@ -1,0 +1,95 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+% Kiểm tra file thư viện
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+
+\usepackage{docmute}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - Nội dung}}
+
+% FIX: Xử lý cảnh báo fancyhdr Warning
+\setlength{\headheight}{15.1pt}
+\addtolength{\topmargin}{-0.6pt}
+
+\begin{document}
+\StandaloneDocumentSetup{content.tex}{LastPageContent}
+\onehalfspacing
+
+% Fix 1 — Footer ID
+\renewcommand{\StandaloneSectionSetup}[2]{%
+  \ApplyStandardFooter{#1}{LastPageContent}%
+}
+
+% Fix 2 — Section numbering (Roman/Arabic)
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thesubsection}{\arabic{subsection}}
+
+% Fix 3 — Group heading (Ngắt trang + In hoa tiêu đề)
+\newcommand{\ContentGroup}[2]{%
+  \clearpage
+  \setcounter{section}{0}%
+  \phantomsection
+  % Tự động viết hoa tiêu đề trong Mục lục (TOC)
+  \addcontentsline{toc}{section}{\textbf{#1.\ \MakeUppercase{#2}}}% 
+  \vspace*{0.4cm}%
+  % Tự động viết hoa tiêu đề hiển thị trong văn bản
+  {\centering\large\bfseries #1.\ \MakeUppercase{#2}\par}% 
+  \vspace{0.4cm}%
+}
+
+% Lệnh chèn file
+\newcommand{\InputContentFile}[1]{%
+  \IfFileExists{src/content/#1}{\input{src/content/#1}}{%
+    \IfFileExists{content/#1}{\input{content/#1}}{\input{../content/#1}}%
+  }%
+}
+
+% --- NỘI DUNG CHÍNH ---
+
+% Preface
+\InputContentFile{01-Preface.tex}
+
+%  A/ TÀI LIỆU ĐẶC TẢ YÊU CẦU (SRS)
+\ContentGroup{A}{đặc tả yêu cầu (SRS)}
+\InputContentFile{02-gameStoryRequirements.tex} \clearpage
+\InputContentFile{03-gameConsoleRequirements.tex} \clearpage
+\InputContentFile{04-gameCoreRequirements.tex}
+
+%  B/ TÀI LIỆU ĐẶC TẢ KỸ THUẬT (SDS)
+\ContentGroup{B}{đặc tả kỹ thuật (SDS)}
+\InputContentFile{05-gameStoryEngineering.tex} \clearpage
+\InputContentFile{06-gameConsoleEngineering.tex} \clearpage
+\InputContentFile{07-gameCoreEngineering.tex}
+
+%  C/ HƯỚNG DẪN CÀI ĐẶT VÀ SỬ DỤNG
+\ContentGroup{C}{Hướng dẫn sử dụng}
+\InputContentFile{08-gameStoryGuide.tex} \clearpage
+\InputContentFile{09-gameConsoleGuide.tex} \clearpage
+\InputContentFile{10-gameCoreGuide.tex}
+
+%  D/ KIỂM THỬ VÀ KIỂM SOÁT CHẤT LƯỢNG
+\ContentGroup{D}{Kiểm thử}
+\InputContentFile{11-testStrategy.tex} \clearpage
+\InputContentFile{12-testList.tex}
+
+%  E/ QUẢN LÝ DỰ ÁN
+\ContentGroup{E}{Quản lý}
+\InputContentFile{13-productMilestones.tex} \clearpage
+\InputContentFile{14-projectGanttChart.tex}
+
+%  F/ QUY HOẠCH TÀI NGUYÊN VÀ ĐỊNH HƯỚNG NHÂN LỰC
+\ContentGroup{F}{Quy hoạch}
+\InputContentFile{15-technologyAdoption.tex} \clearpage
+\InputContentFile{16-toolsetList.tex} \clearpage
+\InputContentFile{17-skillsetList.tex}
+
+%  G/ CÁC NỘI DUNG KHÁC
+\ContentGroup{G}{Các nội dung khác}
+\InputContentFile{00-References.tex} \clearpage
+\InputContentFile{00-Appendix.tex}
+
+\label{LastPageContent}
+\end{document}

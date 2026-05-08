@@ -1,0 +1,43 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - tính năng chính: Đặc tả thiết kế}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{07-gameCoreEngineering.tex}{LastPageGameCoreEngineering}
+\onehalfspacing
+
+\section{Đặc tả kỹ thuật tính năng chính}
+
+\subsection{Sơ đồ luồng (Flow/State Machine)}
+// tự viết thêm: Sơ đồ sequence khi init module: Load file -> Parse JSON -> Đẩy vào Queue -> Render frame by frame.
+
+\subsection{Thuật toán cốt lõi (Core Algorithms)}
+// tự viết thêm: Cấu trúc vòng lặp cập nhật `Update()`.
+// tự viết thêm: Mô tả chi tiết thuật toán quét lưới (Quét từ dưới lên trên, gỡ mảng và kéo các khối phía trên xuống O(n*m)).
+// tự viết thêm: Thuật toán phát hiện va chạm (Collision Detection) dựa trên ma trận.
+
+\subsection{Kiến trúc hệ thống (Architecture)}
+// tự viết thêm: Mô tả mô hình quản lý State của UI (VD: Dùng mẫu thiết kế State Pattern cho `MainMenuState`, `SettingsState`, `LeaderboardState`).
+
+\subsection{Cấu trúc dữ liệu (Data Structures)}
+// tự viết thêm: Class mảng 2 chiều: `int playGrid[20][10];` (0 = rỗng, 1-7 = ID màu khối).
+// tự viết thêm: Struct cho khối đang rơi: `struct ActivePiece { int type; int rotationState; Vector2 position; }`
+
+\subsection{Giao diện giao tiếp (Public interface - Expose cho main.cpp)}
+// tự viết thêm: Module này nên thụ động nhận lệnh. 
+// tự viết thêm: `void CoreEngine::StartSession();`
+// tự viết thêm: `void CoreEngine::ProcessInput(InputMask input);`
+// tự viết thêm: `GameState CoreEngine::GetState();` -> Trả về con trỏ hoặc bản sao của ma trận hiện tại để module khác đem đi render.
+
+\subsection{Thư viện phụ thuộc (Dependencies)}
+// tự viết thêm: Cố gắng giữ module này không phụ thuộc (zero dependencies) ngoài thư viện chuẩn `std` để dễ dàng Unit Test.
+
+\label{LastPageGameCoreEngineering}
+\end{document}

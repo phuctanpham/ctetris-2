@@ -1,0 +1,234 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\usepackage{graphicx}
+\usepackage{float}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - Lời mở đầu}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{01-Preface.tex}{LastPagePreface}
+\onehalfspacing
+
+\clearpage
+\phantomsection
+\section*{Lời mở đầu}
+\addcontentsline{toc}{section}{Lời mở đầu}
+
+Có những tựa game chỉ là trò chơi. Và có những tựa game trở thành một phần của văn hóa nhân loại. \textit{Tetris} thuộc về nhóm thứ hai --- ra đời trong phòng thí nghiệm của Liên Xô, bị tranh giành qua các cuộc chiến pháp lý xuyên quốc gia, rồi cuối cùng định hình cả một ngành công nghiệp giải trí trị giá hàng trăm tỷ đô la.
+
+Dự án \textbf{cTetris} được xây dựng từ niềm tin rằng một tựa game kinh điển không cần phải bị sao chép --- mà cần được hiểu thấu đáo rồi đẩy đi xa hơn. Lấy ngôn ngữ lập trình \textbf{C++} làm nền tảng kỹ thuật cốt lõi, nhóm phát triển tái kiến tạo Tetris với góc nhìn của những người làm game thế hệ mới: tinh gọn, hiệu quả và mang dấu ấn riêng.
+
+Báo cáo này ghi lại toàn bộ hành trình đó --- từ bức tranh toàn cảnh của ngành game thế giới đang thay đổi chóng mặt, câu chuyện lịch sử đầy kịch tính của Tetris, những hướng sáng tạo mà cộng đồng toàn cầu đã mở ra, cho đến ý tưởng thiết kế, thương hiệu và năng lực của chính nhóm phát triển.
+
+\subsection{Tổng quát xu hướng phát triển của ngành công nghiệp trò chơi điện tử}
+
+Không còn là thú vui của một nhóm nhỏ nữa --- ngành game đã trở thành ngành giải trí lớn nhất hành tinh. Năm 2024, hơn 3 tỷ người trên thế giới chơi game, tạo ra doanh thu khoảng 184 tỷ USD \textsuperscript{[1]}. Con số đó dự kiến sẽ vượt 500 tỷ USD vào năm 2034, với tốc độ tăng trưởng kép hằng năm từ 8 đến 9\% \textsuperscript{[2]}. Để dễ hình dung: ngành game hiện lớn hơn cả ngành điện ảnh và âm nhạc toàn cầu cộng lại.
+
+Điều thú vị là trung tâm của ngành không còn nằm ở Mỹ hay Nhật Bản nữa. Châu Á -- Thái Bình Dương đang nắm giữ gần 50\% thị phần toàn cầu \textsuperscript{[3]}, được thúc đẩy mạnh mẽ bởi làn sóng game di động tại Ấn Độ --- nơi có hơn 600 triệu người dưới 35 tuổi và mạng internet giá rẻ phủ sóng đến tận vùng nông thôn. Ở đây, điện thoại thông minh chính là máy chơi game.
+
+Ba làn sóng công nghệ đang định hình lại ngành trong giai đoạn 2025--2030. Thứ nhất là \textbf{game trên đám mây}: thay vì phải có máy tính hay máy console đắt tiền, người chơi chỉ cần đường truyền internet ổn định là có thể chơi bất kỳ tựa game nào trên bất kỳ thiết bị nào. Phân khúc này đang tăng trưởng với tốc độ trên 50\% mỗi năm, dự kiến nhảy từ 1,4 tỷ lên 18,3 tỷ USD vào năm 2030 \textsuperscript{[4]}. Thứ hai là \textbf{trí tuệ nhân tạo tạo sinh}: AI không chỉ điều khiển nhân vật trong game nữa --- nó đang viết cốt truyện, vẽ tài sản đồ họa và tự động kiểm thử lỗi, giúp rút ngắn 30--50\% thời gian phát triển. Khoảng 20\% game mới trên Steam năm 2024 đã công khai dùng AI trong quy trình sản xuất \textsuperscript{[4]}. Thứ ba là \textbf{nền kinh tế sáng tạo}: người chơi không chỉ tiêu thụ nội dung mà còn tạo ra và kiếm tiền từ nó. Riêng Roblox đã chi trả 923 triệu USD cho các nhà sáng tạo cộng đồng trong năm 2024 --- con số gần bằng ngân sách sản xuất của nhiều hãng phim lớn \textsuperscript{[4]}.
+
+Tuy nhiên, sự tăng trưởng đó đi kèm với những vết nứt không nhỏ. Làn sóng sa thải hàng loạt sau đại dịch khiến cứ 10 nhà phát triển thì có 1 người mất việc \textsuperscript{[5]}. Các cuộc tấn công mạng nhắm vào game thủ leo thang với hơn 4 triệu vụ tấn công chỉ trong 12 tháng \textsuperscript{[5]}. Nghịch lý này --- ngành vừa lớn mạnh chưa từng có, vừa đang tái cơ cấu đau đớn --- chính là lý do tại sao các giải pháp phát triển nhỏ gọn, hiệu quả về kỹ thuật ngày càng được đánh giá cao. Và đó cũng là hướng tiếp cận mà \textbf{cTetris} theo đuổi.
+
+\subsection{Lịch sử phát triển của trò chơi Tetris}
+
+Năm 1984, trong một phòng thí nghiệm ở Moscow, một nhà khoa học Liên Xô đang hút thuốc liên hồi và gõ code trên chiếc máy tính Electronika 60. Ông không biết rằng mình đang tạo ra thứ sẽ được chơi bởi hàng tỷ người trong 40 năm tới --- và sẽ không nhận được một xu bản quyền nào trong suốt hơn một thập kỷ \textsuperscript{[6]}.
+
+\textbf{Sự ra đời của một ý tưởng (1984--1985).} Alexey Pajitnov, nhà nghiên cứu toán học tại Viện Hàn lâm Khoa học Liên Xô, bắt đầu từ một trò chơi xếp hình cổ điển tên \textit{pentominoes} --- các mảnh ghép tạo bởi 5 ô vuông. Nhận ra các mảnh ghép 5 ô quá phức tạp, ông đơn giản hóa xuống còn 4 ô, tạo ra \textit{tetrominoes} --- và thêm vào đó một thứ quyết định tất cả: \textit{trọng lực}. Các khối không nằm im; chúng rơi xuống và người chơi phải xoay, di chuyển chúng để lấp đầy từng hàng trước khi màn hình bị lấp kín. Trò chơi có tên \textbf{Tetris} --- ghép từ ``tetra'' (bốn) và ``tennis'' (môn thể thao Pajitnov yêu thích). Người bạn Vadim Gerasimov sau đó chuyển thể sang IBM PC, thêm màu sắc, và các đĩa mềm bắt đầu truyền tay nhau khắp các phòng thí nghiệm Moscow. Bất chấp điều đó, theo luật pháp Liên Xô, mọi sáng chế đều là tài sản nhà nước --- Pajitnov không có quyền sở hữu gì đối với đứa con tinh thần của mình \textsuperscript{[6]}.
+
+\textbf{Cơn sốt bản quyền và màn hỗn loạn phương Tây (1986--1988).} Tetris lọt ra khỏi Biên giới Sắt và nhanh chóng gây sốt tại Phương Tây. Doanh nhân người Anh Robert Stein của Andromeda Software phát hiện trò chơi tại Budapest, vội vã gửi telex đề nghị mua quyền --- và khi nhận được phản hồi ngoại giao mập mờ từ phía Liên Xô, ông tự hiểu đó là cái gật đầu. Ông cấp phép cho Mirrorsoft --- công ty của tỷ phú truyền thông Robert Maxwell --- và Tetris nhanh chóng bán được hơn 100.000 bản trên PC tại Mỹ. Nhưng cơ quan nhà nước Liên Xô phụ trách xuất khẩu phần mềm, Elorg, không hề hay biết về bất kỳ thỏa thuận nào. Khi phát hiện tài sản nhà nước đang bị bán mà không có sự cho phép, Elorg lập tức triệu tập Stein đến Moscow. Qua nhiều vòng đàm phán căng thẳng, Stein chỉ giữ được quyền phát hành trên \textit{máy tính cá nhân (PC)} --- không hơn \textsuperscript{[6]}.
+
+\textbf{Cú chốt hạ của Nintendo và phán quyết lịch sử (1989).} Mirrorsoft, không quan tâm đến những giới hạn đó, tự ý nhượng quyền phiên bản console cho Atari Games. Cùng lúc đó, Henk Rogers --- nhà thiết kế game gốc Hà Lan đang tìm kiếm phần mềm cho thị trường Nhật --- nhìn thấy tiềm năng khổng lồ của Tetris trên hệ máy cầm tay Game Boy sắp ra mắt của Nintendo. Ông làm điều mà không ai nghĩ tới: tự bay thẳng sang Moscow vào tháng 2/1989, đàm phán trực tiếp với Elorg mà không qua trung gian. Nhờ thái độ thẳng thắn và sự tin tưởng của Pajitnov, Rogers bảo đảm được quyền phát hành cho hệ cầm tay. Nintendo tiếp theo đó ký thỏa thuận console toàn cầu với khoản ứng trước 500.000 USD. Ngày 13/11/1989, tòa án Mỹ phán quyết bảo vệ hợp đồng Nintendo -- Elorg, biến 500.000 băng game Tetris mà Atari đã in thành đống phế phẩm bất hợp pháp. Tetris đi kèm với Game Boy, bán được hàng chục triệu bản, biến hệ máy cầm tay này thành biểu tượng văn hóa một thế hệ. Còn Alexey Pajitnov --- phải đến tận năm 1996, sau khi di cư sang Mỹ, ông mới lần đầu tiên nhận được tiền bản quyền từ tựa game do chính tay mình tạo ra \textsuperscript{[6]}.
+
+\subsection{Các ý tưởng tham khảo kết hợp trò chơi Tetris}
+
+Điều khiến Tetris trở thành nguồn cảm hứng lý tưởng để lai tạo với các thể loại khác không nằm ở đồ họa hay cốt truyện --- mà nằm ở cái cảm giác khi một hàng ô vuông biến mất. Đó là sự thỏa mãn nguyên sơ, phi ngôn ngữ, gần như bản năng. Cộng đồng nhà phát triển toàn cầu đã nhận ra điều này và khai thác nó theo ba hướng chính.
+
+\textbf{Kết hợp với nhập vai và đối kháng.} Ý tưởng cơ bản: biến hành động ``dọn hàng'' thành một đòn tấn công. \textit{Tetris Monsters} của Electronic Arts (phát hành riêng cho thị trường Nhật) chia màn hình thành hai phần --- bên dưới là bảng Tetris quen thuộc, bên trên là chiến trường 3D nơi đội quân anh hùng đối mặt với quái vật khổng lồ. Mỗi khi người chơi dọn được 4 hàng cùng lúc, các nhân vật phía trên lập tức tung ra đòn chí mạng \textsuperscript{[7]}. Cùng hướng tư duy đó, \textit{Arcane Board} đặt người chơi vào vai một pháp sư thi triển phép thuật bằng cách điền đầy một bảng ma thuật hình Tetris; \textit{Puyo Puyo Tetris} và \textit{Battle Chef Brigade} biến bảng xếp hình thành đấu trường đối kháng hoặc bàn bếp nấu ăn dưới áp lực thời gian \textsuperscript{[8]}.
+
+\textbf{Kết hợp với xây dựng thành phố.} Ít ai nhận ra điều này, nhưng quy hoạch đô thị và xếp khối Tetris thực ra là cùng một bài toán: làm thế nào để lấp đầy không gian một cách hiệu quả nhất. \textit{Mini City: Mayhem} (2025) biến điều đó thành gameplay rõ ràng --- người chơi nhận các khối Tetris chứa khu dân cư, đường xá và cơ sở hạ tầng bên trong, phải đặt chúng sao cho thành phố không bị tắc nghẽn \textsuperscript{[9]}. \textit{Drop Duchy} đặt cơ chế tương tự vào bối cảnh thời trung cổ với thẻ bài roguelite: mỗi khối đặt xuống không chỉ thay đổi địa hình mà còn quyết định bạn khai thác được loại tài nguyên gì và tuyển được loại binh lính nào \textsuperscript{[10]}. \textit{Blockopolis} đi xa hơn: tòa nhà chỉ được nâng cấp lên mật độ cao hơn khi khu vực xung quanh đã được xếp đủ khối theo quy tắc, tạo ra vòng lặp ``lên kế hoạch dài hạn hay phản xạ tức thì'' không có hồi kết.
+
+\textbf{Ứng dụng ngoài giải trí.} Cấu trúc của Tetris còn mở ra những hướng ứng dụng ít ngờ tới hơn. Trong giáo dục, nền tảng \textit{Factris} sử dụng lối chơi rơi tự do để học ước số và bội số --- học sinh giải toán bằng cách xếp khối thay vì điền vào ô trống. Trong nghiên cứu trí tuệ nhân tạo, dự án \textit{RL-Tetris} dùng môi trường game này như một bài kiểm tra chuẩn mực cho thuật toán Học Tăng cường Sâu --- bởi vì không gian trạng thái của Tetris vừa đủ phức tạp để thách thức máy tính, vừa đủ rõ ràng để đo lường hiệu quả học máy \textsuperscript{[8]}.
+
+Tất cả những ví dụ tham khảo trên đều xuất phát từ cùng một nhận thức: cơ chế xếp khối của Tetris có thể ghép nối với bất kỳ lớp ngữ nghĩa nào --- từ chiến đấu, quản lý đô thị đến học tập. Câu hỏi không phải là \textit{liệu có thể kết hợp Tetris với thể loại X hay không}, mà là \textit{kết hợp theo cách nào để tạo ra một trải nghiệm thực sự mới}. Đó là bài toán mà \textbf{cTetris} đặt ra cho chính mình.
+
+\subsection{Sự khác biệt cốt lõi dự án cTetris}
+
+a) Vòng tuần hoàn khép kín của trò chơi.
+
+\begin{center}
+
+% Ép toàn bộ sơ đồ co giãn vừa khít với chiều rộng của trang (textwidth)
+\resizebox{0.95\textwidth}{!}{
+\begin{tikzpicture}[
+    % Định dạng chung cho các khối
+    box/.style={
+        rectangle, 
+        draw=black!80, 
+        thick, 
+        text width=8cm, 
+        align=left, 
+        rounded corners=3mm, 
+        inner sep=10pt,
+        font=\small
+    },
+    % Định dạng mũi tên uốn cong
+    arrow/.style={
+        -{Stealth[scale=1.5]}, 
+        line width=1.5pt, 
+        draw=gray!80
+    },
+    % Định dạng nhãn trên mũi tên
+    label/.style={
+        font=\footnotesize\bfseries, 
+        align=center, 
+        text=black!70
+    }
+]
+
+% ================= CÁC MODULE (NODES) =================
+
+% KHỐI 1: Tọa độ ở đỉnh (gameStory)
+\node[box, fill=blue!5] (story) at (0, 5) {
+    \textbf{\large 1. MỞ KHOÁ TUYẾN TRUYỆN}\\
+    \textit{(Module \texttt{gameStory})}\\[1ex]
+    $\bullet$ \textbf{Đầu vào:} Điểm và thời gian của "kiếp trước".\\
+    $\bullet$ \textbf{Tác động:} Phân tích di sản để bẻ nhánh cốt truyện. Tạo lựa chọn mới với độ khó tương ứng (mốc hiển thị khối 2 \& 3).\\
+    $\bullet$ \textbf{Đầu ra:} Bộ Thử thách ẩn (ngưỡng điểm, thời gian, tốc độ) để mở nhánh mới.
+};
+
+% KHỐI 2: Tọa độ ở góc dưới bên phải (gameConsole)
+\node[box, fill=purple!5] (console) at (5, -3) {
+    \textbf{\large 2. THỬ THÁCH  TUYẾN TRUYỆN}\\
+    \textit{(Module \texttt{gameConsole})}\\[1ex]
+    $\bullet$ \textbf{Đầu vào:} Bộ thử thách và thông số từ \texttt{gameStory}.\\
+    $\bullet$ \textbf{Tác động:} Cập nhật giao diện (UI). Hiển thị Theme tương ứng với tuyến truyện và mục tiêu cho người chơi.\\
+    $\bullet$ \textbf{Đầu ra:} Bộ thông số cấu hình lối chơi truyền thẳng vào \texttt{gameCore}.
+};
+
+% KHỐI 3: Tọa độ ở góc dưới bên trái (gameCore)
+\node[box, fill=green!5] (core) at (-5, -3) {
+    \textbf{\large 3.  VƯỢT QUA THỬ THÁCH }\\
+    \textit{(Module \texttt{gameCore})}\\[1ex]
+    $\bullet$ \textbf{Đầu vào:} Cấu hình độ khó, tốc độ rơi, điều kiện mở khóa UI (khối 2, khối 3).\\
+    $\bullet$ \textbf{Tác động:} Xử lý logic giải đố. Người chơi vượt thử thách để lấy quyền năng thấu thị, đẩy cao thành tích.\\
+    $\bullet$ \textbf{Đầu ra:} Kết quả thực chiến cuối cùng lưu lại làm dữ liệu đầu vào.
+};
+
+% ================= VÒNG LẶP (ARROWS) =================
+
+% Mũi tên: gameStory -> gameConsole (Bên phải)
+\draw[arrow] (story.south east) to[bend left=20] 
+    node[label, right=2mm] {Chuyển giao\\Thử thách \& Cấu hình} 
+    (console.north);
+
+% Mũi tên: gameConsole -> gameCore (Bên dưới)
+\draw[arrow] (console.west) to[bend left=15] 
+    node[label, below=2mm] {Kích hoạt\\Gameplay cốt lõi} 
+    (core.east);
+
+% Mũi tên: gameCore -> gameStory (Bên trái - Vòng lặp Reset)
+\draw[arrow, draw=red!70!black] (core.north) to[bend left=20] 
+    node[label, left=2mm, text=red!70!black] {\textbf{RESET GAME}\\Trả kết quả thực chiến\\để định đoạt tương lai} 
+    (story.south west);
+
+\end{tikzpicture}
+} % Kết thúc lệnh resizebox
+\end{center}
+
+\vspace{1.5em}
+
+b) 3 điểm khác biệt độc nhất:
+
+\vspace{1em}
+\renewcommand{\arraystretch}{1.6} % Tăng khoảng cách dòng trong bảng
+\setlength{\tabcolsep}{12pt} % Tăng khoảng cách cột
+
+% Khởi tạo bảng với tabularx, X tự động dàn trang
+\noindent
+\begin{tabularx}{\textwidth}{ 
+  | >{\hsize=0.25\hsize\bfseries\raggedright\arraybackslash}X 
+  | >{\hsize=0.35\hsize\raggedright\arraybackslash}X 
+  | >{\hsize=0.4\hsize\raggedright\arraybackslash}X | }
+\hline
+\rowcolor{black!80} 
+\textcolor{white}{\textbf{ĐẠI Ý}} & 
+\textcolor{white}{\textbf{GAME TRUYỀN THỐNG}} & 
+\textcolor{white}{\textbf{CTETRIS}} \\
+\hline
+
+\rowcolor{blue!5}
+1. Không có lựa chọn A/B/C
+& Xếp hình chỉ để lấy điểm cao vô nghĩa. Nếu có cốt truyện, người chơi chỉ được bấm chọn những dòng chữ (hội thoại) nhàm chán trên màn hình. 
+& \textbf{Kỹ năng xếp hình chính là chìa khoá mở "tuyến truyện".} Tổng điểm, tốc độ dọn khối và thời gian sinh tồn là các "từ khóa ẩn" bẻ lái diễn biến. Bạn không đọc cốt truyện, bạn \textit{"chơi"} ra cốt truyện. \\
+\hline
+
+\rowcolor{purple!5}
+2. Màn hình Ending là sự khởi đầu
+& Khi hiện Game Over/Ending, mọi thứ xóa sạch. Bắt đầu ván mới từ con số 0 với cảm giác lặp đi lặp lại trống rỗng. 
+& \textbf{Reset game để "Tiến hóa".} Di sản kiếp trước (điểm, tốc độ) kiến tạo ván tiếp theo. Hệ thống giao Thử thách ẩn hoàn toàn mới. Càng chơi, thế giới quan của câu truyện trong game càng mở rộng. \\
+\hline
+
+\rowcolor{green!5}
+3. Lối chơi bị phá vỡ giới hạn
+& Từ đầu đến cuối, luật chơi bất di bất dịch (luôn chỉ nhìn trước 1 khối hình), khiến lối chơi dần bế tắc ở tốc độ cao. 
+& \textbf{Nâng cấp sức mạnh từ Cốt truyện.} Vượt Thử thách ẩn sẽ nhận Đặc quyền nhìn trước \textbf{khối thứ 2, thứ 3}. Lối chơi chuyển từ "phản xạ thụ động" sang "kiểm soát tuyệt đối". \\
+\hline
+\end{tabularx}
+
+\vspace{1.5em}
+\begin{center}
+    \large\textit{"Ở các game khác, bạn xếp hình để giải trí.\\ Ở đây, bạn xếp hình để thao túng thời gian, thay đổi luật chơi và bẻ khóa định mệnh nhân vật."}
+\end{center}
+\vspace{1.5em}
+
+\subsection{Ý nghĩa logo thương hiệu cTetris}
+Dưới góc độ truyền thông và thiết kế đồ họa, thương hiệu \textbf{cTetris} không chỉ dừng lại ở một tựa game giải đố, mà là một "Đại sứ thị giác" (Visual Ambassador) truyền tải triết lý cốt lõi của dự án: \textit{Sự giao thoa giữa nền tảng kỹ thuật nguyên bản (\textbf{C++}) và tư duy công nghệ bền vững}. Hệ thống nhận diện được quy chuẩn hóa chặt chẽ nhằm bảo vệ tài sản thương hiệu và duy trì tính đồng bộ (Brand Consistency) trên mọi điểm chạm:
+
+\subsubsection*{1. Triết lý Thiết kế \& Tỷ lệ Lưới (Design Philosophy \& Grid System)}
+\begin{itemize}
+    \item \textbf{Cấu trúc ma trận (Pixel-perfect Grid):} Logo được kiến tạo trên hệ lưới đồ họa $3\times3$, kế thừa ngôn ngữ thiết kế \textit{Pixel Art} nguyên thủy của dòng game Tetris. Các khối vuông có tỷ lệ chuẩn 1:1 với khoảng cách an toàn (gutter) 10\%, tạo ra một tổng thể thị giác cân bằng, tối giản nhưng mang đậm hơi thở của không gian điều khiển kỹ thuật số (Cyber-space).
+    \item \textbf{Tính toàn vẹn thị giác (Clear Space):} Để bảo toàn sức mạnh định vị và mức độ nhận diện, khoảng trống bao quanh logo phải luôn duy trì kích thước tối thiểu bằng một khối vuông cơ sở. Mọi hiệu ứng dư thừa như đổ bóng (drop-shadow) hay gradient đều bị loại bỏ nhằm tôn vinh phong cách Flat Design cốt lõi.
+\end{itemize}
+
+\subsubsection*{2. Nhận diện Kép (Dual Identity) - Nghệ thuật Kể chuyện Thị giác}
+Giá trị tiếp thị độc bản (USP - Unique Selling Proposition) của logo cTetris nằm ở khả năng biến đổi thông điệp theo không gian, tạo ra hiệu ứng bất ngờ ("Aha!" moment) cho người xem:
+\begin{itemize}
+    \item \textbf{Định vị Sản phẩm (Góc nhìn $0^\circ$):} Khối chữ \textbf{C} bao bọc lấy khối chữ \textbf{T}. Biểu tượng này ẩn dụ cho thông điệp cốt lõi: \textit{"Kiến trúc Tetris được vận hành và bảo vệ trọn vẹn bởi ngôn ngữ lập trình C++"}.
+    \begin{center}
+        \includegraphics[width=0.2\textwidth]{01-preface-logo-C-component}
+        \hspace{0.5cm}
+        \includegraphics[width=0.2\textwidth]{01-preface-logo-T-component}
+        \item[] \textit{\small Hình 1.1: Trạng thái hiển thị tiêu chuẩn định vị thương hiệu cTetris.}
+    \end{center}
+
+    \item \textbf{Sự gắn kết Cộng đồng (Góc xoay $90^\circ$):} Khi xoay dọc, cấu trúc hình khối tái tạo thành cụm chữ \textbf{U - I - T}. Đây là thủ pháp "Easter Egg" tinh tế nhằm tri ân Trường Đại học Công nghệ Thông tin - ĐHQG TP.HCM. Chi tiết này đóng vai trò như một điểm neo cảm xúc, giúp gia tăng lòng trung thành (Brand Loyalty) từ cộng đồng sinh viên đối với dự án.
+    \begin{center}
+        \includegraphics[width=0.2\textwidth]{01-preface-logo-U-component}
+        \hspace{0.2cm}
+        \includegraphics[width=0.2\textwidth]{01-preface-logo-I-component}
+        \hspace{0.2cm}
+        \includegraphics[width=0.2\textwidth]{01-preface-logo-T-component}
+        \item[] \textit{\small Hình 1.2: Nhận diện ẩn (Hidden Identity) mang thông điệp tri ân.}
+    \end{center}
+\end{itemize}
+
+\subsubsection*{3. Ngôn ngữ Màu sắc \& Tâm lý học Thương hiệu (Color Psychology)}
+Bảng màu (Color Palette) không được chọn ngẫu nhiên, mà là một công cụ dẫn dắt tâm lý người dùng, phản ánh chính xác chiều sâu kỹ thuật của dự án:
+\begin{itemize}
+    \item \textbf{Vàng Đồng (Copper Yellow - \#FFFF00):} Chữ C và chữ U ghép lại sẽ là CU / nguyên tố Đồng (Cu) – chất liệu cốt lõi của mọi bo mạch phần cứng. Trong tâm lý học tiếp thị, màu vàng đại diện cho năng lượng, sự khởi nguyên và kích thích tư duy logic.
+    \item \textbf{Xanh Công nghệ (Digital Blue - \#0000FF):} Tone màu đặc trưng của kỷ nguyên số (Technology). Xanh dương tạo dựng niềm tin (Brand Trust), sự ổn định tuyệt đối và tính chính xác của các thuật toán hệ thống.
+    \item \textbf{Xanh Sinh thái (Green IT):} Nếu pha trộn giữa Vàng và Xanh Dương thì sẽ tạo ra màu xanh lá. Ẩn ý trong chữ \textbf{I} mang ý nghĩa chiến lược sâu sắc. Nó đại diện cho \textbf{Công nghệ Bền vững (Green IT)}, khẳng định tầm nhìn của nhóm phát triển về việc tạo ra các sản phẩm phần mềm tối ưu hóa năng lượng và thân thiện với môi trường.
+\end{itemize}
+
+\subsection{Giới thiệu về năng lực nhóm phát triển}
+// tự viết thêm
+
+\label{LastPagePreface}
+\end{document}

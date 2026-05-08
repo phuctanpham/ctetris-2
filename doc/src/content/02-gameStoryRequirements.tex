@@ -1,0 +1,34 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - tính năng cốt truyện: Đặc tả yêu cầu}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{02-gameStoryRequirements.tex}{LastPageGameStoryRequirements}
+\onehalfspacing
+\section{Đặc tả yêu cầu tính năng cốt truyện}
+
+// tự viết thêm: Viết một câu mô tả tổng quan kiến trúc hệ thống Story (VD: Hệ thống đọc file kịch bản tĩnh và render hội thoại/cutscene độc lập trước khi load core game).
+
+\subsection{Mục tiêu (Objective)}
+// tự viết thêm: Module này nhận input gì và trả ra output gì? (VD: Input: File JSON kịch bản. Output: Callback tín hiệu báo kết thúc Story để main.cpp chuyển sang Menu).
+
+\subsection{Phạm vi (Scope)}
+// tự viết thêm: In-scope: Logic parse file kịch bản, quản lý hàng đợi (queue) hiển thị text dạng typewriter, hiển thị sprite nhân vật.
+// tự viết thêm: Out-scope: Không xử lý âm thanh/voice (chỉ gửi event cho Audio module), không xử lý logic lưu/tải game.
+
+\subsection{Đặc tả chức năng (Functional List)}
+// tự viết thêm: - Tính năng Parse: Đọc và validate file kịch bản.
+// tự viết thêm: - Tính năng Control: Tua nhanh (Skip), tự động chạy (Auto-play), lưu log các câu thoại cũ.
+
+\subsection{Giới hạn kỹ thuật (Constraints)}
+// tự viết thêm: Bộ nhớ: Cache kịch bản load lên RAM tối đa < 5MB. UI: Text không được tràn viền hiển thị ở độ phân giải nhỏ nhất (VD: 720p).
+
+\label{LastPageGameStoryRequirements}
+\end{document}

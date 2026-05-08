@@ -1,0 +1,42 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - tính năng cấu hình: Đặc tả thiết kế}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{06-gameConsoleEngineering.tex}{LastPageGameConsoleEngineering}
+\onehalfspacing
+
+\section{Đặc tả kỹ thuật tính năng cấu hình}
+
+\subsection{Sơ đồ luồng (Flow/State Machine)}
+// tự viết thêm: Sơ đồ sequence khi init module: Load file -> Parse JSON -> Đẩy vào Queue -> Render frame by frame.
+
+\subsection{Thuật toán cốt lõi (Core Algorithms)}
+// tự viết thêm: Cấu trúc vòng lặp cập nhật `Update()`.
+// tự viết thêm: Mô tả chi tiết thuật toán quét lưới (Quét từ dưới lên trên, gỡ mảng và kéo các khối phía trên xuống O(n*m)).
+// tự viết thêm: Thuật toán phát hiện va chạm (Collision Detection) dựa trên ma trận.
+
+\subsection{Kiến trúc hệ thống (Architecture)}
+// tự viết thêm: Mô tả mô hình quản lý State của UI (VD: Dùng mẫu thiết kế State Pattern cho `MainMenuState`, `SettingsState`, `LeaderboardState`).
+
+\subsection{Cấu trúc dữ liệu và Lưu trữ (Data Schema)}
+// tự viết thêm: Singleton Class cho Cấu hình. VD: `struct AppSettings { float bgmVolume; float sfxVolume; bool fullScreen; }`
+// tự viết thêm: Cơ chế Serialize: Lưu settings dưới định dạng .ini hay .json ở thư mục user.
+
+\subsection{Giao diện giao tiếp (Public interface - Expose cho main.cpp)}
+// tự viết thêm: `void ConsoleMenu::Show();`
+// tự viết thêm: `void ConsoleMenu::Hide();`
+// tự viết thêm: `void ConsoleMenu::OnGameOver(int finalScore);` -> Nhận điểm từ GameCore đẩy vào.
+
+\subsection{Thư viện phụ thuộc (Dependencies)}
+// tự viết thêm: Các thư viện mạng (nếu có gọi API RESTful như cURL) hoặc thư viện UI (ImGui, SDL).
+
+\label{LastPageGameConsoleEngineering}
+\end{document}

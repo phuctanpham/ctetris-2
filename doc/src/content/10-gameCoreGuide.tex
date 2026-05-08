@@ -1,0 +1,229 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Hướng dẫn sử dụng: tính năng chính}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{10-gameCoreGuide.tex}{LastPageGameCoreGuide}
+\onehalfspacing
+
+\section{Hướng dẫn sử dụng tính năng chính}
+
+\subsection{Tổng quan}
+\textbf{gameCore} là module trung tâm của ứng dụng \textit{cTetris}, đảm nhận toàn bộ trải nghiệm chơi game xếp hình. Module được thiết kế để chạy trong cửa sổ kích thước \texttt{270$\times$480 px} (tỉ lệ 9:16) trên cả hai môi trường: ứng dụng máy tính (\textit{desktop}) và trình duyệt web qua WebAssembly (\textit{WASM}).
+
+Phiên bản v1 hỗ trợ ba kênh điều khiển độc lập, cho phép bạn chơi linh hoạt theo thiết bị đang sử dụng:
+\begin{itemize}
+    \item \textbf{Bàn phím} -- thao tác bằng các phím mũi tên hoặc cụm phím WASD.
+    \item \textbf{Chuột} -- click hoặc giữ chuột lên các icon trên thanh bên.
+    \item \textbf{Cảm ứng (vuốt)} -- vuốt trực tiếp trên màn hình cảm ứng để di chuyển hoặc lật khối.
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.3\textwidth]{10-gameCoreGuide-screenshot}
+    \\[10pt] % Tạo khoảng cách nhỏ giữa hình và chú thích
+    \textit{\small Hình 10.1: Màn hình module gameCore}
+\end{figure}
+
+\subsection{Bố cục màn hình}
+Cửa sổ trò chơi được chia thành hai vùng cố định, đặt cạnh nhau theo chiều ngang:
+\begin{itemize}
+    \item \textbf{Bảng chơi (Board) -- 240$\times$480 px:} chiếm phần bên trái màn hình. Đây là khu vực các khối Tetromino sẽ rơi xuống. Bảng được chia thành lưới gồm 16 cột $\times$ 32 hàng.
+    \item \textbf{Thanh bên (Sidebar) -- 30$\times$480 px:} chiếm phần bên phải màn hình. Thanh bên gồm 12 ô đồng nhất kích thước 30$\times$40 px, hiển thị thông tin trạng thái và các nút điều khiển bằng chuột.
+\end{itemize}
+
+\noindent\textbf{Sơ đồ 12 ô của thanh bên} (đánh số từ trên xuống dưới):
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|c|l|X|}
+    \hline
+    \textbf{Ô \#} & \textbf{Tên} & \textbf{Chức năng} \\
+    \hline
+    0  & QUIT        & Mở hộp thoại thoát game (icon hình nút nguồn). \\
+    \hline
+    1  & PAUSE       & Tạm dừng hoặc tiếp tục trò chơi. \\
+    \hline
+    2  & SCORE       & Hiển thị điểm số hiện tại (định dạng 5 chữ số). \\
+    \hline
+    3  & TIMER       & Hiển thị thời gian chơi tích lũy (định dạng \texttt{HH:MM}). \\
+    \hline
+    4  & NEXT-1      & Xem trước hình dạng khối tiếp theo sẽ rơi. \\
+    \hline
+    5  & NEXT-2      & \textit{Để trống ở v1} (mở rộng cho phiên bản sau). \\
+    \hline
+    6  & NEXT-3      & \textit{Để trống ở v1} (mở rộng cho phiên bản sau). \\
+    \hline
+    7  & ARROW UP    & Lật khối theo chiều kim đồng hồ. \\
+    \hline
+    8  & ARROW DOWN  & Lật khối ngược chiều kim đồng hồ. \\
+    \hline
+    9  & ARROW LEFT  & Di chuyển khối sang trái. \\
+    \hline
+    10 & ARROW RIGHT & Di chuyển khối sang phải. \\
+    \hline
+    11 & SPEED       & Nút tăng tốc rơi (\textit{Speed Booster}). \\
+    \hline
+\end{tabularx}
+
+\vspace{4pt}
+\noindent\textit{Lưu ý:} toàn bộ icon trên thanh bên được vẽ thủ công bằng hình học SDL (\textit{procedural drawing}) thay vì sử dụng ảnh bitmap. Khi bạn nhấn giữ chuột hoặc giữ phím tương ứng, icon sẽ được tô \textbf{vàng nổi bật} (\textit{highlight yellow}) để báo hiệu trạng thái \textit{active}.
+
+\subsection{Quy tắc chơi}
+Lối chơi cốt lõi đòi hỏi sự khéo léo và tư duy không gian. Các khối Tetromino sẽ liên tục rơi xuống từ phía trên màn hình, và nhiệm vụ của bạn là sắp xếp chúng để ghi điểm:
+\begin{itemize}
+    \item \textbf{Lắp ráp các khối} sao cho lấp đầy hoàn toàn một (hoặc nhiều) hàng ngang trên bảng chơi.
+    \item \textbf{Xóa hàng (Line Clear):} mỗi khi một hàng ngang được lấp kín, hàng đó sẽ tự động biến mất, các khối phía trên rơi xuống bù chỗ trống. Mỗi hàng được xóa cộng \textbf{1 điểm} vào tổng điểm.
+    \item \textbf{Game Over:} nếu khối mới sinh ra không còn chỗ trống ở đỉnh bảng (chạm khối đã có trên bảng), trò chơi sẽ kết thúc và tự động mở \textit{hộp thoại Game Over}.
+\end{itemize}
+
+\noindent\textbf{Bộ khối hình:} Phiên bản v1 sử dụng 5 khối cơ bản: \textbf{L}, \textbf{I}, \textbf{Z}, \textbf{O}, \textbf{T}. Để tăng tính đa dạng, mỗi khối khi sinh ra sẽ có \textbf{50\% xác suất bị lật gương theo trục X} (\textit{mirror flip}); nhờ đó bạn có thể bắt gặp các biến thể trông giống J (lật L) hoặc S (lật Z) mà không cần khai báo riêng.
+
+\noindent\textbf{Bộ màu sắc:} Mỗi khối được tô ngẫu nhiên một trong 6 màu: \textit{Xanh dương, Đỏ, Xanh lá, Vàng, Cam, Tím}.
+
+\subsection{Hệ thống điều khiển}
+
+\subsubsection{Điều khiển bằng bàn phím}
+Bàn phím là kênh điều khiển chủ đạo trên môi trường desktop. Hệ thống chấp nhận song song hai cụm phím (mũi tên và WASD) để bạn dùng tay nào cũng được:
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Phím} & \textbf{Hành động} \\
+    \hline
+    \texttt{A} \,/\, \texttt{$\leftarrow$}     & Di chuyển khối sang \textbf{trái}. \\
+    \hline
+    \texttt{D} \,/\, \texttt{$\rightarrow$}    & Di chuyển khối sang \textbf{phải}. \\
+    \hline
+    \texttt{W} \,/\, \texttt{$\uparrow$}       & Lật khối \textbf{theo chiều kim đồng hồ}. \\
+    \hline
+    \texttt{S} \,/\, \texttt{$\downarrow$}     & Lật khối \textbf{ngược chiều kim đồng hồ}. \\
+    \hline
+    \texttt{SPACE}                              & Bật chế độ \textbf{rơi nhanh} (Soft Drop) khi giữ phím. \\
+    \hline
+    \texttt{ENTER} \,/\, \texttt{KP\_ENTER}     & Tạm dừng hoặc tiếp tục trò chơi. \\
+    \hline
+    \texttt{ESC}                                & Mở hộp thoại Quit. \\
+    \hline
+\end{tabularx}
+
+\vspace{4pt}
+\noindent\textit{Lưu ý quan trọng:} nếu thao tác di chuyển hoặc xoay khiến khối va vào tường, đáy bảng hoặc một khối đã đặt cố định, hệ thống sẽ \textbf{tự động hủy thao tác} đó để tránh đè khối. Bạn có thể yên tâm spam phím xoay sát tường mà không lo phá bố cục bàn cờ.
+
+\subsubsection{Điều khiển bằng chuột}
+Toàn bộ chức năng có thể thực hiện chỉ với chuột, hữu ích khi bạn chơi trên laptop không có numpad hoặc khi đang tay cầm cốc cà phê. Cơ chế \textbf{Click \& Hold} (nhấn và giữ) được hỗ trợ cho các nút điều hướng và nút Speed Booster:
+\begin{itemize}
+    \item \textbf{Click vào icon QUIT} (ô số 0): mở hộp thoại Quit, tương đương phím \texttt{ESC}.
+    \item \textbf{Click vào icon PAUSE} (ô số 1): tạm dừng hoặc tiếp tục, tương đương phím \texttt{ENTER}.
+    \item \textbf{Click các nút mũi tên} (ô 7--10): mỗi cú click thực hiện một thao tác (lật/di chuyển), tương đương nhấn phím mũi tên một lần.
+    \item \textbf{Giữ chuột nút Speed Booster} (ô 11): bật chế độ rơi nhanh suốt thời gian giữ, tương đương giữ phím \texttt{SPACE}.
+\end{itemize}
+
+Khi nút đang được giữ, icon sẽ chuyển sang \textbf{màu vàng nổi bật} để bạn biết hệ thống đã ghi nhận thao tác.
+
+\subsubsection{Điều khiển bằng cử chỉ vuốt (cảm ứng)}
+Trên thiết bị cảm ứng (điện thoại, máy tính bảng, hoặc trình duyệt hỗ trợ touch), bạn có thể thao tác trực tiếp ngay trên \textit{vùng bảng chơi} mà không cần chạm vào thanh bên:
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Cử chỉ} & \textbf{Hành động} \\
+    \hline
+    Vuốt \textbf{ngang} (trái/phải) trên \textit{khối đang rơi} & Di chuyển khối sang trái/phải. \\
+    \hline
+    Vuốt \textbf{dọc} (lên/xuống) trên \textit{nền bảng} (không trúng khối) & Lật khối ngược/theo chiều kim đồng hồ. \\
+    \hline
+\end{tabularx}
+
+\vspace{4pt}
+\noindent\textbf{Quy tắc nhận diện:}
+\begin{itemize}
+    \item Cử chỉ chỉ được ghi nhận khi quãng vuốt đạt tối thiểu \textbf{15 px}, để tránh nhầm lẫn với thao tác chạm (\textit{tap}).
+    \item Hệ thống xét \textit{trục ưu thế}: nếu khoảng vuốt ngang lớn hơn dọc thì coi là vuốt ngang, và ngược lại; vuốt chéo gần 45° sẽ bị bỏ qua.
+    \item Vuốt trên \textbf{thanh bên} (vùng \texttt{x $\geq$ 240}) không kích hoạt cử chỉ -- thanh bên giữ nguyên hành vi tap như bình thường.
+\end{itemize}
+
+\subsection{Các tính năng nâng cao}
+
+\subsubsection{Rơi nhanh (Soft Drop)}
+Khi muốn nhanh chóng kết thúc một hàng hoặc đặt khối vào vị trí đã chọn sẵn, bạn có thể bật chế độ rơi nhanh:
+\begin{itemize}
+    \item \textbf{Trên bàn phím:} nhấn giữ phím \texttt{SPACE}.
+    \item \textbf{Trên chuột/cảm ứng:} nhấn giữ nút \textit{Speed Booster} (ô số 11).
+\end{itemize}
+Trong thời gian giữ, tốc độ rơi của khối tăng lên \textbf{5 lần} so với bình thường (chu kỳ rơi giảm từ 500 ms xuống 100 ms). Khi nhả phím/chuột, tốc độ trở về mặc định ngay lập tức.
+
+\subsubsection{Đồng hồ tính giờ chơi (Play Timer)}
+Ô số 3 trên thanh bên hiển thị tổng thời gian chơi \textbf{thực tế} theo định dạng \texttt{HH:MM} (giờ:phút). Đồng hồ chỉ đếm khi trò chơi đang chạy: nếu bạn tạm dừng hoặc mở hộp thoại Quit, đồng hồ sẽ \textbf{ngừng đếm}, và tiếp tục từ giá trị cũ khi quay lại. Nhờ đó, thời gian hiển thị phản ánh đúng nỗ lực thực tế, không bị ``ăn gian'' vì pause lâu.
+
+\subsubsection{Hệ thống điểm số}
+\begin{itemize}
+    \item \textbf{Quy tắc tính điểm:} mỗi hàng được xóa = \textbf{1 điểm}.
+    \item \textbf{Điểm tối đa:} \texttt{99999} (5 chữ số). Vượt mức này, điểm sẽ được giữ nguyên ở \texttt{99999}.
+    \item \textbf{Định dạng hiển thị:} luôn là chuỗi 5 chữ số có đệm số 0 ở trước (ví dụ: \texttt{00007}, \texttt{00125}, \texttt{99999}). Định dạng cố định này giúp ô SCORE và ô TIMER có cùng kích thước hiển thị, cân đối hài hòa trong không gian hẹp 30$\times$40 px.
+\end{itemize}
+
+\subsubsection{Xem trước khối tiếp theo (Preview Next)}
+Ô \textbf{NEXT-1} (ô số 4) hiển thị thu nhỏ hình dạng của khối sắp rơi tiếp theo, kèm đúng màu sẽ được sinh ra. Nhờ đó, bạn có thể \textbf{lập kế hoạch trước một bước}, sắp xếp khối hiện tại ở vị trí tối ưu để đón khối kế tiếp.
+
+\subsubsection{Tạm dừng / Tiếp tục (Pause / Play)}
+Bạn có thể tạm dừng trò chơi bất cứ lúc nào theo một trong ba cách: nhấn phím \texttt{ENTER}, phím \texttt{KP\_ENTER} trên numpad, hoặc click vào icon PAUSE (ô số 1). Khi trạng thái thay đổi, icon trên thanh bên cũng đổi tương ứng để bạn dễ nhận biết:
+\begin{itemize}
+    \item \textbf{Hình vuông đặc} -- trò chơi \textit{đang chạy} (click để dừng).
+    \item \textbf{Hình tam giác} -- trò chơi \textit{đang tạm dừng} (click để tiếp tục).
+\end{itemize}
+Trong thời gian tạm dừng, đồng hồ play timer ngừng đếm và khối ngừng rơi.
+
+\subsection{Trạng thái đặc biệt}
+
+\subsubsection{Hộp thoại Quit / Game Over (Lightbox)}
+Hộp thoại này được hiển thị theo kỹ thuật \textit{lightbox}: nền phía sau bị phủ mờ đen để tập trung sự chú ý vào popup ở giữa. Hộp thoại tự động kích hoạt trong các trường hợp:
+\begin{itemize}
+    \item Bạn nhấn phím \texttt{ESC} hoặc click icon QUIT.
+    \item Trò chơi kết thúc do khối mới không có chỗ sinh ra (\textit{Game Over}).
+\end{itemize}
+
+\noindent\textbf{Thông tin hiển thị trong hộp thoại:}
+\begin{itemize}
+    \item Tiêu đề trạng thái: \texttt{PAUSED} (khi do người chơi mở) hoặc \texttt{GAME OVER} (khi do thua).
+    \item \textbf{Current score} -- điểm số hiện tại.
+    \item \textbf{Total time} -- tổng thời gian chơi thực tế (loại trừ pause), định dạng \texttt{HH:MM:SS}.
+\end{itemize}
+
+\noindent\textbf{Bốn lựa chọn hành động:}
+\begin{itemize}
+    \item \textbf{Restart} -- bắt đầu một ván mới ngay trong gameCore (reset điểm và đồng hồ).
+    \item \textbf{Console} -- thoát gameCore và quay lại màn hình \textit{gameConsole} (menu chính).
+    \item \textbf{Quit} -- thoát hoàn toàn ứng dụng (trên web sẽ chuyển sang màn hình Reload, xem mục tiếp).
+    \item \textbf{Cancel} -- đóng hộp thoại và quay lại trận đấu (nếu chưa Game Over).
+\end{itemize}
+Ngoài ra, bạn có thể click vào nút \textbf{X} màu đỏ ở góc trên bên phải hộp thoại để đóng nhanh -- tương đương Cancel.
+
+\subsubsection{Màn hình Reload (chỉ trên Web/WASM)}
+Trên trình duyệt, lệnh \texttt{exit()} của ứng dụng C++ không thể đóng tab thực sự. Để thay thế, sau khi bạn chọn \textbf{Quit} từ hộp thoại, gameCore hiển thị một \textbf{màn hình đen} với một nút \textbf{RELOAD} lớn ở giữa kèm dòng chú thích \textit{``Press F5 or click RELOAD to start a new game''}.
+
+Bạn có thể kích hoạt làm mới trang theo bốn cách:
+\begin{itemize}
+    \item Click chuột vào nút RELOAD.
+    \item Nhấn phím \texttt{F5}.
+    \item Nhấn \texttt{ENTER} hoặc \texttt{SPACE}.
+\end{itemize}
+Khi đó, trình duyệt sẽ tải lại trang và bạn được khởi động lại từ màn hình gameStory đầu tiên. Trên phiên bản desktop, \textbf{Quit} sẽ đóng cửa sổ ngay lập tức và không hiển thị màn hình này.
+
+\subsection{Mẹo chơi nhanh}
+\begin{itemize}
+    \item Luôn quan sát ô \textbf{NEXT-1} trước khi đặt khối hiện tại để có chiến lược dài hơi.
+    \item Trên thiết bị cảm ứng, hãy tận dụng \textbf{vuốt} thay vì tap nhiều lần vào nút mũi tên -- thao tác mượt và nhanh hơn.
+    \item Khi gặp khối \textbf{I} (thanh dài 4 ô), giữ một cột trống ở rìa bảng để tạo điều kiện xóa nhiều hàng cùng lúc.
+    \item Đừng quên nhấn \texttt{ENTER} để pause khi cần xử lý việc khác -- đồng hồ sẽ ngừng đếm, không ảnh hưởng tới thành tích thời gian của bạn.
+    \item Nếu lỡ tay rơi khối sai vị trí, vẫn còn cơ hội cứu vãn nhờ cơ chế tự hủy thao tác khi va chạm; cứ thử xoay/dịch chuyển sát tường, không khối nào bị phá hỏng.
+\end{itemize}
+
+\label{LastPageGameCoreGuide}
+\end{document}

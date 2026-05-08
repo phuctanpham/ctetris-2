@@ -1,0 +1,201 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Bien ban hop - ctetris}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{03-meetingMinute.tex}{LastPageMeetingMinute}
+
+\setlist[itemize,1]{label=\textbullet, leftmargin=1.5em, itemsep=0pt, parsep=0pt, topsep=2pt}
+\setlist[itemize,2]{label=$\circ$, leftmargin=1.8em, itemsep=0pt, parsep=0pt, topsep=2pt}
+
+\pagenumbering{arabic}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\singlespacing
+% ----------------------------------------------------
+% ====================================================
+% ===== BIÊN BẢN HỌP NGÀY 12/04/2026 =================
+% ====================================================
+% ===== TITLE =====
+\begin{center}
+    {\large\bfseries BIÊN BẢN CUỘC HỌP}
+\end{center}
+\begin{center}
+    \textbf{Ngày: 12 / 04 / 2026}
+\end{center}
+\vspace{0.4em}
+
+% ===== SECTION 1 =====
+\textbf{1. Thông tin chung}
+\begin{itemize}
+    \item \textbf{Thời gian:} 13h:30 – 13h:55, Chủ nhật, ngày 12/04/2026.
+    \item \textbf{Địa điểm:} Trực tuyến qua Google Meet.
+    \item \textbf{Tổ chức cuộc họp:} Phạm Tấn Phúc.
+    \item \textbf{Thành phần tham dự:} Phạm Tấn Phúc, Ngô Triều Vĩ, Nguyễn Trung Kiên.
+    \item \textbf{Mục đích cuộc họp:}
+    \begin{itemize}
+        \item Review cấu trúc mã nguồn dự án CTetris trên GitHub.
+        \item Kiểm tra tài liệu báo cáo trên Latex
+        \item Chia sẻ và thảo luận về Gameplay của trò chơi.
+    \end{itemize}
+\end{itemize}
+
+% ===== SECTION 2 =====
+\vspace{4pt}
+\textbf{2. Nội dung thảo luận chính}
+
+\subsecheading{2.1. Dự án CTetris (Console Tetris)}
+\begin{itemize}
+    \item Cấu trúc thư mục mã nguồn: Nhóm đã thống nhất chia dự án thành các module rõ ràng:
+    \begin{itemize}
+        \item \texttt{app/}: Chứa mã nguồn chính (\texttt{main.cpp}).
+        \item \texttt{src/}: Bao gồm các thành phần giao diện console, logic game (gameCore), và hình học (geometry).
+        \item \texttt{include/}: Chứa các file header tương ứng cho từng module.
+    \end{itemize}
+    \item Tài liệu đi kèm: File \texttt{appTree.md} đã liệt kê chi tiết sơ đồ cây của ứng dụng để các thành viên dễ theo dõi.
+    \item Tiến độ GitHub: Đã thực hiện cập nhật nội dung game guide.
+\end{itemize}
+
+\subsecheading{2.2. Tài liệu Báo cáo (Overleaf/LaTeX)}
+\begin{itemize}
+    \item Nội dung báo cáo: Nhóm đang hoàn thiện báo cáo.
+    \item Cấu trúc file LaTeX: Đã phân chia thành các file nhỏ trong thư mục \texttt{doc/src/content/} (Preface, References, Appendix, GameRequirements...).
+    \item Chữ ký xác nhận: Nhóm đã chuẩn bị trang ký tên với chữ ký số của các thành viên.
+\end{itemize}
+
+\subsecheading{2.3. Dự án cTetris}
+\begin{itemize}
+    \item Gameplay: Trò chơi cTetris
+    \item Cơ chế điều khiển:
+    \begin{itemize}
+        \item Phím A/D hoặc Mũi tên để di chuyển.
+        \item Phím W hoặc Mũi tên lên xoay.
+    \end{itemize}
+    \item Quy tắc tính điểm: đạt 1 dòng được +1 điểm. Tốc độ game tăng dần theo điểm số.
+\end{itemize}
+
+\subsecheading{2.4. Thảo luận khác}
+\begin{itemize}
+    \item Nhóm đã kiểm tra các kênh trao đổi trên Slack (\texttt{\#all-sii004f21}) để cập nhật thông báo từ giảng viên.
+    \item Thống nhất hạn chót hoàn thiện các phần còn lại là trước 20:00 cùng ngày.
+\end{itemize}
+
+% ===== SECTION 3 =====
+\vspace{2pt}
+\textbf{3. Kết luận và Phân công tiếp theo:}
+\begin{itemize}
+    \item \textbf{Phạm Tấn Phúc:} Tổng hợp mã nguồn cuối cùng và kiểm tra tính ổn định của game.
+    \item \textbf{Tạ Minh Trường:} Hoàn thiện nốt các phần nội dung còn trống trong file báo cáo LaTeX.
+    \item \textbf{Cả nhóm:} Cùng rà soát lại file PDF xuất ra từ Overleaf để đảm bảo không lỗi định dạng trước khi nộp.
+\end{itemize}
+
+% ====================================================
+% ===== BIÊN BẢN HỌP NGÀY 15/04/2026 =================
+% ====================================================
+\newpage
+
+\begin{center}
+    {\large\bfseries BIÊN BẢN CUỘC HỌP}
+\end{center}
+\begin{center}
+    \textbf{Ngày: 15 / 04 / 2026}
+\end{center}
+\vspace{0.4em}
+
+% ===== SECTION 1 =====
+\textbf{1. Thông tin chung}
+\begin{itemize}
+    \item \textbf{Thời gian:} 20:20 - 20:35, Thứ Tư, ngày 15/04/2026.
+    \item \textbf{Địa điểm:} Trực tuyến qua Google Meet.
+    \item \textbf{Tổ chức cuộc họp:} Phạm Tấn Phúc.
+    \item \textbf{Thành phần tham dự:} Phạm Tấn Phúc, Ngô Triều Vĩ, Tạ Minh Trường, Đàm Gia Thái, Nguyễn Trung Kiên.
+    \item \textbf{Mục đích cuộc họp:}
+    \begin{itemize}
+        \item Kiểm tra tiến độ công việc trên bảng quản trị Trello.
+        \item Review cấu trúc mã nguồn dự án trên GitHub và môi trường lập trình Codespaces.
+        \item Thống nhất các đầu việc cần hoàn thiện cho báo cáo cuối khóa.
+    \end{itemize}
+\end{itemize}
+
+% ===== SECTION 2 =====
+\vspace{4pt}
+\textbf{2. Nội dung thảo luận chính}
+
+\subsecheading{2.1. Quản lý công việc (Trello)}
+\begin{itemize}
+    \item Nhóm đã tiến hành rà soát các thẻ công việc (cards) trên Trello của từng thành viên:
+    \begin{itemize}
+        \item \textbf{Thái:} Đã hoàn thành các phần việc được giao, chuyển thẻ sang cột "Done".
+        \item \textbf{Trường:} Đang thực hiện viết User Acceptance Test (UAT) cho module gameCore.
+        \item \textbf{Vĩ:} Đã cập nhật các đầu việc liên quan đến giao diện console.
+        \item \textbf{Phúc:} Thực hiện điều phối và di chuyển các task đã hoàn thành để theo dõi tiến độ tổng thể.
+    \end{itemize}
+\end{itemize}
+
+\subsecheading{2.2. Quản lý mã nguồn và Tài liệu (GitHub \& Overleaf)}
+\begin{itemize}
+    \item \textbf{GitHub:} Review cấu trúc thư mục dự án ctetris:
+    \begin{itemize}
+        \item \texttt{app/}: Chứa logic chính và file \texttt{main.cpp}.
+        \item \texttt{doc/}: Chứa file \texttt{appTree.md} (sơ đồ cây ứng dụng) và tài liệu \texttt{docTree.md}.
+        \item \texttt{src/}: Chia nhỏ thành các module gameConsole, gameCore, gameStory, geometry.
+    \end{itemize}
+    \item \textbf{Overleaf (LaTeX):} Nhóm đang soạn thảo báo cáo "Kỹ năng nghề nghiệp - SII004.F21.CNTT".
+    \begin{itemize}
+        \item Đã hoàn thiện trang bìa, mục lục và các phần nội dung kỹ thuật (SRS, SDS).
+        \item Đã có trang chữ ký xác nhận của các thành viên trong nhóm.
+    \end{itemize}
+\end{itemize}
+
+\subsecheading{2.3. Thảo luận về nội dung báo cáo}
+\begin{itemize}
+    \item Nhóm đã xem xét các file nội dung trong \texttt{doc/src/content/}:
+    \begin{itemize}
+        \item \texttt{01-Preface.tex}: Lời mở đầu.
+        \item \texttt{02-gameStoryRequirements.tex}: Yêu cầu cho phần cốt truyện game.
+        \item \texttt{09-gameConsoleGuide.tex}: Hướng dẫn sử dụng giao diện console.
+    \end{itemize}
+    \item Thảo luận về cách trình bày sơ đồ máy trạng thái (Finite State Machine) và kiến trúc hệ thống trong báo cáo.
+\end{itemize}
+
+\subsecheading{2.4. Công tác chuẩn bị khác}
+\begin{itemize}
+    \item Nhóm đã kiểm tra lại các thông báo trên Slack và trao đổi qua trello để đảm bảo mọi thành viên nắm bắt được lịch họp và hạn nộp bài.
+\end{itemize}
+
+% ===== SECTION 3 =====
+\vspace{2pt}
+\textbf{3. Kết luận và Giao việc:}
+\begin{itemize}
+    \item \textbf{Trường:} Hoàn thành tài liệu UAT và cập nhật vào file báo cáo.
+    \item \textbf{Cả nhóm:} Kiểm tra lại định dạng file PDF xuất ra từ Overleaf, đặc biệt là phần hình ảnh và sơ đồ.
+    \item \textbf{Hạn chót:} Hoàn thiện toàn bộ báo cáo và mã nguồn để chuẩn bị nộp bài đúng hạn.
+\end{itemize}
+
+% ====================================================
+% ===== BIÊN BẢN HỌP NGÀY ---/--- /2026 =================
+% ====================================================
+\newpage
+
+\begin{center}
+    {\large\bfseries BIÊN BẢN CUỘC HỌP}
+\end{center}
+\begin{center}
+    \textbf{Ngày: --- / --- / 2026}
+\end{center}
+\vspace{0.4em}
+
+% ===== SECTION 1 =====
+\textbf{1. Thông tin chung}
+
+\textbf{bổ sung sau}
+
+\label{LastPageMeetingMinute} 
+\end{document}

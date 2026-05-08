@@ -1,0 +1,261 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Hướng dẫn sử dụng tính năng cấu hình}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{09-gameConsoleGuide.tex}{LastPageGameConsoleGuide}
+\onehalfspacing
+
+\section{Hướng dẫn sử dụng tính năng cấu hình}
+
+\subsection{Tổng quan}
+\textbf{gameConsole} là \textit{hub screen} (màn hình trung tâm) của ứng dụng \textit{cTetris}. Đây là nơi bạn khởi động ván đấu, tra cứu hướng dẫn chơi, xem bảng xếp hạng, và thoát ứng dụng. Màn hình được thiết kế cố định theo tỉ lệ 9:16 (portrait), đảm bảo hiển thị nhất quán trên cả ứng dụng máy tính và trình duyệt web (WASM).
+
+\noindent\textbf{Vị trí của gameConsole trong luồng ứng dụng:}
+\begin{itemize}
+    \item Khi mở ứng dụng, bạn lần lượt đi qua: \textit{gameStory} (màn hình mở đầu) $\rightarrow$ \textit{gameConsole} (màn hình đang đọc).
+    \item Từ \textit{gameConsole}, nhấn \textbf{PLAY} để vào màn hình chơi chính (\textit{gameCore}).
+    \item Từ \textit{gameCore}, nhấn nút \textit{power off} trên thanh bên rồi chọn \textbf{Console} để quay lại đây.
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.3\textwidth]{09-gameConsoleGuide-screenshot}
+    \\[10pt] % Tạo khoảng cách nhỏ giữa hình và chú thích
+    \textit{\small Hình 9.1: Màn hình module gameConsole}
+\end{figure}
+
+\subsection{Giao diện màn hình chính}
+Màn hình chính được chia thành ba vùng theo chiều dọc:
+\begin{itemize}
+    \item \textbf{Vùng tiêu đề} (trên cùng) -- hiển thị tên thương hiệu \textit{C TETRIS -- GAME CONSOLE}.
+    \item \textbf{Vùng nút bấm} (giữa) -- gồm 4 nút điều khiển chính, kích thước đồng nhất \texttt{140$\times$30 px}, sắp xếp dọc thẳng hàng.
+    \item \textbf{Vùng phím tắt} (dưới cùng) -- hiển thị gợi ý các phím điều hướng (TAB, ENTER, ESC...) để bạn dễ nhớ khi chơi.
+\end{itemize}
+
+\noindent Nền màn hình dùng màu xám đậm \texttt{\#282C34} -- vừa đủ tối để các nút màu nổi bật, vừa dễ chịu cho mắt khi nhìn lâu.
+
+\subsection{Bốn nút điều khiển chính}
+Bốn nút bấm trung tâm là cách duy nhất để rời khỏi gameConsole. Mỗi nút có màu sắc riêng để bạn nhận diện nhanh ngay cả khi không đọc chữ:
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|l|l|X|}
+    \hline
+    \textbf{Nút} & \textbf{Màu nền} & \textbf{Chức năng} \\
+    \hline
+    \textbf{GUIDE} & Xanh dương đậm & Mở popup hướng dẫn cách chơi (\textit{Guide Lightbox}). \\
+    \hline
+    \textbf{BOARD} & Xanh lá đậm   & Mở popup bảng xếp hạng (\textit{Leaderboard Lightbox}). \\
+    \hline
+    \textbf{PLAY}  & Đỏ đậm        & Chuyển sang màn hình chơi chính \textit{gameCore}. \\
+    \hline
+    \textbf{QUIT}  & Xám trung tính & Thoát ứng dụng. Trên web (WASM) sẽ chuyển sang màn hình \textit{Reload} thay vì đóng trực tiếp. \\
+    \hline
+\end{tabularx}
+
+\vspace{4pt}
+\noindent\textit{Mẹo nhận diện trạng thái:} nút đang được \textbf{focus} (chọn để kích hoạt) sẽ có \textbf{viền vàng đôi} bao quanh. Nhờ đó, ngay cả khi không nhìn vào con trỏ chuột, bạn vẫn biết mình đang đứng ở nút nào.
+
+\subsection{Hệ thống điều hướng}
+gameConsole hỗ trợ song song ba kênh điều hướng và bạn có thể kết hợp tự do trong cùng một phiên.
+
+\subsubsection{Điều hướng bằng bàn phím}
+Hệ thống chấp nhận nhiều bộ phím tương đương để bạn dùng tay nào cũng thuận:
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Phím} & \textbf{Hành động trên màn hình chính} \\
+    \hline
+    \texttt{TAB} \,/\, \texttt{S} \,/\, \texttt{A}                & Chuyển focus tiến tới nút kế tiếp (theo chiều xuống). \\
+    \hline
+    \texttt{Shift+TAB} \,/\, \texttt{W} \,/\, \texttt{D}          & Chuyển focus lùi về nút trước đó (theo chiều lên). \\
+    \hline
+    \texttt{ENTER} \,/\, \texttt{SPACE}                            & Kích hoạt nút đang được focus. \\
+    \hline
+    \texttt{ESC}                                                    & Nhảy nhanh focus về nút \textbf{QUIT}. \\
+    \hline
+\end{tabularx}
+
+\subsubsection{Điều hướng bằng chuột và con lăn}
+\begin{itemize}
+    \item \textbf{Click chuột trái} vào bất kỳ nút nào: kích hoạt nút đó ngay lập tức, đồng thời cập nhật focus về nút vừa click.
+    \item \textbf{Click vào nút \texttt{[X]}} ở góc trên phải của popup (Guide hoặc Board): đóng popup.
+    \item \textbf{Con lăn chuột} (\textit{mouse wheel}): cuộn nội dung khi popup Guide hoặc Board đang mở.
+\end{itemize}
+
+\subsection{Scrollbar tương tác}
+Hai popup \textbf{GUIDE} và \textbf{BOARD} đều dùng chung một \textit{scrollbar} (thanh cuộn) đặt bên phải. Scrollbar hỗ trợ bốn kiểu tương tác để bạn cuộn dài hay ngắn đều thuận tiện:
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Kiểu tương tác} & \textbf{Cách thực hiện} \\
+    \hline
+    \textbf{Kéo thả} (Drag)         & Nhấn giữ chuột lên \textit{thumb} (con trượt) và kéo theo chiều dọc. \\
+    \hline
+    \textbf{Click track}            & Click vào phần rãnh trống (ngoài thumb) để nhảy cóc tới vị trí tương ứng. \\
+    \hline
+    \textbf{Click mũi tên}          & Click vào nút ▲ hoặc ▼ ở hai đầu để cuộn từng dòng. \\
+    \hline
+    \textbf{Auto-repeat}            & Giữ chuột trên nút mũi tên: sau 300 ms, scrollbar tự động cuộn liên tục mỗi 60 ms. \\
+    \hline
+\end{tabularx}
+
+\vspace{4pt}
+\noindent\textbf{Phản hồi thị giác:}
+\begin{itemize}
+    \item Nút mũi tên đổi sang \textbf{màu vàng nổi bật} khi đang được nhấn giữ.
+    \item Thumb chuyển sang màu vàng trong toàn bộ thời gian bạn kéo thả.
+    \item Thumb \textbf{tự co dãn kích thước} theo tỉ lệ giữa nội dung và vùng hiển thị (tối thiểu 16 px), cho bạn cảm nhận trực quan độ dài còn lại.
+\end{itemize}
+
+\subsection{Popup Hướng dẫn (Guide)}
+Nhấn nút \textbf{GUIDE} (hoặc dùng phím tắt khi nút đang được focus: \texttt{ENTER} / \texttt{SPACE}) để mở popup hướng dẫn chơi. Popup dùng kỹ thuật \textit{lightbox} -- nền phía sau bị phủ mờ \emph{70\%} để bạn tập trung vào nội dung hướng dẫn.
+
+\vspace{4pt}
+\noindent\textbf{Đặc điểm vỏ popup:}
+\begin{itemize}
+    \item Kích thước \texttt{260$\times$440 px}, nền màu xanh xám tối.
+    \item Hiển thị \textbf{24 dòng} cùng lúc trên tổng số \textbf{38 dòng} hướng dẫn -- phần còn lại bạn xem bằng cách cuộn scrollbar (xem mục trên) hoặc dùng phím \texttt{W}/\texttt{S} hay \texttt{$\uparrow$}/\texttt{$\downarrow$}.
+    \item Nội dung dài tự động \textbf{ngắt dòng theo từ}, giới hạn 28 ký tự mỗi dòng -- không cắt giữa từ, đọc tự nhiên.
+    \item \textbf{Đóng popup} bằng một trong ba cách: nhấn phím \texttt{ESC}, click nút \texttt{[X]} màu đỏ ở góc trên phải, hoặc click ra vùng nền mờ.
+\end{itemize}
+
+\noindent\textbf{Các nhóm chủ đề trong popup:}
+\begin{itemize}
+    \item \textbf{Movement Keys} -- danh sách phím di chuyển và xoay khối khi chơi.
+    \item \textbf{Sidebar (12 thành phần)} -- danh sách 12 ô trên thanh bên màn hình chơi.
+    \item \textbf{Quit Popup} -- 4 nút trong hộp thoại Quit/Game Over của màn hình chơi.
+    \item \textbf{Swipe (Mobile)} -- cử chỉ vuốt cảm ứng khi chơi trên điện thoại.
+\end{itemize}
+
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Phạm vi nội dung:} popup này chỉ là phần \textbf{tham khảo nhanh}; mô tả chi tiết về cách chơi, ý nghĩa từng phím và icon đã được trình bày đầy đủ trong tài liệu \texttt{10-gameCoreGuide} (mục \emph{Hướng dẫn sử dụng tính năng chính}). Khi cần tra cứu sâu, bạn nên mở tài liệu đó thay vì đọc lại trong popup.
+\end{minipage}}
+
+\subsection{Popup Bảng xếp hạng (Board)}
+Nhấn nút \textbf{BOARD} để mở popup xem bảng xếp hạng người chơi. Popup tái sử dụng kỹ thuật lightbox và scrollbar giống popup Guide, nhưng tập trung trình bày dữ liệu dạng bảng.
+
+\vspace{4pt}
+\noindent\textbf{Đặc điểm vỏ popup:}
+\begin{itemize}
+    \item Kích thước \texttt{260$\times$420 px}, nền màu xanh lá tối.
+    \item Hiển thị \textbf{9 dòng} cùng lúc trên tổng số \textbf{30 bản ghi} -- cuộn để xem hết.
+    \item Mỗi dòng cao 36 px để đọc thoải mái, không bị chen chúc.
+    \item \textbf{Đóng popup}: phím \texttt{ESC} hoặc click nút \texttt{[X]} ở góc trên phải.
+\end{itemize}
+
+\noindent\textbf{Cấu trúc một bản ghi} -- ba trường thông tin cho mỗi người chơi:
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Trường} & \textbf{Mô tả} \\
+    \hline
+    \textbf{Username} & Tên người chơi (hiển thị tối đa 12 ký tự, căn trái). \\
+    \hline
+    \textbf{Score}    & Điểm số (số nguyên 5 chữ số, căn phải). \\
+    \hline
+    \textbf{Time}     & Thời điểm chơi, hiển thị 5 ký tự cuối theo định dạng \texttt{HH:mm}. \\
+    \hline
+\end{tabularx}
+
+\vspace{4pt}
+\noindent Phía dưới cùng popup có dòng nhắc \texttt{W/S to scroll, ESC close} -- hữu ích nếu bạn quen điều hướng bằng bàn phím hơn chuột.
+
+\vspace{4pt}
+\noindent\textit{Lưu ý ở phiên bản v1:} dữ liệu bảng xếp hạng hiện đang được nhúng cứng trong mã nguồn (30 bản ghi mẫu). Điểm số và tên của bạn \textbf{chưa được lưu lại tự động} sau mỗi ván -- tính năng này nằm trong kế hoạch của các phiên bản sau.
+
+\subsection{Nhạc nền}
+Khi bạn vào màn hình gameConsole, hệ thống tự động kích hoạt mô-đun phát nhạc nền -- không cần thao tác thủ công. Ở phiên bản v1, mô-đun này được triển khai dưới dạng \textit{stub} (khung sườn): chương trình ghi nhận sự kiện ``đã yêu cầu phát nhạc'' vào log nhưng \textbf{chưa phát âm thanh thực tế}. Nhờ kiến trúc này, các phiên bản sau có thể bổ sung nhạc nền mà không cần thay đổi giao diện hay luồng điều hướng hiện tại.
+
+\subsection{Màn hình Reload (chỉ trên Web/WASM)}
+Trên trình duyệt web, ứng dụng C++ không thể đóng tab thay người dùng. Vì vậy, khi bạn nhấn \textbf{QUIT}, gameConsole hiển thị một màn hình trung gian với một nút \textbf{RELOAD} lớn ở giữa.
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Nền tảng} & \textbf{Hành vi khi nhấn QUIT} \\
+    \hline
+    \textbf{Desktop (native)} & Đóng cửa sổ ứng dụng ngay lập tức. \\
+    \hline
+    \textbf{Web (WASM)}       & Hiển thị màn hình Reload với nút \textbf{RELOAD} màu xanh. \\
+    \hline
+\end{tabularx}
+
+\vspace{4pt}
+\noindent Trên màn hình Reload, bạn có \textbf{bốn cách} để tải lại trang và bắt đầu phiên mới: click chuột vào nút RELOAD, hoặc nhấn một trong các phím \texttt{F5} \,/\, \texttt{ENTER} \,/\, \texttt{SPACE}. Khi di chuột qua nút RELOAD, nút sẽ đổi sang sắc xanh nhạt hơn để xác nhận trạng thái \textit{hover}.
+
+\subsection{Bảng tham chiếu phím tắt}
+Bảng tổng hợp dưới đây gom toàn bộ phím tắt của gameConsole vào một chỗ để bạn dễ tra cứu nhanh.
+
+\subsubsection{Trên màn hình chính}
+
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Phím / Tổ hợp} & \textbf{Hành động} \\
+    \hline
+    \texttt{TAB}                                  & Focus tiến tới nút kế tiếp. \\
+    \hline
+    \texttt{Shift + TAB}                          & Focus lùi về nút trước đó. \\
+    \hline
+    \texttt{S} \,/\, \texttt{A} \,/\, \texttt{$\downarrow$} \,/\, \texttt{$\leftarrow$} & Focus tiến tới (nhóm phím thay thế). \\
+    \hline
+    \texttt{W} \,/\, \texttt{D} \,/\, \texttt{$\uparrow$} \,/\, \texttt{$\rightarrow$}  & Focus lùi về (nhóm phím thay thế). \\
+    \hline
+    \texttt{ENTER} \,/\, \texttt{SPACE}           & Kích hoạt nút đang focus. \\
+    \hline
+    \texttt{ESC}                                  & Nhảy focus về nút \textbf{QUIT}. \\
+    \hline
+\end{tabularx}
+
+\subsubsection{Khi popup Guide hoặc Board đang mở}
+
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Phím / Tổ hợp} & \textbf{Hành động} \\
+    \hline
+    \texttt{W} \,/\, \texttt{$\uparrow$}                  & Cuộn lên một dòng. \\
+    \hline
+    \texttt{S} \,/\, \texttt{$\downarrow$}                & Cuộn xuống một dòng. \\
+    \hline
+    Con lăn chuột (\textit{mouse wheel})                  & Cuộn theo chiều lăn. \\
+    \hline
+    \texttt{ESC} \,/\, click \texttt{[X]}                  & Đóng popup. \\
+    \hline
+\end{tabularx}
+
+\subsubsection{Trên màn hình Reload (WASM)}
+
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Phím / Hành động} & \textbf{Kết quả} \\
+    \hline
+    \texttt{F5}                                   & Tải lại trang trình duyệt. \\
+    \hline
+    \texttt{ENTER} \,/\, \texttt{SPACE}           & Tải lại trang trình duyệt. \\
+    \hline
+    Click nút \textbf{RELOAD}                     & Tải lại trang trình duyệt. \\
+    \hline
+\end{tabularx}
+
+\subsection{Giới hạn của phiên bản v1}
+Để bạn nắm rõ kỳ vọng, dưới đây là những điểm \emph{chưa có} trong v1 nhưng đã nằm trong kế hoạch phát triển:
+\begin{itemize}
+    \item Bảng xếp hạng đọc dữ liệu thật từ máy chủ (hiện đang dùng dữ liệu mẫu nhúng cứng trong mã).
+    \item Nhạc nền phát thực tế (hiện chỉ ghi log, chưa có âm thanh).
+    \item Popup \textit{Settings} cho phép bạn chỉnh âm lượng và chọn màu khối yêu thích.
+    \item Hình nền tùy biến cho màn hình chính.
+\end{itemize}
+Các tính năng trên sẽ lần lượt xuất hiện ở các phiên bản v2 và v3.
+
+\label{LastPageGameConsoleGuide}
+\end{document}

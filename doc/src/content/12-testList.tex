@@ -1,0 +1,646 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - danh sách kịch bản kiểm thử}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{12-testList.tex}{LastPageTestList}
+\onehalfspacing
+
+\section{Danh Sách Kịch Bản Kiểm Thử}
+
+% ────────────────────────────────────────────────────────────────────
+% 1. MÔI TRƯỜNG BUILD
+% ────────────────────────────────────────────────────────────────────
+\subsection{Môi Trường Build và Yêu Cầu Hệ Thống}
+
+\subsubsection{Yêu Cầu Môi Trường}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{Thành Phần} & \textbf{Yêu Cầu / Mô Tả} \\ \hline
+Trình biên dịch   & C++ compiler hỗ trợ chuẩn C++17 trở lên (GCC / MinGW / Clang) \\ \hline
+Build system      & CMake (phiên bản 3.15 trở lên) \\ \hline
+Thư viện đồ họa   & SDL2, ImGui – phải được cài đặt và khai báo vào biến môi trường hệ thống \\ \hline
+Dữ liệu mock story & File JSON kịch bản tại \texttt{/data/mock/} trước khi chạy test gameStory \\ \hline
+Module gameCore   & Logic thuần túy, không phụ thuộc thư viện ngoài – chạy trực tiếp Console App \\ \hline
+OS hỗ trợ        & Windows 10/11, Linux Ubuntu 20.04+, macOS 12+ \\ \hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Lệnh Build Độc Lập Từng Module}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{Module} & \textbf{Lệnh Build} \\ \hline
+gameStory   & \texttt{g++ src/gameStory/*.cpp tests/test\_story.cpp -o bin/story\_tester} \\ \hline
+gameConsole & \texttt{cmake -B build -S . \&\& cmake --build build --target ConsoleTest} \\ \hline
+gameCore    & \texttt{g++ src/gameCore/app.cpp tests/test\_core.cpp -I src/gameCore/app/include -o core\_test} \\ \hline
+\end{tabularx}
+\end{table}
+
+% ────────────────────────────────────────────────────────────────────
+% 2. TEST CASE – gameStory
+% ────────────────────────────────────────────────────────────────────
+\subsection{Danh Sách Test Case -- Module gameStory}
+
+\introtext{Module gameStory quản lý trải nghiệm onboarding: logo, loading, dialogue, skip, và download động. Các test được phân theo phiên bản (v1, v2, v3) phản ánh tiến độ phát triển.}
+
+% helper macro cho khung test case
+\newcommand{\tcbox}[2]{%
+  \begin{table}[H]
+  \centering
+  \rowcolors{2}{gray!15}{white}
+  \begin{tabularx}{\linewidth}{|l|X|}
+  \hline
+  \rowcolor{gray!35}
+  \multicolumn{2}{|l|}{\textbf{#1}} \\ \hline
+  #2
+  \end{tabularx}
+  \end{table}%
+}
+
+\subsubsection{Nhóm Test v1 -- Khởi Tạo và Hiển Thị Cơ Bản}
+
+\tcbox{STY\_TC\_001 \quad Thiết Lập Layout và Build File Thực Thi}{
+\textbf{Mã Test Case}       & STY\_TC\_001 \\ \hline
+\textbf{Tiêu Đề}            & Thiết Lập Layout và Build File Thực Thi \\ \hline
+\textbf{Module / Phiên Bản} & gameStory / v1 \\ \hline
+\textbf{Loại Test}          & Manual + Build Test \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & Môi trường build C++17 đã cài đặt. Chưa có file \texttt{layout.h}. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Tạo file \texttt{layout.h} với macro \texttt{WIDTH=900}, \texttt{HEIGHT=1600} (tỷ lệ 9:16). \newline
+  2. Build bằng g++ hoặc CMake, tạo file .exe. \newline
+  3. Khởi chạy .exe và quan sát cửa sổ. \newline
+  4. Thay đổi độ phân giải và chạy lại. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Cửa sổ hiển thị đúng tỷ lệ 9:16, không bị kéo dãn. Build thành công không có lỗi compile. \\ \hline
+\textbf{Trường Hợp Biên}    & Test trên màn hình 480p, 4K và tỷ lệ 16:9 để đảm bảo fallback hợp lý. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Cửa sổ 9:16, build thành công. \textbf{FAIL:} Tỷ lệ sai hoặc crash khi khởi chạy. \\ \hline
+}
+
+\tcbox{STY\_TC\_002 \quad Hiển Thị Logo UIT với Hiệu Ứng và Âm Thanh}{
+\textbf{Mã Test Case}       & STY\_TC\_002 \\ \hline
+\textbf{Tiêu Đề}            & Hiển Thị Logo UIT với Hiệu Ứng và Âm Thanh \\ \hline
+\textbf{Module / Phiên Bản} & gameStory / v1 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & Ứng dụng đã build thành công. File âm thanh logo tồn tại. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Khởi chạy ứng dụng, quan sát logo UIT xuất hiện từ trung tâm. \newline
+  2. Kiểm tra hiệu ứng fade-in trong 2–3 giây. \newline
+  3. Xác nhận âm thanh chào mừng phát đúng lúc. \newline
+  4. Thay đổi hiệu ứng (nếu có) và test lại. \newline
+  5. Kiểm tra trên nhiều thiết bị khác nhau. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Logo hiển thị rõ nét, hiệu ứng mượt (không lag), âm thanh phát đúng thời điểm. \\ \hline
+\textbf{Trường Hợp Biên}    & Test khi âm thanh bị tắt trong hệ thống, file âm thanh bị thiếu hoặc định dạng không hỗ trợ. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Logo rõ, hiệu ứng mượt, âm thanh đúng. \textbf{FAIL:} Lag, âm thanh không phát, hiển thị lỗi. \\ \hline
+}
+
+\tcbox{STY\_TC\_003 \quad Loading Bar Đồng Bộ với Thời Gian Hiệu Ứng Logo}{
+\textbf{Mã Test Case}       & STY\_TC\_003 \\ \hline
+\textbf{Tiêu Đề}            & Loading Bar Đồng Bộ với Thời Gian Hiệu Ứng Logo \\ \hline
+\textbf{Module / Phiên Bản} & gameStory / v1 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & STY\_TC\_002 đã pass. Logo có hiệu ứng thời gian xác định. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Khởi chạy, quan sát loading bar xuất hiện bên dưới logo. \newline
+  2. Kiểm tra bar tăng từ 0\% đến 100\% trong đúng thời gian hiệu ứng logo. \newline
+  3. Xác nhận bar đầy khi logo biến mất. \newline
+  4. Test với hiệu ứng logo dài hơn. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Loading bar đầy đúng thời điểm logo kết thúc, không lag, không nhảy giá trị. \\ \hline
+\textbf{Trường Hợp Biên}    & Test khi hiệu ứng logo bị gián đoạn đột ngột. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Bar đầy đúng thời điểm, đồng bộ mượt. \textbf{FAIL:} Không đồng bộ hoặc bar không tăng. \\ \hline
+}
+
+\subsubsection{Nhóm Test v2 -- Dialogue và Tương Tác}
+
+\tcbox{STY\_TC\_004 \quad Dialogue Story với Nhạc Nền}{
+\textbf{Mã Test Case}       & STY\_TC\_004 \\ \hline
+\textbf{Tiêu Đề}            & Dialogue Story với Nhạc Nền \\ \hline
+\textbf{Module / Phiên Bản} & gameStory / v2 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & v1 tests đã pass. File nhạc nền tồn tại tại thư mục assets. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Khởi chạy, điều hướng đến phần dialogue. \newline
+  2. Quan sát hộp thoại hiển thị văn bản giới thiệu. \newline
+  3. Kiểm tra nhạc nền phát mượt, âm lượng phù hợp. \newline
+  4. Nhấn phím để tiếp tục dialogue từng bước. \newline
+  5. Test với nhạc nền bị tắt. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Dialogue hiển thị văn bản đúng nội dung, nhạc nền phù hợp tone và không gián đoạn. \\ \hline
+\textbf{Trường Hợp Biên}    & Test khi file nhạc thiếu hoặc định dạng sai. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Dialogue đúng, nhạc phù hợp. \textbf{FAIL:} Văn bản sai, nhạc gián đoạn, crash. \\ \hline
+}
+
+\tcbox{STY\_TC\_005 \quad Nút Skip Bỏ Qua Cốt Truyện}{
+\textbf{Mã Test Case}       & STY\_TC\_005 \\ \hline
+\textbf{Tiêu Đề}            & Nút Skip Bỏ Qua Cốt Truyện \\ \hline
+\textbf{Module / Phiên Bản} & gameStory / v2 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & STY\_TC\_004 đã pass. Đang trong phần dialogue. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Trong dialogue, nhấn ESC hoặc nút skip. \newline
+  2. Xác nhận story dừng ngay lập tức. \newline
+  3. Kiểm tra chuyển sang game chính mượt mà. \newline
+  4. Xác nhận nhạc nền dừng hoặc chuyển sang nhạc game. \newline
+  5. Test nhấn skip giữa chừng dialogue. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Story dừng hoàn toàn, chuyển sang game chính không crash, trạng thái nhạc đúng. \\ \hline
+\textbf{Trường Hợp Biên}    & Test khi story đã kết thúc tự nhiên trước khi nhấn skip. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Skip thành công, chuyển cảnh mượt, không crash. \textbf{FAIL:} Không chuyển hoặc crash. \\ \hline
+}
+
+\subsubsection{Nhóm Test v3 -- Download Động}
+
+\tcbox{STY\_TC\_006 \quad Download Âm Thanh và Hình Ảnh qua API}{
+\textbf{Mã Test Case}       & STY\_TC\_006 \\ \hline
+\textbf{Tiêu Đề}            & Download Âm Thanh và Hình Ảnh qua API \\ \hline
+\textbf{Module / Phiên Bản} & gameStory / v3 \\ \hline
+\textbf{Loại Test}          & Manual + API Test \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & API endpoint khả dụng. Kết nối mạng ổn định. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Khởi chạy, quan sát quá trình download từ API. \newline
+  2. Kiểm tra file được lưu vào thư mục cache đúng định dạng. \newline
+  3. Xác nhận asset được sử dụng trong story đúng. \newline
+  4. Test với mạng chậm (throttle 3G). \newline
+  5. Test khi không có kết nối mạng. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Download thành công, file lưu đúng, asset hiển thị/phát đúng. Lỗi mạng hiển thị thông báo rõ ràng. \\ \hline
+\textbf{Trường Hợp Biên}    & Test API không khả dụng, file cache đã tồn tại, định dạng file không hỗ trợ. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Download OK, dùng được. \textbf{FAIL:} Lỗi mạng không xử lý được, crash. \\ \hline
+}
+
+\tcbox{STY\_TC\_007 \quad Loading Bar Theo Tiến Độ Download}{
+\textbf{Mã Test Case}       & STY\_TC\_007 \\ \hline
+\textbf{Tiêu Đề}            & Loading Bar Theo Tiến Độ Download \\ \hline
+\textbf{Module / Phiên Bản} & gameStory / v3 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & STY\_TC\_006 đã pass. API hoạt động. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Khởi chạy, quan sát bar tăng theo phần trăm download thực. \newline
+  2. Kiểm tra logo repeat animation trong khi chờ. \newline
+  3. Xác nhận bar đầy khi download hoàn tất. \newline
+  4. Test với download nhanh ($<$ 1 giây) và chậm ($>$ 30 giây). \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Bar tăng phản ánh đúng tiến độ download, logo repeat mượt, chuyển tiếp khi xong. \\ \hline
+\textbf{Trường Hợp Biên}    & Test khi download fail ở giữa chừng (50\%). \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Đồng bộ bar-download, repeat mượt. \textbf{FAIL:} Bar không cập nhật hoặc sai giá trị. \\ \hline
+}
+
+% ────────────────────────────────────────────────────────────────────
+% 3. TEST CASE – gameConsole
+% ────────────────────────────────────────────────────────────────────
+\subsection{Danh Sách Test Case -- Module gameConsole}
+
+\introtext{Module gameConsole quản lý giao diện cấu hình, popups, settings và nhạc nền. Đây là điểm tiếp xúc đầu tiên khi người chơi khởi động game.}
+
+\subsubsection{Nhóm Test v1 -- Layout và Popup Cơ Bản}
+
+\tcbox{CON\_TC\_001 \quad Thiết Lập Layout Console và Build}{
+\textbf{Mã Test Case}       & CON\_TC\_001 \\ \hline
+\textbf{Tiêu Đề}            & Thiết Lập Layout Console và Build \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v1 \\ \hline
+\textbf{Loại Test}          & Manual + Build Test \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & Môi trường build C++17 với CMake. SDL2/ImGui đã cài đặt. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Tạo/cập nhật \texttt{layout.h} với \texttt{WIDTH=900}, \texttt{HEIGHT=1600}. \newline
+  2. Build bằng CMake (\texttt{cmake -B build -S . \&\& cmake --build build}). \newline
+  3. Khởi chạy .exe, kiểm tra tỷ lệ 9:16 trên màn hình thực. \newline
+  4. Quan sát vị trí tiêu đề, menu, thông báo trong khung. \newline
+  5. Đổi kích thước cửa sổ console và quan sát fallback. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Giao diện build thành công, hiển thị đúng 9:16, các thành phần UI trong khung. \\ \hline
+\textbf{Trường Hợp Biên}    & Test trên 480p, 4K, tỷ lệ 16:9 và resize cửa sổ console. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Build OK, đúng 9:16, không lỗi runtime. \textbf{FAIL:} Tỷ lệ sai, giao diện cắt, crash. \\ \hline
+}
+
+\tcbox{CON\_TC\_002 \quad Popup Guide -- Mở và Đóng}{
+\textbf{Mã Test Case}       & CON\_TC\_002 \\ \hline
+\textbf{Tiêu Đề}            & Popup Guide – Mở và Đóng \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v1 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & CON\_TC\_001 đã pass. Ứng dụng đang chạy ở màn hình chính. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Quan sát nút Guide trên giao diện chính. \newline
+  2. Nhấn nút Guide, kiểm tra popup xuất hiện với nội dung hướng dẫn rõ ràng. \newline
+  3. Đọc nội dung, xác nhận định nghĩa phím đầy đủ. \newline
+  4. Nhấn nút Close (X), xác nhận popup đóng và state giao diện chính không thay đổi. \newline
+  5. Mở lại Guide nhiều lần, kiểm tra không memory leak. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Popup Guide mở đúng nội dung, đóng hoàn toàn, trở về giao diện chính không mất state. \\ \hline
+\textbf{Trường Hợp Biên}    & Nhấn Guide khi popup đã mở, màn hình nhỏ (popup không vượt biên), Close nhanh liên tiếp. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Popup đúng nội dung, Close OK, không crash. \textbf{FAIL:} Không mở, Close không hoạt động. \\ \hline
+}
+
+\tcbox{CON\_TC\_003 \quad Popup Board (Leaderboard) -- Mở và Đóng}{
+\textbf{Mã Test Case}       & CON\_TC\_003 \\ \hline
+\textbf{Tiêu Đề}            & Popup Board (Leaderboard) – Mở và Đóng \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v1 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & CON\_TC\_001 đã pass. Dữ liệu leaderboard mẫu đã có. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Quan sát nút Board trên giao diện. \newline
+  2. Nhấn Board, kiểm tra popup hiển thị danh sách điểm đúng định dạng. \newline
+  3. Xác nhận cột score/time/name phân biệt rõ. \newline
+  4. Nhấn Close, xác nhận đóng popup và trở về giao diện chính. \newline
+  5. Mở lại nhiều lần, không lag hoặc dữ liệu trống. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Popup Board hiển thị đúng dữ liệu, Close hoạt động, không crash khi mở lại. \\ \hline
+\textbf{Trường Hợp Biên}    & Dữ liệu board rỗng, danh sách quá dài (phải cuộn), dữ liệu thiếu trường score/time. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Hiển thị đúng, Close OK. \textbf{FAIL:} Không mở, hiển thị sai, crash khi reload. \\ \hline
+}
+
+\tcbox{CON\_TC\_004 \quad Nhạc Nền Trong Màn Hình Game Console}{
+\textbf{Mã Test Case}       & CON\_TC\_004 \\ \hline
+\textbf{Tiêu Đề}            & Nhạc Nền Trong Màn Hình Game Console \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v1 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & Ứng dụng console đang chạy. File nhạc nền tồn tại. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Vào màn hình game chính, quan sát nhạc nền bắt đầu. \newline
+  2. Chơi game và xác nhận nhạc liên tục không ngắt quãng. \newline
+  3. Mở popup Guide/Board và quay lại, kiểm tra nhạc không bị reset. \newline
+  4. Thoát game, xác nhận nhạc dừng. \newline
+  5. Test ở âm lượng 0 và khi file nhạc không tồn tại. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Nhạc nền phát khi vào game, liên tục khi chơi, dừng đúng khi thoát. Không gây lag. \\ \hline
+\textbf{Trường Hợp Biên}    & Mở/đóng popup nhanh liên tiếp, âm lượng = 0, file nhạc bị xóa giữa phiên. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Nhạc đúng timing, không ngắt. \textbf{FAIL:} Không phát, ngắt quãng, ảnh hưởng điều khiển. \\ \hline
+}
+
+\subsubsection{Nhóm Test v2 -- Setting và Tùy Chỉnh}
+
+\tcbox{CON\_TC\_005 \quad Popup Setting -- Mở, Đóng và Bảo Toàn State}{
+\textbf{Mã Test Case}       & CON\_TC\_005 \\ \hline
+\textbf{Tiêu Đề}            & Popup Setting – Mở, Đóng và Bảo Toàn State \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v2 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & v1 tests đã pass. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Nhấn nút Settings trên giao diện chính. \newline
+  2. Popup Setting mở với các tùy chọn: âm lượng, màu khối, điều khiển, chế độ hiển thị. \newline
+  3. Thay đổi một tùy chọn nhưng KHÔNG bấm Save/Apply. \newline
+  4. Nhấn Close, xác nhận popup đóng và thay đổi chưa áp dụng. \newline
+  5. Mở lại Setting, kiểm tra state ban đầu được giữ. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Popup Setting mở đúng, nội dung rõ ràng. Thay đổi chưa lưu không áp dụng khi Close. \\ \hline
+\textbf{Trường Hợp Biên}    & Nhấn Setting khi đã mở, màn hình nhỏ, Close nhanh liên tiếp, mục cấu hình thiếu/không hợp lệ. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Mở đúng, Close đúng chính sách lưu. \textbf{FAIL:} Không đóng, lưu sai state. \\ \hline
+}
+
+\tcbox{CON\_TC\_006 \quad Điều Chỉnh Âm Lượng}{
+\textbf{Mã Test Case}       & CON\_TC\_006 \\ \hline
+\textbf{Tiêu Đề}            & Điều Chỉnh Âm Lượng \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v2 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & CON\_TC\_005 đã pass. Popup Setting đang mở. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Tìm điều khiển âm lượng (slider/phím tăng-giảm). \newline
+  2. Tăng âm lượng từ min đến max, xác nhận âm thanh tăng theo. \newline
+  3. Giảm về 0, xác nhận âm thanh tắt hoàn toàn. \newline
+  4. Đóng và mở lại Setting, kiểm tra giá trị âm lượng được giữ. \newline
+  5. Thay đổi âm lượng liên tục nhanh. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Âm lượng điều chỉnh chính xác, phản hồi tức thì. Giá trị được lưu đúng nếu policy yêu cầu. \\ \hline
+\textbf{Trường Hợp Biên}    & Đặt âm lượng = 0, kéo max liên tục, đóng popup mà không save. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Điều chỉnh OK, phản hồi tức thì. \textbf{FAIL:} Không thay đổi âm thanh, giá trị bị khóa. \\ \hline
+}
+
+\tcbox{CON\_TC\_007 \quad Tùy Chỉnh Màu Sắc Khối}{
+\textbf{Mã Test Case}       & CON\_TC\_007 \\ \hline
+\textbf{Tiêu Đề}            & Tùy Chỉnh Màu Sắc Khối \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v2 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & CON\_TC\_005 đã pass. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Mở Setting, tìm tùy chọn màu sắc khối. \newline
+  2. Chọn màu mới cho một loại khối, Apply/Save. \newline
+  3. Vào màn hình chơi, xác nhận khối hiển thị đúng màu đã chọn. \newline
+  4. Thay đổi màu lần nữa và kiểm tra màu mới áp dụng đúng (không giữ màu cũ). \newline
+  5. Chọn màu tương phản thấp với nền. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Màu khối được tùy chỉnh đúng, áp dụng ngay trong game, không làm hỏng layout. \\ \hline
+\textbf{Trường Hợp Biên}    & Màu không hợp lệ, màu tương phản quá thấp với nền, đổi nhiều lần trong một phiên. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Màu đúng, áp dụng ngay. \textbf{FAIL:} Không đổi màu, đổi nhầm khối, hỏng giao diện. \\ \hline
+}
+
+\tcbox{CON\_TC\_008 \quad Nút Start và Tích Hợp với Các Tính Năng Khác}{
+\textbf{Mã Test Case}       & CON\_TC\_008 \\ \hline
+\textbf{Tiêu Đề}            & Nút Start và Tích Hợp với Các Tính Năng Khác \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v2 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & Toàn bộ v1, v2 tests trước đã pass. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Nhấn nút Start từ menu chính, xác nhận vào màn hình game. \newline
+  2. Trong game, mở popup Guide/Board, xác nhận không treo. \newline
+  3. Đóng popup, xác nhận game tiếp tục hoặc pause đúng theo thiết kế. \newline
+  4. Kiểm tra nhạc nền: bật khi start, xử lý đúng khi mở/đóng popup. \newline
+  5. Nhấn Start liên tiếp nhiều lần. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Start vào game đúng. Popup không gây xung đột state. Nhạc nền xử lý đúng. \\ \hline
+\textbf{Trường Hợp Biên}    & Nhấn Start nhiều lần liên tiếp, mở popup trước Start, thay đổi Setting chưa lưu rồi Start. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Start OK, tích hợp popup+nhạc đúng. \textbf{FAIL:} Không vào game, mất dữ liệu, crash. \\ \hline
+}
+
+\subsubsection{Nhóm Test v3 -- Tích Hợp API}
+
+\tcbox{CON\_TC\_009 \quad Gọi API Mongo Atlas cho Leaderboard}{
+\textbf{Mã Test Case}       & CON\_TC\_009 \\ \hline
+\textbf{Tiêu Đề}            & Gọi API Mongo Atlas cho Leaderboard \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v3 \\ \hline
+\textbf{Loại Test}          & Manual + API Test \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & Kết nối Mongo Atlas đã cấu hình. API endpoint khả dụng. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Vào popup Board, quan sát ứng dụng gọi API thay vì đọc \texttt{board.json}. \newline
+  2. Xác nhận dữ liệu từ API hiển thị đúng: name/score/time chính xác. \newline
+  3. So sánh dữ liệu API với expected data mẫu. \newline
+  4. Test khi API lỗi mạng – kiểm tra thông báo lỗi rõ ràng. \newline
+  5. Test khi API trả về dữ liệu trống hoặc thiếu trường. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & API gọi đúng, dữ liệu hiển thị chính xác. Lỗi được xử lý an toàn, không crash. \\ \hline
+\textbf{Trường Hợp Biên}    & API chậm/timeout, token Mongo Atlas sai, trường dữ liệu không đúng định dạng. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} API OK, lỗi xử lý an toàn. \textbf{FAIL:} Crash, vẫn dùng board.json, không xử lý lỗi. \\ \hline
+}
+
+\tcbox{CON\_TC\_010 \quad Sort Leaderboard Theo Score}{
+\textbf{Mã Test Case}       & CON\_TC\_010 \\ \hline
+\textbf{Tiêu Đề}            & Sort Leaderboard Theo Score \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v3 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & CON\_TC\_009 đã pass. Popup Board đang mở với dữ liệu từ API. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Tìm và nhấn nút sort theo Score giảm dần. \newline
+  2. Kiểm tra danh sách từ điểm cao đến thấp. \newline
+  3. Chuyển sang sort Score tăng dần. \newline
+  4. Test với nhiều bản ghi cùng điểm. \newline
+  5. Đóng popup và mở lại, kiểm tra state sort. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Sort theo score chính xác cả chiều tăng và giảm. Dữ liệu cùng score giữ thứ tự ổn định. \\ \hline
+\textbf{Trường Hợp Biên}    & Dữ liệu rỗng, điểm số bằng nhau, sort liên tiếp nhiều lần. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Sort đúng thứ tự. \textbf{FAIL:} Thứ tự sai, popup lỗi khi sort. \\ \hline
+}
+
+\tcbox{CON\_TC\_011 \quad Sort Leaderboard Theo Time}{
+\textbf{Mã Test Case}       & CON\_TC\_011 \\ \hline
+\textbf{Tiêu Đề}            & Sort Leaderboard Theo Time \\ \hline
+\textbf{Module / Phiên Bản} & gameConsole / v3 \\ \hline
+\textbf{Loại Test}          & Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & CON\_TC\_009 đã pass. Popup Board đang mở. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Tìm và nhấn nút sort theo Time. \newline
+  2. Sort tăng dần: danh sách từ thời gian nhỏ nhất đến lớn nhất. \newline
+  3. Sort giảm dần: ngược lại. \newline
+  4. Test với nhiều bản ghi cùng timestamp. \newline
+  5. Đóng/mở popup, kiểm tra state sort duy trì. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Sort theo time chính xác cả chiều, dữ liệu cùng time ổn định. \\ \hline
+\textbf{Trường Hợp Biên}    & Dữ liệu rỗng, nhiều bản ghi cùng thời gian, sort liên tiếp. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Sort đúng. \textbf{FAIL:} Thứ tự sai, popup lỗi. \\ \hline
+}
+
+% ────────────────────────────────────────────────────────────────────
+% 4. TEST CASE – gameCore
+% ────────────────────────────────────────────────────────────────────
+\subsection{Danh Sách Test Case -- Module gameCore}
+
+\introtext{Module gameCore chứa toàn bộ logic gameplay. Đây là module có mức ưu tiên kiểm thử cao nhất. Các test được phân theo nhóm chức năng.}
+
+\subsubsection{Nhóm Test -- Khởi Tạo và Hiển Thị}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|X|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{Mã TC} & \textbf{Tiêu Đề} & \textbf{Kịch Bản Tóm Tắt} & \textbf{Pass Condition} \\ \hline
+CORE\_TC\_001 & Layout và Build gameCore     & Build bằng g++/CMake, kiểm tra cửa sổ 9:16 trên nhiều độ phân giải & Build thành công, cửa sổ đúng tỷ lệ \\ \hline
+CORE\_TC\_002 & Tạo 6 Loại Khối Cơ Bản       & Khởi tạo từng khối L, I, T, Z-trái, Z-phải, O; quan sát hình dạng và màu & Mỗi khối đủ ô, đúng hình, màu đồng nhất \\ \hline
+CORE\_TC\_003 & Màu Ngẫu Nhiên Hợp Lệ        & Tạo nhiều khối liên tiếp, xác nhận màu thuộc \{Blue, Red, Green, Yellow, Orange, Purple\} & Màu thuộc danh sách, không cố định một giá trị \\ \hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Nhóm Test -- Vật Lý và Di Chuyển Khối}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|X|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{Mã TC} & \textbf{Tiêu Đề} & \textbf{Kịch Bản Tóm Tắt} & \textbf{Pass Condition} \\ \hline
+CORE\_TC\_004 & Rơi Tự Do                           & Thả khối từ vị trí top, quan sát chuyển động và tốc độ rơi đều & Khối rơi đều, không dừng sai chỗ \\ \hline
+CORE\_TC\_005 & Di Chuyển Trái/Phải và Xoay         & Dùng A/D hoặc mũi tên dịch chuyển; W/mũi tên lên để xoay & Khối thay đổi vị trí và hướng đúng \\ \hline
+CORE\_TC\_006 & Va Chạm và Dừng Đúng Vị Trí        & Để khối rơi đến đáy, quan sát trạng thái dừng; để khối chạm khối đã đặt & Khối dừng đúng, không tiếp tục rơi, không overlap \\ \hline
+CORE\_TC\_007 & Xoay Chặn Sát Tường                 & Đặt khối sát tường, xoay và quan sát wall kick hoặc chặn xoay & Khối không vượt ra khỏi bảng sau xoay \\ \hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Nhóm Test -- Xóa Dòng và Tính Điểm}
+
+\tcbox{CORE\_TC\_008 \quad Xóa Dòng và Hiệu Ứng (removeLine)}{
+\textbf{Mã Test Case}       & CORE\_TC\_008 \\ \hline
+\textbf{Tiêu Đề}            & Xóa Dòng và Hiệu Ứng (\texttt{removeLine}) \\ \hline
+\textbf{Module / Phiên Bản} & gameCore / v1+ \\ \hline
+\textbf{Loại Test}          & Unit + Manual \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & Board đã khởi tạo (\texttt{initBoard}). Một hàng nội bộ được điền đầy. \\ \hline
+\textbf{Các Bước Thực Hiện} &
+  1. Khởi tạo board kích thước H=20, W=15 bằng \texttt{initBoard()}. \newline
+  2. Điền đầy hàng i=17 (mọi cột j=1 đến j=W-2 chứa ký tự khối). \newline
+  3. Gọi \texttt{removeLine()}. \newline
+  4. Kiểm tra hàng i=17 trở thành khoảng trắng (ngoại trừ biên). \newline
+  5. Kiểm tra nội dung hàng i=16 dịch xuống i=17. \newline
+  6. Kiểm tra ký tự biên \texttt{`|'} không bị ghi đè. \newline
+  7. Test với 2–3 hàng đầy liên tiếp. \\ \hline
+\textbf{Kết Quả Mong Đợi}   & Hàng đầy bị xóa hoàn toàn. Các hàng trên trượt xuống đúng 1 vị trí. Biên tường \texttt{`|'} giữ nguyên. Hàng trên cùng trở thành khoảng trắng. \\ \hline
+\textbf{Trường Hợp Biên}    & Hàng đầy tại i=1 (gần biên trên), không có hàng đầy nào (board không đổi), 3 hàng đầy liên tiếp. \\ \hline
+\textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} Tất cả điều kiện trên đúng. \textbf{FAIL:} Biên bị xóa, hàng dịch sai, hàng đầy còn lại. \\ \hline
+}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|X|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{Mã TC} & \textbf{Tiêu Đề} & \textbf{Kịch Bản Tóm Tắt} & \textbf{Pass Condition} \\ \hline
+CORE\_TC\_009 & Tính Điểm Khi Xóa Dòng    & Xóa 1, 2, 3, 4 dòng; đối chiếu điểm với công thức chuẩn Tetris & Điểm thay đổi đúng theo số dòng (Tetris=800$\times$level) \\ \hline
+CORE\_TC\_010 & Tốc Độ Tăng Theo Điểm     & Xóa liên tiếp nhiều dòng, quan sát tốc độ khối sau mỗi lần & Khối rơi nhanh hơn khi điểm/level tăng, không vượt max \\ \hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Nhóm Test -- Tính Năng Game}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|X|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{Mã TC} & \textbf{Tiêu Đề} & \textbf{Kịch Bản Tóm Tắt} & \textbf{Pass Condition} \\ \hline
+CORE\_TC\_011 & Nhạc Nền Liên Tục          & Bật game, để chạy 5+ phút, quan sát nhạc nền & Nhạc không bị ngắt giữa chừng \\ \hline
+CORE\_TC\_012 & Dự Báo 3 Khối Tiếp Theo    & Chơi và quan sát khu vực preview khi khối rơi & Luôn hiển thị đúng 3 khối tiếp theo theo thứ tự \\ \hline
+CORE\_TC\_013 & Pause và Resume            & Nhấn P để pause, quan sát dừng chuyển động + nhạc; nhấn lại để tiếp tục & Game dừng/tiếp tục chính xác, state không bị mất \\ \hline
+CORE\_TC\_014 & Quit Game                  & Nhấn nút Quit trong khi chơi, xác nhận thoát & Ứng dụng đóng đúng, không crash, không process còn chạy ngầm \\ \hline
+CORE\_TC\_015 & Nhập Tên Game Over         & Chơi đến khi hết mạng, nhập tên và xác nhận & Tên được chấp nhận, hiển thị trên kết quả \\ \hline
+CORE\_TC\_016 & Gửi Điểm lên Mongo Atlas   & Kết thúc game, nhập tên, gửi data lên API & Dữ liệu gửi thành công, API phản hồi 200 \\ \hline
+\end{tabularx}
+\end{table}
+
+% ────────────────────────────────────────────────────────────────────
+% 5. MÔ TẢ KỸ THUẬT – removeLine()
+% ────────────────────────────────────────────────────────────────────
+\subsection{Mô Tả Kỹ Thuật Chi Tiết -- Hàm \texttt{removeLine()}}
+
+\introtext{Phần này mô tả kỹ thuật kiểm thử chi tiết cho hàm \texttt{removeLine()} – hàm quan trọng nhất trong gameCore. Sai sót ở đây ảnh hưởng trực tiếp đến core gameplay.}
+
+\subsubsection{Cấu Trúc Board và Điều Kiện Kiểm Thử}
+\begin{itemize}[leftmargin=3em]
+  \item Board được lưu trong mảng 2 chiều \texttt{board[H][W]}, kích thước chuẩn H=20, W=15
+  \item Hàng đầu (i=0), hàng cuối (i=H-1), cột trái (j=0) và phải (j=W-1): biên tường cố định chứa ký tự \texttt{`|'}
+  \item Các ô nội bộ (j=1 đến j=W-2): khoảng trắng (trống) hoặc ký tự khối
+  \item Hàng đầy: tất cả ô nội bộ khác khoảng trắng
+\end{itemize}
+
+\subsubsection{Kịch Bản Kiểm Thử Chi Tiết \texttt{removeLine()}}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|X|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{\#} & \textbf{Kịch Bản} & \textbf{Input / Setup} & \textbf{Kết Quả Mong Đợi} \\ \hline
+TC-A & Xóa 1 hàng đơn             & Hàng i=17 đầy; i=16 có vài ký tự & i=17 thành trắng; nội dung i=16 xuống i=17; i=16 thành trắng \\ \hline
+TC-B & Xóa 2 hàng liên tiếp       & Hàng i=16 và i=17 đều đầy & Cả 2 hàng xóa; các hàng trên dịch xuống đúng thứ tự \\ \hline
+TC-C & Hàng đầy gần biên trên     & Hàng i=1 đầy & i=1 thành trắng; thuật toán xử lý đúng giáp biên \\ \hline
+TC-D & Không có hàng đầy          & Board chỉ có ô trắng và biên & Board không thay đổi \\ \hline
+TC-E & Biên tường sau xóa         & Bất kỳ kịch bản xóa nào & Ký tự \texttt{`|'} ở cột 0 và W-1 không bị thay đổi \\ \hline
+TC-F & Ô trống dùng khoảng trắng  & Sau khi xóa hàng & Ô trống dùng \texttt{' '} (space), không phải null hoặc ký tự rác \\ \hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Checklist Kiểm Thử \texttt{removeLine()}}
+\begin{itemize}[leftmargin=3em]
+  \item Hàng đầy biến mất hoàn toàn, không còn ký tự khối
+  \item Các hàng phía trên dịch xuống đúng 1 vị trí
+  \item Hàng trên cùng (sau dịch chuyển) trở thành khoảng trắng
+  \item Ký tự biên \texttt{`|'} ở cột 0 và W-1 không bị ghi đè
+  \item Không có ký tự lạ (ASCII không in được, null) trong ô trống
+  \item Hai hàng đầy liên tiếp: thuật toán tăng i sau xóa để kiểm tra lại hàng mới trượt xuống
+  \item Kết quả test nhất quán khi chạy nhiều lần với cùng input
+\end{itemize}
+
+\subsubsection{Hướng Dẫn Xây Dựng Test Tự Động cho \texttt{removeLine()}}
+\begin{itemize}[leftmargin=3em]
+  \item Tạo hàm helper riêng để khởi tạo ma trận mẫu và chuyển thành chuỗi văn bản để so sánh
+  \item So sánh toàn bộ bảng sau gọi \texttt{removeLine()} với expected board đã chuẩn bị sẵn
+  \item Phân tách thành các test case nhỏ: \textit{đơn} (single clear), \textit{dồn} (multi clear), \textit{giáp đáy}, \textit{giáp trên}
+  \item Cân nhắc thêm hàm \texttt{isLineFull(int row)} để unit test riêng logic nhận biết hàng đầy
+\end{itemize}
+
+% ────────────────────────────────────────────────────────────────────
+% 6. KIỂM THỬ XOAY KHỐI
+% ────────────────────────────────────────────────────────────────────
+\subsection{Mô Tả Kỹ Thuật -- Kiểm Thử Xoay Khối}
+
+\subsubsection{Các Yếu Tố Kiểm Thử Chính}
+\begin{itemize}[leftmargin=3em]
+  \item Xoay tại vị trí trung tâm: hình dạng đổi đúng quy tắc SRS
+  \item Xoay sát tường: khối không bị cắt, không vượt biên (wall kick nếu có)
+  \item Xoay gần khối cố định: không chồng lên ô đã đặt
+  \item 4 lần xoay liên tiếp trả về hình dạng ban đầu
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|X|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{\#} & \textbf{Kịch Bản Xoay} & \textbf{Setup} & \textbf{Kết Quả Mong Đợi} \\ \hline
+R-01 & Xoay ở vị trí trung tâm    & Block ở giữa board, không vật cản & Hình dạng đúng, số ô không đổi, không lỗi hình học \\ \hline
+R-02 & Xoay sát tường trái        & Block sát j=1 & Không vượt biên; wall kick điều chỉnh vị trí (nếu có) \\ \hline
+R-03 & Xoay sát tường phải        & Block sát j=W-2 & Tương tự R-02 phía phải \\ \hline
+R-04 & Xoay sát đáy               & Block gần hàng đáy & Không overlap đáy, xoay hợp lệ hoặc bị block \\ \hline
+R-05 & Xoay gần khối cố định      & Có ô đã đặt bên cạnh & Không chồng lên ô cố định \\ \hline
+R-06 & 4 lần xoay liên tiếp       & Block ở vị trí bất kỳ hợp lệ & Block trở về hình dạng ban đầu \\ \hline
+\end{tabularx}
+\end{table}
+
+% ────────────────────────────────────────────────────────────────────
+% 7. KIỂM THỬ GIAO DIỆN – VIỀN VÀ BLOCK VUÔNG
+% ────────────────────────────────────────────────────────────────────
+\subsection{Kiểm Thử Giao Diện -- Viền và Block Vuông}
+
+\introtext{Giao diện lưới vuông đảm bảo game cảm nhận đúng tỷ lệ Tetris. Khung và block bị méo làm giảm độ chính xác chơi và trải nghiệm thị giác.}
+
+\subsubsection{Kịch Bản Kiểm Thử}
+\begin{itemize}[leftmargin=3em]
+  \item Chạy ứng dụng và quan sát khung hiển thị cùng các block trong khu vực chơi
+  \item Xác thực từng ô trong lưới có kích thước bằng nhau theo cả chiều ngang và dọc
+  \item Kiểm tra viền màn hình tạo thành hình chữ nhật cân đối với góc 90 độ
+  \item Kiểm tra mỗi block hiển thị trong ô vuông đồng nhất, không kéo dài một chiều
+  \item Thay đổi kích thước cửa sổ, xác nhận tỷ lệ 1:1 vẫn duy trì
+  \item Ghi nhận bất kỳ ô/block xuất hiện dạng HCN (hình chữ nhật) – note vị trí cụ thể
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{Tiêu Chí} & \textbf{Mô Tả} \\ \hline
+\textbf{PASS} & Tất cả ô lưới và block tỷ lệ 1:1, viền rõ ràng, góc vuông sắc nét, không biến dạng HCN \\ \hline
+\textbf{FAIL} & Khác biệt rõ giữa chiều ngang/dọc của ô hoặc block, viền kéo dài, góc không vuông \\ \hline
+\end{tabularx}
+\end{table}
+
+% ────────────────────────────────────────────────────────────────────
+
+% ────────────────────────────────────────────────────────────────────
+\subsection{Kiểm Thử Tốc Độ Rơi Sau \texttt{removeLine()}}
+
+\introtext{Cơ chế tăng tốc độ rơi sau mỗi lần xóa dòng là yếu tố gameplay quan trọng tạo nên độ khó và sự thú vị của Tetris.}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|X|X|}
+\hline
+\rowcolor{gray!35}
+\textbf{\#} & \textbf{Kịch Bản} & \textbf{Thực Hiện} & \textbf{Kết Quả Mong Đợi} \\ \hline
+SPD-01 & Tốc độ tăng sau 1 lần xóa            & Ghi delay ban đầu (ví dụ 300ms), xóa 1 hàng, đo delay mới & Delay mới $<$ 300ms (tốc độ tăng) \\ \hline
+SPD-02 & Tốc độ tăng dần qua nhiều lần xóa    & Xóa liên tiếp 3 lần, ghi delay sau mỗi lần & Delay giảm dần qua mỗi lần xóa \\ \hline
+SPD-03 & Không xóa dòng thì không tăng tốc    & Chơi không xóa dòng nào & Delay giữ nguyên, tốc độ không tăng \\ \hline
+SPD-04 & Tốc độ không vượt giới hạn tối đa    & Xóa rất nhiều dòng liên tiếp & Tốc độ không vượt max, không crash \\ \hline
+\end{tabularx}
+\end{table}
+
+% ────────────────────────────────────────────────────────────────────
+% 9. TỔNG HỢP VÀ MA TRẬN KIỂM THỬ
+% ────────────────────────────────────────────────────────────────────
+\subsection{Tổng Hợp và Ma Trận Kiểm Thử}
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{gray!15}{white}
+\begin{tabularx}{\linewidth}{|l|X|l|l|l|l|}
+\hline
+\rowcolor{gray!35}
+\textbf{Module} & \textbf{Nhóm Test} & \textbf{Tổng TC} & \textbf{Auto} & \textbf{Manual} & \textbf{Trạng Thái} \\ \hline
+gameStory   & v1, v2, v3                              & 7   & 2  & 5   & Planned \\ \hline
+gameConsole & v1, v2, v3                              & 11  & 3  & 8   & Planned \\ \hline
+gameCore    & Build, Physics, Lines, Features         & 16  & 6  & 10  & Planned \\ \hline
+Technical   & removeLine, Rotation, Display, Speed    & 20+ & 10 & 10+ & Planned \\ \hline
+Integration & End-to-end, Stress                      & 5+  & 2  & 3+  & Planned \\ \hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Kết Luận}
+
+\introtext{Tài liệu này cung cấp danh sách test case đầy đủ cho toàn bộ ba module của cTetris. Các test case được tổ chức theo module và phiên bản, có cấu trúc rõ ràng với preconditions, steps, expected results và boundary cases.}
+
+\introtext{Nhóm phát triển nên ưu tiên thực hiện các test case theo thứ tự: gameCore (CORE\_TC\_001 $\rightarrow$ CORE\_TC\_016) $\rightarrow$ Integration $\rightarrow$ gameConsole $\rightarrow$ gameStory. Các test case kỹ thuật về \texttt{removeLine()} và xoay khối phải được thực hiện trước khi release bất kỳ build nào.}
+
+\label{LastPageTestList}
+\end{document}

@@ -1,0 +1,28 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - Công nghệ nền tảng}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{15-technologyAdoption.tex}{LastPageTechnologyAdoption}
+\onehalfspacing
+\section{Công nghệ nền tảng}
+
+\subsection{Công nghệ Frontend}
+// tự viết thêm: 
+
+\subsection{Công nghệ Backend}
+// tự viết thêm:  
+\subsection{Công nghệ Database}
+// tự viết thêm: 
+\subsection{Công nghệ Devops}
+// tự viết thêm: 
+
+\label{LastPageTechnologyAdoption}
+\end{document}

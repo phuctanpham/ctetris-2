@@ -1,0 +1,35 @@
+% !TEX TS-program = xelatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - tính năng chính: Đặc tả yêu cầu}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{04-gameCoreRequirements.tex}{LastPageGameCoreRequirements}
+\onehalfspacing
+
+\section{Đặc tả yêu cầu tính năng chính}
+
+// tự viết thêm: Khái quát đây là engine xử lý vòng lặp trò chơi (Game Loop) thuần túy (thuật toán lưới, va chạm, điểm số).
+
+\subsection{Mục tiêu (Objective)}
+// tự viết thêm: Mô phỏng vật lý và logic bàn cờ (Grid) của game xếp hình, nhận thao tác phím (Input) và cập nhật trạng thái lưới (State) liên tục.
+
+\subsection{Phạm vi (Scope)}
+// tự viết thêm: In-scope: Thuật toán di chuyển khối, xoay, rơi nhanh, xóa hàng, combo multiplier.
+// tự viết thêm: Out-scope: Không chịu trách nhiệm render hình ảnh (chỉ tính toán mảng), không xử lý menu Tạm dừng (Pause do Console lo).
+
+\subsection{Đặc tả chức năng (Functional List)}
+// tự viết thêm: - Xử lý khối: Logic sinh tetromino ngẫu nhiên (hoặc dùng túi 7 khối - 7-bag randomizer).
+// tự viết thêm: - Xử lý tính điểm: Hàm tính toán điểm theo số hàng xóa cùng lúc. Hàm bắt điều kiện Game Over (chạm đỉnh lưới).
+
+\subsection{Giới hạn kỹ thuật (Constraints)}
+// tự viết thêm: Hiệu năng: Thuật toán quét và xóa hàng phải độ phức tạp thấp (O(n)), đảm bảo Update Loop chạy ổn định ở 60 FPS (thời gian tính toán < 16.6ms). Không được cấp phát RAM động liên tục (tránh Garbage Collection/Memory Leak).
+
+\label{LastPageGameCoreRequirements}
+\end{document}
