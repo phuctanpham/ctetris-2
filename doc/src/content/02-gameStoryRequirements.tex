@@ -6,29 +6,153 @@
 \IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
 \IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
 \usepackage{docmute}
-\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - tính năng cốt truyện: Đặc tả yêu cầu}}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds}
+\usepackage{tabularx}
+\usepackage{enumitem}
+
+\hypersetup{pdftitle={Software Requirements Specification (SRS) - gameStory Module}}
 
 \begin{document}
 \providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
 \StandaloneSectionSetup{02-gameStoryRequirements.tex}{LastPageGameStoryRequirements}
 \onehalfspacing
-\section{Đặc tả yêu cầu tính năng cốt truyện}
 
-// tự viết thêm: Viết một câu mô tả tổng quan kiến trúc hệ thống Story (VD: Hệ thống đọc file kịch bản tĩnh và render hội thoại/cutscene độc lập trước khi load core game).
+\section{Đặc tả Yêu cầu Nghiệp vụ (SRS): Module gameStory}
 
-\subsection{Mục tiêu (Objective)}
-// tự viết thêm: Module này nhận input gì và trả ra output gì? (VD: Input: File JSON kịch bản. Output: Callback tín hiệu báo kết thúc Story để main.cpp chuyển sang Menu).
+\subsection{Tổng quan Nghiệp vụ (Business Overview)}
+Phân hệ \textbf{gameStory} đóng vai trò là màn hình khởi động và giới thiệu của ứng dụng cTetris. Module chịu trách nhiệm thiết lập nhận diện thương hiệu, tải tài nguyên hệ thống, và dẫn dắt người chơi vào không gian trò chơi thông qua cốt truyện tương tác trước khi chuyển sang Menu chính (\texttt{gameConsole}).
 
-\subsection{Phạm vi (Scope)}
-// tự viết thêm: In-scope: Logic parse file kịch bản, quản lý hàng đợi (queue) hiển thị text dạng typewriter, hiển thị sprite nhân vật.
-// tự viết thêm: Out-scope: Không xử lý âm thanh/voice (chỉ gửi event cho Audio module), không xử lý logic lưu/tải game.
+\subsection{Mô hình hóa Hệ thống (System Modeling)}
 
-\subsection{Đặc tả chức năng (Functional List)}
-// tự viết thêm: - Tính năng Parse: Đọc và validate file kịch bản.
-// tự viết thêm: - Tính năng Control: Tua nhanh (Skip), tự động chạy (Auto-play), lưu log các câu thoại cũ.
+\subsubsection{Sơ đồ Ngữ cảnh (System Context Diagram)}
+\begin{center}
+\begin{tikzpicture}[
+    entity/.style={rectangle, draw=black, fill=blue!10, thick, minimum width=2.8cm, minimum height=1.2cm, align=center, font=\small},
+    system/.style={circle, draw=orange, fill=orange!10, thick, minimum size=2.8cm, align=center, font=\small},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+\node[system] (gamestory) {\textbf{gameStory}};
+% Thu hẹp khoảng cách về 3cm để tránh tràn trang A4
+\node[entity, left=3cm of gamestory] (player) {Người chơi};
+\node[entity, right=3cm of gamestory] (os) {API Cloud /\\ OS / Browser};
+\node[entity, below=1.5cm of gamestory] (gameconsole) {Module\\ gameConsole};
 
-\subsection{Giới hạn kỹ thuật (Constraints)}
-// tự viết thêm: Bộ nhớ: Cache kịch bản load lên RAM tối đa < 5MB. UI: Text không được tràn viền hiển thị ở độ phân giải nhỏ nhất (VD: 720p).
+% Tách biệt luồng Người chơi <-> gameStory bằng yshift
+\draw[arrow] ($(player.east)+(0,0.3)$) -- node[above, font=\scriptsize, align=center] {Khởi chạy \&\\ Tương tác} ($(gamestory.west)+(0,0.3)$);
+\draw[arrow] ($(gamestory.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Hiển thị UI/Story} ($(player.east)-(0,0.3)$);
+
+% Tách biệt luồng gameStory <-> API Cloud bằng yshift
+\draw[arrow] ($(gamestory.east)+(0,0.3)$) -- node[above, font=\scriptsize] {Yêu cầu Asset} ($(os.west)+(0,0.3)$);
+\draw[arrow] ($(os.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Cung cấp Media} ($(gamestory.east)-(0,0.3)$);
+
+% Luồng gameStory -> gameConsole
+\draw[arrow] (gamestory) -- node[right, font=\scriptsize] {Tín hiệu kết thúc} (gameconsole);
+\end{tikzpicture}
+\end{center}
+
+\subsection{Yêu cầu Phiên bản V1: Khởi tạo \& Nhận diện Thương hiệu}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mục tiêu cốt lõi:} Thiết lập nền tảng hoạt động độc lập và nhận diện thương hiệu cTetris thông qua hiệu ứng thị giác 8 giây tối ưu.
+    \item \textbf{Đặc tả Giao diện \& Hiệu ứng:}
+    \begin{itemize}[noitemsep]
+        \item Layout dọc tỷ lệ 9:16; Logo cTetris (3$\times$3 ô vuông) Fade-in chính giữa.
+        \item Hiệu ứng văn bản mỏng (Thinning) cho tên game; Loading bar xanh lá (180$\times$12 px).
+    \end{itemize}
+    \item \textbf{Luồng tương tác sử dụng (userflow):}
+    \begin{center}
+    \begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, start/.style={circle, draw, fill=green!20, minimum size=0.6cm}, end/.style={circle, draw, fill=red!20, double, minimum size=0.6cm}, process/.style={rectangle, draw, fill=orange!10, minimum width=2cm}, decision/.style={diamond, draw, fill=blue!5, aspect=2}]
+        \node (s) [start] {Start};
+        \node (p1) [process, below=0.6cm of s] {Init Clock (T=0)};
+        \node (p2) [process, below=0.6cm of p1] {Update UI/Bar};
+        \node (d1) [decision, below=0.6cm of p2] {T $\geq$ 8s?};
+        \node (e) [end, right=1.5cm of d1] {End};
+        \draw [->] (s) -- (p1); \draw [->] (p1) -- (p2); \draw [->] (p2) -- (d1);
+        \draw [->] (d1) -- node[above] {Yes} (e); \draw [->] (d1.west) -- ++(-0.5,0) |- (p2.west);
+    \end{tikzpicture}
+    \end{center}
+    \item \textbf{Sơ đồ tình huống sử dụng (usecase):}
+    \begin{center}
+    \begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10, minimum size=0.5cm}, usecase/.style={ellipse, draw, fill=white, minimum width=2cm}]
+        \draw (0,0) rectangle (4,-2.5); \node at (2,-0.3) {\textbf{System V1}};
+        \node (p) [actor] at (-1.5, -1.25) {Player};
+        \node (u1) [usecase] at (2,-1) {Xem Intro};
+        \node (u2) [usecase] at (2,-1.8) {Theo dõi Bar};
+        \draw [->] (p) -- (u1); \draw [->] (p) -- (u2);
+    \end{tikzpicture}
+    \end{center}
+    \item \textbf{Yêu cầu Chức năng:} Tự động chạy Intro; Lấp đầy Loading Bar tuyến tính; Chuyển sang Menu sau 8 giây.
+    \item \textbf{Yêu cầu Phi Chức năng:} Tương thích đa nền tảng (SDL3); Hỗ trợ ký tự Copyright (©) UTF-8.
+    \item \textbf{Yêu cầu Kỹ thuật:} Sử dụng \texttt{nanosvg}; Cơ chế Lazy Init Texture tối ưu tài nguyên.
+    \item \textbf{Tiêu chí thành công (user acceptance criteria):} Hệ thống tự động chuyển Menu đúng 8.0s; Không vỡ đồ họa SVG.
+\end{itemize}
+
+\subsection{Yêu cầu Phiên bản V2: Cốt truyện Tương tác}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mục tiêu cốt lõi:} Giới thiệu bối cảnh và tăng tính gắn kết thông qua hội thoại tương tác và lựa chọn phân nhánh.
+    \item \textbf{Đặc tả Giao diện \& Hiệu ứng:} Dialogue Box mờ nửa dưới; Hiệu ứng chữ máy đánh chữ; BGM đồng bộ cốt truyện.
+    \item \textbf{Luồng tương tác sử dụng (userflow):}
+    \begin{center}
+    \begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, start/.style={circle, draw, fill=green!20}, end/.style={circle, draw, fill=red!20, double}, process/.style={rectangle, draw, fill=orange!10}, decision/.style={diamond, draw, fill=blue!5, aspect=2}]
+        \node (s) [start] {Start};
+        \node (p1) [process, below=0.6cm of s] {Hiện hội thoại};
+        \node (d1) [decision, below=0.6cm of p1] {Skip?};
+        \node (p2) [process, below=0.6cm of d1] {Chọn Nhánh};
+        \node (e) [end, right=1.5cm of d1] {End};
+        \draw [->] (s) -- (p1); \draw [->] (p1) -- (d1);
+        \draw [->] (d1) -- node[left] {No} (p2); \draw [->] (d1) -- node[above] {Yes} (e);
+        \draw [->] (p2.east) -| (e.south);
+    \end{tikzpicture}
+    \end{center}
+    \item \textbf{Sơ đồ tình huống sử dụng (usecase):}
+    \begin{center}
+    \begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10}, usecase/.style={ellipse, draw, fill=white, minimum width=2.2cm}]
+        \draw (0,0) rectangle (5,-3.5); \node at (2.5,-0.3) {\textbf{System V2}};
+        \node (p) [actor] at (-1.5, -1.75) {Player};
+        \node (u1) [usecase] at (2.5,-1) {Đọc hội thoại};
+        \node (u2) [usecase] at (2.5,-1.8) {Chọn Route A/B};
+        \node (u3) [usecase] at (2.5,-2.6) {Bấm Skip};
+        \draw [->] (p) -- (u1); \draw [->] (p) -- (u2); \draw [->] (p) -- (u3);
+    \end{tikzpicture}
+    \end{center}
+    \item \textbf{Yêu cầu Chức năng:} Hỗ trợ Enter/Space chuyển thoại; Phím TAB điều hướng Option; Logic xử lý Skip nhịp nhàng.
+    \item \textbf{Yêu cầu Phi Chức năng:} Phản hồi phím < 50ms; Âm thanh dừng ngay khi chuyển cảnh.
+    \item \textbf{Yêu cầu Kỹ thuật:} State Machine quản lý Route; Tích hợp SDL\_Mixer xử lý nhạc nền.
+    \item \textbf{Tiêu chí thành công (user acceptance criteria):} Người chơi hoàn thành đủ các nhánh truyện; Skip không gây lỗi logic.
+\end{itemize}
+
+\subsection{Yêu cầu Phiên bản V3: Tích hợp API \& Lưu trữ Đám mây}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mục tiêu cốt lõi:} Tối ưu dung lượng bằng cách tải tài nguyên Media động từ Cloud dựa trên tốc độ mạng thực tế.
+    \item \textbf{Đặc tả Giao diện \& Hiệu ứng:} Trạng thái Download (KB/s, \%); Hiệu ứng Logo lặp (Pulse) báo hiệu đang tải.
+    \item \textbf{Luồng tương tác sử dụng (userflow):}
+    \begin{center}
+    \begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, start/.style={circle, draw, fill=green!20}, end/.style={circle, draw, fill=red!20, double}, process/.style={rectangle, draw, fill=orange!10}, decision/.style={diamond, draw, fill=blue!5, aspect=2}]
+        \node (s) [start] {Open};
+        \node (d1) [decision, below=0.6cm of s] {Online?};
+        \node (p1) [process, below=0.6cm of d1] {Tải Assets};
+        \node (p2) [process, below=0.6cm of p1] {Chạy Story (V2)};
+        \node (e) [end, right=1.5cm of d1] {End (V1)};
+        \draw [->] (s) -- (d1);
+        \draw [->] (d1) -- node[left] {Yes} (p1); \draw [->] (d1) -- node[above] {No} (e);
+        \draw [->] (p1) -- (p2); \draw [->] (p2.east) -| (e.south);
+    \end{tikzpicture}
+    \end{center}
+    \item \textbf{Sơ đồ tình huống sử dụng (usecase):}
+    \begin{center}
+    \begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10}, usecase/.style={ellipse, draw, fill=white, minimum width=2.5cm}]
+        \draw (0,0) rectangle (5,-3); \node at (2.5,-0.3) {\textbf{System V3}};
+        \node (sys) [actor] at (6.5, -1.5) {Cloud API};
+        \node (u1) [usecase] at (2.5,-1) {Kiểm tra mạng};
+        \node (u2) [usecase] at (2.5,-2) {Tải Media};
+        \draw [->] (sys) -- (u2);
+    \end{tikzpicture}
+    \end{center}
+    \item \textbf{Yêu cầu Chức năng:} Đồng bộ Loading Bar với tiến độ download; Tự động Skip nếu mất mạng; Xóa media nặng khỏi file build.
+    \item \textbf{Yêu cầu Phi Chức năng:} Cơ chế Timeout 15s; Bảo mật tài nguyên; Chống treo luồng chính (Main Thread).
+    \item \textbf{Yêu cầu Kỹ thuật:} \texttt{emscripten\_fetch} (Web) hoặc Networking (Native); Quản lý Cache tài nguyên động.
+    \item \textbf{Tiêu chí thành công (user acceptance criteria):} Giảm 50\% dung lượng file .exe; Cốt truyện chỉ chạy sau khi tải xong 100\%.
+\end{itemize}
 
 \label{LastPageGameStoryRequirements}
 \end{document}

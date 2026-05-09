@@ -6,30 +6,225 @@
 \IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
 \IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
 \usepackage{docmute}
-\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - tính năng cấu hình: Đặc tả yêu cầu}}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, trees}
+\usepackage{tabularx}
+\usepackage{enumitem}
+
+\hypersetup{pdftitle={Software Requirements Specification (SRS) - gameConsole Module}}
 
 \begin{document}
 \providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
 \StandaloneSectionSetup{03-gameConsoleRequirements.tex}{LastPageGameConsoleRequirements}
 \onehalfspacing
 
-\section{Đặc tả yêu cầu tính năng cấu hình}
+\section{Đặc tả Yêu cầu Nghiệp vụ (SRS): Module gameConsole}
 
-// tự viết thêm: Mô tả vai trò điều phối vòng đời ứng dụng bên ngoài gameplay chính (UI Menu, Cài đặt người dùng, Leaderboard).
+\subsection{Tổng quan Nghiệp vụ (Business Overview)}
+Phân hệ \textbf{gameConsole} đóng vai trò là Trung tâm điều phối (Hub Screen) của ứng dụng \textit{cTetris}. Module này quản lý trạng thái của hệ thống ngoài luồng chơi chính, cung cấp giao diện để người dùng khởi động ván đấu, tra cứu hướng dẫn, xem bảng xếp hạng, thiết lập cấu hình cá nhân hóa và quản lý việc thoát ứng dụng an toàn trên đa nền tảng.
 
-\subsection{Mục tiêu (Objective)}
-// tự viết thêm: Quản lý State của ứng dụng ngoài luồng chơi, cung cấp UI để giao tiếp với người dùng và khởi tạo các thiết lập hệ thống trước khi gọi module Core.
+\subsection{Mô hình hóa Hệ thống (System Modeling)}
 
-\subsection{Phạm vi (Scope)}
-// tự viết thêm: In-scope: Màn hình Main Menu, Pop-up Settings (Âm lượng, Đồ họa), UI kết quả Game Over. API gọi lấy Leaderboard.
-// tự viết thêm: Out-scope: Không xử lý logic va chạm hay tính toán điểm số (do Core tính và truyền sang qua tham số).
+\subsubsection{Sơ đồ Ngữ cảnh (System Context Diagram)}
+\begin{center}
+\begin{tikzpicture}[
+    entity/.style={rectangle, draw=black, fill=blue!10, thick, minimum width=2.8cm, minimum height=1.2cm, align=center, font=\small},
+    system/.style={circle, draw=orange, fill=orange!10, thick, minimum size=2.8cm, align=center, font=\small},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+\node[system] (gameconsole) {\textbf{gameConsole}};
+\node[entity, left=3.5cm of gameconsole] (player) {Người chơi};
+\node[entity, right=3cm of gameconsole] (storage) {Local JSON /\\ API MongoDB};
+\node[entity, above=1.5cm of gameconsole] (gamestory) {Module\\ gameStory};
+\node[entity, below=1.5cm of gameconsole] (gamecore) {Module\\ gameCore};
 
-\subsection{Đặc tả chức năng (Functional List)}
-// tự viết thêm: - Quản lý Cấu hình: Ghi/đọc thiết lập (Config) xuống file local.
-// tự viết thêm: - Điều hướng UI: Logic Stack/Queue để pop/push các màn hình Menu chồng lên nhau mà không bị lỗi đè nút.
+\draw[arrow] ($(player.east)+(0,0.25)$) -- node[above, font=\scriptsize, align=center] {Thao tác Menu} ($(gameconsole.west)+(0,0.25)$);
+\draw[arrow] ($(gameconsole.west)-(0,0.25)$) -- node[below, font=\scriptsize] {Hiển thị UI} ($(player.east)-(0,0.25)$);
 
-\subsection{Giới hạn kỹ thuật (Constraints)}
-// tự viết thêm: UI phải scale đúng và không bị vỡ layout trên các tỷ lệ màn hình (16:9, 18:9, 4:3). Thời gian gọi API Leaderboard không được block Main Thread quá 2 giây.
+\draw[arrow] ($(gameconsole.east)+(0,0.25)$) -- node[above, font=\scriptsize] {Ghi/Đọc Cấu hình} ($(storage.west)+(0,0.25)$);
+\draw[arrow] ($(storage.west)-(0,0.25)$) -- node[below, font=\scriptsize] {Trả Data (Board)} ($(gameconsole.east)-(0,0.25)$);
+
+\draw[arrow] (gamestory) -- node[right, font=\scriptsize] {Tín hiệu bắt đầu} (gameconsole);
+\draw[arrow] ($(gameconsole.south)+(-0.3,0)$) -- node[left, font=\scriptsize] {Khởi tạo Game} ($(gamecore.north)+(-0.3,0)$);
+\draw[arrow] ($(gamecore.north)+(0.3,0)$) -- node[right, font=\scriptsize] {Return (Thoát/Menu)} ($(gameconsole.south)+(0.3,0)$);
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Sơ đồ Ca sử dụng (Use Case Diagram)}
+\begin{center}
+\begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10, minimum size=0.5cm}, usecase/.style={ellipse, draw, fill=white, minimum width=2cm}]
+    \draw (0,0) rectangle (5,-4); \node at (2.5,-0.3) {\textbf{Hệ thống gameConsole}};
+    \node (p) [actor] at (-1.5, -2) {Player};
+    \node (u1) [usecase] at (2.5,-1) {Xem Guide};
+    \node (u2) [usecase] at (2.5,-1.8) {Xem Bảng xếp hạng};
+    \node (u3) [usecase] at (2.5,-2.6) {Bắt đầu chơi (Play)};
+    \node (u4) [usecase] at (2.5,-3.4) {Thiết lập (V2/V3)};
+    \draw [->] (p) -- (u1); \draw [->] (p) -- (u2); 
+    \draw [->] (p) -- (u3); \draw [->] (p) -- (u4);
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Sơ đồ Hoạt động (Activity Diagram)}
+Mô tả luồng xử lý lựa chọn từ màn hình chính.
+\begin{center}
+\begin{tikzpicture}[
+    node distance=1cm, 
+    every node/.style={font=\scriptsize},
+    startstop/.style={rectangle, rounded corners, draw=black, fill=red!10, thick, minimum width=2cm, minimum height=0.6cm, align=center},
+    process/.style={rectangle, draw=black, fill=orange!10, thick, minimum width=2.5cm, minimum height=0.6cm, align=center},
+    decision/.style={diamond, draw=black, fill=green!10, thick, aspect=2, align=center},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+    \node (start) [startstop] {Mở Console};
+    \node (init) [process, below=0.6cm of start] {Hiển thị Menu chính};
+    \node (wait) [process, below=0.6cm of init] {Đợi sự kiện Input};
+    \node (dec) [decision, below=0.8cm of wait] {Lựa chọn?};
+    
+    \node (guide) [process, left=1cm of dec] {Mở Popup Guide};
+    \node (board) [process, below=0.6cm of guide] {Mở Popup Board};
+    \node (play) [process, right=1cm of dec] {Kích hoạt gameCore};
+    \node (quit) [decision, below=0.8cm of dec] {Nền tảng?};
+    \node (reload) [process, left=1cm of quit] {Màn hình Reload};
+    \node (exit) [startstop, right=1cm of quit] {Thoát App};
+
+    \draw [arrow] (start) -- (init);
+    \draw [arrow] (init) -- (wait);
+    \draw [arrow] (wait) -- (dec);
+    \draw [arrow] (dec) -- node[above] {Guide} (guide);
+    \draw [arrow] (dec) -- node[left] {Board} (board);
+    \draw [arrow] (dec) -- node[above] {Play} (play);
+    \draw [arrow] (dec) -- node[left] {Quit} (quit);
+    \draw [arrow] (guide) -- ++(-1.5,0) |- (wait);
+    \draw [arrow] (board) -- ++(-1.5,0) |- (wait);
+    \draw [arrow] (quit) -- node[above] {WASM} (reload);
+    \draw [arrow] (quit) -- node[above] {Native} (exit);
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Sơ đồ Trạng thái (State Machine Diagram)}
+Mô tả các trạng thái giao diện của module \texttt{gameConsole}.
+\begin{center}
+\begin{tikzpicture}[
+    node distance=3.5cm,
+    state/.style={circle, draw=blue, fill=blue!5, thick, minimum size=2.2cm, align=center, font=\scriptsize},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+    \node[state] (main) {MAIN\_MENU};
+    \node[state, left=of main] (guide) {GUIDE\_POPUP};
+    \node[state, below=2cm of main] (board) {BOARD\_POPUP};
+    \node[state, right=of main] (reload) {RELOAD\_SCREEN};
+
+    \draw[arrow] (main.160) -- node[above, font=\scriptsize] {Click GUIDE} (guide.20);
+    \draw[arrow] (guide.340) -- node[below, font=\scriptsize] {ESC / Close} (main.200);
+    \draw[arrow] (main.250) -- node[left, font=\scriptsize] {Click BOARD} (board.110);
+    \draw[arrow] (board.70) -- node[right, font=\scriptsize] {ESC / Close} (main.290);
+    \draw[arrow] (main) -- node[above, font=\scriptsize] {Quit (WASM)} (reload);
+    \draw[arrow] (reload.north) to[bend right=35] node[above, font=\scriptsize] {F5 / Button} (main.north);
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Cây tính năng (Feature Tree)}
+Phân rã cấu trúc các nhóm tính năng của \texttt{gameConsole}.
+\begin{center}
+\begin{tikzpicture}[
+    grow=right,
+    level 1/.style={sibling distance=2.5cm, level distance=4.5cm},
+    level 2/.style={sibling distance=1.1cm, level distance=4.5cm},
+    edge from parent fork right,
+    every node/.style={rectangle, draw=black, rounded corners, fill=gray!10, thick, align=center, font=\scriptsize},
+    root/.style={fill=orange!20, font=\small\bfseries, minimum height=0.8cm}
+]
+\node[root] {Module \\ gameConsole}
+    child { node[fill=red!10] {Cấu hình (V2/V3)}
+        child { node {Lưu/Đọc thiết lập} }
+        child { node {Chỉnh Âm lượng/Màu} }
+    }
+    child { node[fill=yellow!10] {Giao diện Pop-up}
+        child { node {Hướng dẫn (Guide)} }
+        child { node {Bảng điểm (Board)} }
+        child { node {Scrollbar tương tác} }
+    }
+    child { node[fill=green!10] {Điều hướng}
+        child { node {Hệ thống Focus nút} }
+        child { node {Phím tắt điều khiển} }
+        child { node {Chuột \& Con lăn} }
+    }
+    child { node[fill=blue!10] {Quản lý Phiên}
+        child { node {Chuyển đổi Module} }
+        child { node {Màn hình Reload} }
+    };
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Câu chuyện người dùng (Storyboard)}
+Mô tả quá trình tương tác của người chơi tại Hub Screen.
+
+\vspace{5pt}
+\begin{tabularx}{\linewidth}{|c|X|}
+    \hline
+    \textbf{Giai đoạn} & \textbf{Mô tả trải nghiệm (User Experience)} \\
+    \hline
+    \textbf{1. Tiếp nhận} & Sau Intro, người chơi thấy màn hình xám đậm với 4 nút rực rỡ. Nút đầu tiên (GUIDE) tự động có viền vàng đôi báo hiệu đang được chọn. \\
+    \hline
+    \textbf{2. Tra cứu} & Người chơi nhấn ENTER, một cửa sổ Guide hiện lên giữa màn hình, che mờ Menu phía sau. Họ dùng con lăn chuột để đọc các phím điều khiển, sau đó nhấn ESC để đóng popup. \\
+    \hline
+    \textbf{3. Kiểm tra} & Người chơi dùng phím TAB để chuyển viền vàng xuống nút BOARD. Bảng xếp hạng hiện ra với danh sách 30 người chơi hàng đầu. \\
+    \hline
+    \textbf{4. Quyết định} & Người chơi di chuột và click trực tiếp vào nút đỏ PLAY. Màn hình Menu biến mất nhanh chóng để nhường chỗ cho bàn cờ Tetris. \\
+    \hline
+    \textbf{5. Kết thúc} & Nếu người chơi muốn nghỉ, họ chọn QUIT. Trên trình duyệt, một nút RELOAD lớn xuất hiện để họ có thể dễ dàng bắt đầu lại phiên mới sau này. \\
+    \hline
+\end{tabularx}
+
+\subsection{Yêu cầu Phiên bản V1: Nền tảng Hub Screen \& Lightbox UI}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mục tiêu cốt lõi:} Xây dựng bộ khung UI tiêu chuẩn, hệ thống điều hướng đa kênh (chuột, phím, con lăn) và quản lý Pop-up (Lightbox) bằng mảng dữ liệu tĩnh.
+    \item \textbf{Yêu cầu Chức năng:}
+    \begin{itemize}[noitemsep]
+        \item Hệ thống Pop-up Lightbox: Phủ mờ nền 70\%, tích hợp Scrollbar hỗ trợ kéo thả và tự động cuộn.
+        \item Điều hướng đa năng: Hỗ trợ WASD, Mũi tên, TAB cho việc chuyển đổi Focus; Enter/Space để chọn.
+        \item Xử lý văn bản: Thuật toán Word Wrapping tự động ngắt dòng tại 28 ký tự để đảm bảo hiển thị đẹp trong popup.
+    \end{itemize}
+    \item \textbf{Yêu cầu Phi Chức năng:} Đảm bảo thời gian phản hồi phím < 50ms. Tích hợp ký hiệu Copyright (©) UTF-8 trên thanh tiêu đề OS.
+    \item \textbf{Yêu cầu Kỹ thuật \& Tiêu chí thành công:}
+    \begin{itemize}[noitemsep]
+        \item Kỹ thuật: Sử dụng cấu trúc \texttt{gameConsole\_layout.h}. Chế độ \texttt{BUILD\_STANDALONE} cho kiểm thử độc lập.
+        \item \textbf{Tiêu chí thành công:} Chuyển đổi trạng thái Focus mượt mà; Popup không bị lỗi tràn văn bản; Scrollbar hoạt động chính xác theo tọa độ chuột.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Yêu cầu Phiên bản V2: Cấu hình cá nhân hóa \& JSON Data}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mục tiêu cốt lõi:} Tăng cường trải nghiệm bằng hình nền động (Dynamic Background), thay thế dữ liệu cứng bằng File JSON nội bộ và bổ sung tính năng cá nhân hóa Settings.
+    \item \textbf{Yêu cầu Chức năng:}
+    \begin{itemize}[noitemsep]
+        \item Hình nền động: Hỗ trợ tải ảnh nền từ file vật lý với thuật toán co dãn bảo toàn tỷ lệ 9:16.
+        \item Màn hình Settings: Cho phép điều chỉnh âm lượng (Slider) và lựa chọn màu sắc khối Tetromino chủ đạo.
+        \item Dữ liệu cục bộ: Đọc/Ghi thông tin Bảng xếp hạng và thiết lập người dùng xuống tệp JSON.
+    \end{itemize}
+    \item \textbf{Yêu cầu Kỹ thuật \& Tiêu chí thành công:}
+    \begin{itemize}[noitemsep]
+        \item Kỹ thuật: Tích hợp thư viện parse JSON. Cơ chế đồng bộ thiết lập (Settings) sang module \texttt{gameCore}.
+        \item \textbf{Tiêu chí thành công:} Thiết lập của người dùng được lưu lại và áp dụng chính xác cho ván đấu tiếp theo.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Yêu cầu Phiên bản V3: Tích hợp Đám mây \& Bảng xếp hạng Động}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mục tiêu cốt lõi:} Số hóa tính cạnh tranh bằng cách đồng bộ Bảng xếp hạng trực tuyến qua API MongoDB Atlas, hỗ trợ bộ lọc và sắp xếp (Sorting).
+    \item \textbf{Yêu cầu Chức năng:}
+    \begin{itemize}[noitemsep]
+        \item Đồng bộ trực tuyến: Gọi HTTP Request lấy dữ liệu Leaderboard thời gian thực.
+        \item Phân loại dữ liệu: Chức năng sắp xếp danh sách theo "Điểm cao" hoặc "Thời gian gần nhất".
+        \item Trạng thái mạng: Hiển thị hiệu ứng Loading khi đang truy vấn dữ liệu từ Server.
+    \end{itemize}
+    \item \textbf{Yêu cầu Phi Chức năng:} Xử lý bất đồng bộ (Asynchronous) để không làm treo giao diện chính khi mạng yếu. Timeout tối đa 2 giây.
+    \item \textbf{Yêu cầu Kỹ thuật \& Tiêu chí thành công:}
+    \begin{itemize}[noitemsep]
+        \item Kỹ thuật: Client Network sử dụng \texttt{curl} hoặc \texttt{emscripten\_fetch}. Thuật toán sắp xếp mảng BoardEntry tại Client.
+        \item \textbf{Tiêu chí thành công:} Bảng xếp hạng hiển thị đúng dữ liệu trên Cloud; Ứng dụng xử lý lỗi mạng (Offline mode) nhịp nhàng.
+    \end{itemize}
+\end{itemize}
 
 \label{LastPageGameConsoleRequirements}
 \end{document}

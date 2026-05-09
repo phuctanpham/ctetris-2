@@ -74,7 +74,18 @@
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-tuy-chinh-mau-cho-cac-khoi-xep-hinh-12
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 11 và trên 13.
     - Cho phép click multi choice (red, orange, pink, yellow, green, blue, purple) làm thông số cấu hình đầu vào cho gameCore.
-[ ] Task 2.6: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp
+[ ] Task 2.6: viết v2 gameConsole/app.cpp - hiển thị background nền ứng nội dung tuyến truyện
+    - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-nen-nhan-vat-12
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 12 và trên 14.
+    - Dựa vào sự lựa chọn tuyến truyện ở gameStory để hiện hình nền tương ứng.
+    - Xây dựng thên nút "Chapter", khi bấm vào sẽ hiển thị popup với các component như mô tả bên dưới:
+        - Nút Đóng (X): Nằm ở góc trên cùng bên phải, chiếm tỷ lệ kích thước rất nhỏ.
+        - Khung Ảnh (Thumbnail): Nằm ngay dưới nút đóng, chiếm toàn bộ chiều ngang (có lề) và khoảng 25-30% chiều cao màn hình.
+        - Danh sách Truyện: Nằm ở giữa, chiếm phần diện tích lớn nhất (khoảng 45-50% chiều cao). Gồm 9 dòng, mỗi dòng chứa: Nút hình tròn (trái) + Tên truyện (giữa) + Nút Play (phải). Đặc điểm: phân biệt cách hiển thị giữa 3 trạng thái: đã hoàn thành thử thách's tuyến truyện, chưa mở thử thức's tuyến truyện, đang mở thử thách's tuyến truyện. Nút play không hiển thị với trạng thái "chưa mở thử thức's tuyến truyện".
+        - Khu vực Điều hướng: Nằm ở dưới cùng, chiếm khoảng 15-20% chiều cao. Bao gồm tiêu đề chương ("chapper's title") nằm trên, bên dưới là mũi tên trái/phải để chuyển chương. Vì chỉ có 3 chương nên hiển thị số trang ("1/3") nằm chính giữa. Mỗi chương luôn gồm 9 tuyến truyện theo cấu trúc bên dưới:
+            - Score driven chapper: chương luôn mở
+
+[ ] Task 2.7: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameConsole/app.cpp là: integration/v2
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v1
 

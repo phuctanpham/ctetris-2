@@ -6,30 +6,216 @@
 \IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
 \IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
 \usepackage{docmute}
-\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - tính năng chính: Đặc tả yêu cầu}}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, trees}
+\usepackage{tabularx}
+\usepackage{enumitem}
+
+\hypersetup{pdftitle={Software Requirements Specification (SRS) - gameCore Module}}
 
 \begin{document}
 \providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
 \StandaloneSectionSetup{04-gameCoreRequirements.tex}{LastPageGameCoreRequirements}
 \onehalfspacing
 
-\section{Đặc tả yêu cầu tính năng chính}
+\section{Đặc tả Yêu cầu Nghiệp vụ (SRS): Module gameCore}
 
-// tự viết thêm: Khái quát đây là engine xử lý vòng lặp trò chơi (Game Loop) thuần túy (thuật toán lưới, va chạm, điểm số).
+\subsection{Tổng quan Nghiệp vụ (Business Overview)}
+Phân hệ \textbf{gameCore} là trái tim của ứng dụng \textit{cTetris}, đóng vai trò là Engine xử lý vòng lặp trò chơi (Game Loop) cốt lõi. Module này chịu trách nhiệm mô phỏng vật lý của bàn cờ (Grid), tiếp nhận và xử lý thao tác điều khiển (Input) đa kênh (phím, chuột, vuốt cảm ứng), tính toán va chạm, quản lý điểm số và thời gian chơi.
 
-\subsection{Mục tiêu (Objective)}
-// tự viết thêm: Mô phỏng vật lý và logic bàn cờ (Grid) của game xếp hình, nhận thao tác phím (Input) và cập nhật trạng thái lưới (State) liên tục.
+\subsection{Mô hình hóa Hệ thống (System Modeling)}
 
-\subsection{Phạm vi (Scope)}
-// tự viết thêm: In-scope: Thuật toán di chuyển khối, xoay, rơi nhanh, xóa hàng, combo multiplier.
-// tự viết thêm: Out-scope: Không chịu trách nhiệm render hình ảnh (chỉ tính toán mảng), không xử lý menu Tạm dừng (Pause do Console lo).
+\subsubsection{Sơ đồ Ngữ cảnh (System Context Diagram)}
+\begin{center}
+\begin{tikzpicture}[
+    entity/.style={rectangle, draw=black, fill=blue!10, thick, minimum width=2.8cm, minimum height=1.2cm, align=center, font=\small},
+    system/.style={circle, draw=orange, fill=orange!10, thick, minimum size=2.8cm, align=center, font=\small},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+\node[system] (gamecore) {\textbf{gameCore}};
+\node[entity, left=3.5cm of gamecore] (player) {Người chơi};
+\node[entity, right=3.5cm of gamecore] (database) {MongoDB \\ (Cloud API)};
+\node[entity, above=1.5cm of gamecore] (gameconsole) {Module\\ gameConsole};
 
-\subsection{Đặc tả chức năng (Functional List)}
-// tự viết thêm: - Xử lý khối: Logic sinh tetromino ngẫu nhiên (hoặc dùng túi 7 khối - 7-bag randomizer).
-// tự viết thêm: - Xử lý tính điểm: Hàm tính toán điểm theo số hàng xóa cùng lúc. Hàm bắt điều kiện Game Over (chạm đỉnh lưới).
+\draw[arrow] ($(player.east)+(0,0.3)$) -- node[above, font=\scriptsize, align=center] {Thao tác (Phím/Vuốt)} ($(gamecore.west)+(0,0.3)$);
+\draw[arrow] ($(gamecore.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Render Lưới/UI} ($(player.east)-(0,0.3)$);
 
-\subsection{Giới hạn kỹ thuật (Constraints)}
-// tự viết thêm: Hiệu năng: Thuật toán quét và xóa hàng phải độ phức tạp thấp (O(n)), đảm bảo Update Loop chạy ổn định ở 60 FPS (thời gian tính toán < 16.6ms). Không được cấp phát RAM động liên tục (tránh Garbage Collection/Memory Leak).
+\draw[arrow] ($(gamecore.east)+(0,0.3)$) -- node[above, font=\scriptsize] {Gửi Điểm \& Tên (V3)} ($(database.west)+(0,0.3)$);
+\draw[arrow] ($(database.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Trạng thái lưu} ($(gamecore.east)-(0,0.3)$);
+
+\draw[arrow] ($(gameconsole.south)+(-0.3,0)$) -- node[left, font=\scriptsize] {Khởi tạo Game} ($(gamecore.north)+(-0.3,0)$);
+\draw[arrow] ($(gamecore.north)+(0.3,0)$) -- node[right, font=\scriptsize] {Return (Thoát/Menu)} ($(gameconsole.south)+(0.3,0)$);
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Sơ đồ Ca sử dụng (Use Case Diagram)}
+\begin{center}
+\begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10, minimum size=0.5cm}, usecase/.style={ellipse, draw, fill=white, minimum width=2cm}]
+    \draw (0,0) rectangle (5,-4); \node at (2.5,-0.3) {\textbf{Hệ thống gameCore}};
+    \node (p) [actor] at (-1.5, -2) {Player};
+    \node (u1) [usecase] at (2.5,-1) {Di chuyển/Xoay khối};
+    \node (u2) [usecase] at (2.5,-1.8) {Rơi nhanh (Soft Drop)};
+    \node (u3) [usecase] at (2.5,-2.6) {Tạm dừng (Pause)};
+    \node (u4) [usecase] at (2.5,-3.4) {Xem khối kế tiếp};
+    \draw [->] (p) -- (u1); \draw [->] (p) -- (u2); 
+    \draw [->] (p) -- (u3); \draw [->] (p) -- (u4);
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Sơ đồ Hoạt động (Activity Diagram)}
+Mô tả luồng hoạt động chi tiết trong một vòng lặp trò chơi (Game Loop).
+\begin{center}
+\begin{tikzpicture}[
+    node distance=1.2cm, 
+    every node/.style={font=\scriptsize},
+    startstop/.style={rectangle, rounded corners, draw=black, fill=red!10, thick, minimum width=2cm, minimum height=0.6cm, align=center},
+    process/.style={rectangle, draw=black, fill=orange!10, thick, minimum width=2.5cm, minimum height=0.6cm, align=center},
+    decision/.style={diamond, draw=black, fill=green!10, thick, aspect=2, align=center},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+    \node (start) [startstop] {Bắt đầu Ván};
+    \node (spawn) [process, below=0.6cm of start] {Sinh khối Tetromino mới};
+    \node (input) [process, below=0.6cm of spawn] {Nhận thao tác điều khiển};
+    \node (move) [process, below=0.6cm of input] {Cập nhật vị trí/Xoay};
+    \node (col) [decision, below=0.6cm of move] {Va chạm?};
+    \node (lock) [process, right=1.5cm of col] {Khóa khối \& Xóa dòng};
+    \node (over) [decision, above=0.8cm of lock] {Đầy bảng?};
+    \node (end) [startstop, right=1.2cm of over] {Game Over};
+
+    \draw [arrow] (start) -- (spawn);
+    \draw [arrow] (spawn) -- (input);
+    \draw [arrow] (input) -- (move);
+    \draw [arrow] (move) -- (col);
+    \draw [arrow] (col) -- node[above] {Có} (lock);
+    \draw [arrow] (col.west) -- node[above] {Không} ++(-1,0) |- (input.west);
+    \draw [arrow] (lock) -- (over);
+    \draw [arrow] (over) -- node[above] {Có} (end);
+    \draw [arrow] (over.north) |- node[above, near start] {Không} (spawn.east);
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Sơ đồ Trạng thái (State Machine Diagram)}
+Mô tả các trạng thái vòng đời của module \texttt{gameCore}.
+\begin{center}
+\begin{tikzpicture}[
+    node distance=3cm,
+    state/.style={circle, draw=blue, fill=blue!5, thick, minimum size=2cm, align=center, font=\scriptsize},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+    \node[state] (init) {INIT};
+    \node[state, right=of init] (playing) {PLAYING};
+    \node[state, below=1.5cm of playing] (paused) {PAUSED};
+    \node[state, right=of playing] (gameover) {GAME\_OVER};
+
+    \draw[arrow] (init) -- node[above, font=\scriptsize] {Khởi tạo xong} (playing);
+    \draw[arrow] (playing.250) -- node[left, font=\scriptsize] {Nhấn PAUSE} (paused.110);
+    \draw[arrow] (paused.70) -- node[right, font=\scriptsize] {Tiếp tục} (playing.290);
+    \draw[arrow] (playing) -- node[above, font=\scriptsize] {Khối chạm đỉnh} (gameover);
+    \draw[arrow] (gameover) |- node[near start, below, font=\scriptsize] {Restart} (init);
+    \draw[arrow] (paused) -| node[near start, below, font=\scriptsize] {Quit} (gameover);
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Cây tính năng (Feature Tree)}
+Phân rã cấu trúc các nhóm tính năng cốt lõi của \texttt{gameCore}.
+\begin{center}
+\begin{tikzpicture}[
+    edge from parent fork down,
+    level 1/.style={sibling distance=3.5cm, level distance=1.5cm},
+    level 2/.style={sibling distance=1.8cm, level distance=1.5cm},
+    every node/.style={rectangle, draw=black, rounded corners, fill=gray!10, thick, align=center, font=\scriptsize},
+    root/.style={fill=orange!20, font=\small\bfseries, minimum height=0.8cm}
+]
+\node[root] {Module gameCore}
+    child { node[fill=blue!10] {Xử lý Khối}
+        child { node {Sinh khối ngẫu nhiên} }
+        child { node {Phát hiện va chạm} }
+    }
+    child { node[fill=green!10] {Điều khiển}
+        child { node {Bàn phím} }
+        child { node {Chuột (UI)} }
+        child { node {Cảm ứng (Vuốt)} }
+    }
+    child { node[fill=yellow!10] {Luật chơi}
+        child { node {Xóa dòng} }
+        child { node {Tính điểm \& Combo} }
+    }
+    child { node[fill=red!10] {Trạng thái \& UI}
+        child { node {Đồng hồ đếm} }
+        child { node {Popup Tạm dừng} }
+    };
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Câu chuyện người dùng (Storyboard)}
+Mô tả trực quan quá trình trải nghiệm của người chơi từ lúc bắt đầu ván đấu đến khi kết thúc.
+
+\vspace{5pt}
+\begin{tabularx}{\linewidth}{|c|X|}
+    \hline
+    \textbf{Giai đoạn} & \textbf{Mô tả trải nghiệm (User Experience)} \\
+    \hline
+    \textbf{1. Bắt đầu} & Người chơi vào \texttt{gameCore} từ Menu. Bàn cờ trống rỗng. Khối đầu tiên bắt đầu rơi chậm từ đỉnh màn hình. Âm nhạc nổi lên. Ở góc phải (Sidebar), người chơi thấy điểm số là 00000, đồng hồ 00:00 và hình dáng khối sắp tới. \\
+    \hline
+    \textbf{2. Xử lý} & Người chơi dùng phím mũi tên hoặc vuốt màn hình để dịch chuyển khối sang trái/phải và lật khối cho khớp với các rãnh trống phía dưới. Khi chắc chắn, người chơi nhấn SPACE để khối rơi nhanh (Soft Drop) xuống đáy. \\
+    \hline
+    \textbf{3. Ăn điểm} & Khối lấp đầy 2 hàng ngang liền kề. Màn hình chớp nháy nhẹ, 2 hàng biến mất kèm âm thanh "Clear". Các khối bên trên tụt xuống. Điểm số trên Sidebar tăng vọt nhờ hiệu ứng nhân Combo. Tốc độ rơi của khối mới bắt đầu tăng lên một chút. \\
+    \hline
+    \textbf{4. Tạm dừng} & Người chơi có việc bận, bấm nút PAUSE (hoặc phím ENTER). Bàn cờ bị phủ mờ tối lại, nhạc nền tạm dừng, xuất hiện popup báo hiệu trạng thái dừng. \\
+    \hline
+    \textbf{5. Game Over} & Khi các khối chất đống cao chạm đến mép trên cùng, trò chơi dừng lại. Một popup lớn xuất hiện thông báo GAME OVER, tổng kết điểm và thời gian, đồng thời cho phép nhập tên để lưu lên Bảng xếp hạng. \\
+    \hline
+\end{tabularx}
+
+\subsection{Yêu cầu Phiên bản V1: Core Gameplay \& Controls}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mục tiêu cốt lõi:} Xây dựng hệ thống vật lý và logic bàn cờ vững chắc cho game xếp hình, hỗ trợ thao tác đa nền tảng (Desktop/WASM) và đa thiết bị.
+    \item \textbf{Yêu cầu Chức năng:}
+    \begin{itemize}[noitemsep]
+        \item Sinh ngẫu nhiên 5 khối (L, I, Z, O, T) tích hợp 50\% xác suất lật gương (Mirror Flip).
+        \item Điều khiển qua Phím (WASD/Arrows), Chuột (Click \& Hold Sidebar), và Cảm ứng (Vuốt $\geq$ 15px trục ưu thế).
+        \item Đồng hồ tính giờ chơi thực tế (loại trừ thời gian Pause) định dạng HH:MM. Điểm số tối đa 99999.
+    \end{itemize}
+    \item \textbf{Yêu cầu Phi Chức năng:} Đảm bảo thao tác sát tường hoặc kẹt khối tự động bị hủy để không làm vỡ logic mảng lưới. Frame rate ổn định ở 60 FPS.
+    \item \textbf{Yêu cầu Kỹ thuật \& Tiêu chí thành công:}
+    \begin{itemize}[noitemsep]
+        \item Kỹ thuật: Không cấp phát bộ nhớ động (RAM) liên tục trong Game Loop. Lưới ma trận tĩnh.
+        \item \textbf{Tiêu chí thành công:} Khối di chuyển, lật, rớt và ăn điểm chính xác. Cử chỉ vuốt nhận diện chuẩn xác.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Yêu cầu Phiên bản V2: Nâng cấp Trải nghiệm \& Độ khó}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mục tiêu cốt lõi:} Nâng cao tính thử thách và cải thiện trải nghiệm nghe nhìn thông qua hệ thống điểm thưởng cấp số nhân và âm thanh.
+    \item \textbf{Yêu cầu Chức năng:}
+    \begin{itemize}[noitemsep]
+        \item Hệ thống tự động giảm chu kỳ rơi (tăng tốc độ) dựa trên các mốc điểm đạt được.
+        \item Tính điểm Combo đa dòng: (Số dòng xóa) $\times$ (Số dòng xóa). Ví dụ: 3 dòng = 9 điểm.
+        \item Hiệu ứng chớp tắt (Blink Effect) 3 lần liên tiếp tại các dòng chuẩn bị bị xóa. Sidebar dự báo 3 khối.
+    \end{itemize}
+    \item \textbf{Yêu cầu Phi Chức năng:} Âm thanh phát nền liên tục, không bị giật/lag khi thực hiện hiệu ứng chớp xóa dòng.
+    \item \textbf{Yêu cầu Kỹ thuật \& Tiêu chí thành công:}
+    \begin{itemize}[noitemsep]
+        \item Kỹ thuật: Tích hợp thư viện SDL\_Mixer. Đồng bộ luồng chớp tắt với Game Loop.
+        \item \textbf{Tiêu chí thành công:} Xóa 4 dòng ăn trọn 16 điểm; Tốc độ game nhanh dần theo điểm số một cách mượt mà.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Yêu cầu Phiên bản V3: Cạnh tranh \& Lưu trữ Đám mây}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Mục tiêu cốt lõi:} Số hóa thành tích thông qua việc cho phép người chơi định danh và lưu trữ điểm số vinh danh lên hệ thống Server Cloud.
+    \item \textbf{Yêu cầu Chức năng:}
+    \begin{itemize}[noitemsep]
+        \item Bắt phím (Keyboard Event) để người dùng gõ tên trực tiếp trên màn hình Game Over.
+        \item Đóng gói Payload (Tên, Điểm, Thời gian) và gọi API đẩy dữ liệu lên cơ sở dữ liệu MongoDB Atlas.
+    \end{itemize}
+    \item \textbf{Yêu cầu Phi Chức năng:} Tác vụ gọi mạng không được chặn vòng lặp chính của ứng dụng. Đảm bảo bảo mật chuỗi định dạng.
+    \item \textbf{Yêu cầu Kỹ thuật \& Tiêu chí thành công:}
+    \begin{itemize}[noitemsep]
+        \item Kỹ thuật: C++ HTTP Request (\texttt{curl} cho Native, \texttt{emscripten\_fetch} cho Web).
+        \item \textbf{Tiêu chí thành công:} Dữ liệu xuất hiện chính xác trên MongoDB Atlas.
+    \end{itemize}
+\end{itemize}
 
 \label{LastPageGameCoreRequirements}
 \end{document}
