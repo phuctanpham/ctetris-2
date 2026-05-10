@@ -1,6 +1,7 @@
 // integration/v1
 // gameCore: ban co 240x480 + sidebar 30x480 voi 12 component dong nhat 30x40
 #include "gameCore_layout.h"
+#include "gameConsole_layout.h"   // [D.6] SettingsConfig contract
 #include <SDL3/SDL.h>
 #include <cstdlib>
 #include <ctime>
@@ -579,8 +580,12 @@ static void handleQuitAction(GameState& state) {
 }
 
 // gamecore-xu-ly-roi-03
-int runGameCore(SDL_Window* window, SDL_Renderer* renderer) {
+// [D.6] Signature accepts SettingsConfig& -- volume + color palette
+// chosen in gameConsole. Currently unused; V2 will consume.
+int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
+                const SettingsConfig& cfg) {
     (void)window;
+    (void)cfg; // [D.6] reserved for V2 (audio + colored piece spawn)
     std::srand((unsigned)std::time(nullptr));
 
     GameState state;
@@ -716,7 +721,7 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer) {
                 event.button.button == SDL_BUTTON_LEFT) {
                 // Swipe gesture recognition — fires on finger lift
                 if (swipeActive) {
-                        float dx  = event.button.x - swipeStartX;
+                    float dx  = event.button.x - swipeStartX;
                     float dy  = event.button.y - swipeStartY;
                     float adx = (dx < 0) ? -dx : dx;
                     float ady = (dy < 0) ? -dy : dy;
@@ -806,7 +811,8 @@ int main(int argc, char* argv[]) {
     SDL_Window* window = SDL_CreateWindow("Game Core \xC2\xA9 - Standalone",
                                           CORE_SCREEN_WIDTH, CORE_SCREEN_HEIGHT, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
-    runGameCore(window, renderer);
+    SettingsConfig cfg; // [D.6] standalone owns its own defaults
+    runGameCore(window, renderer, cfg);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

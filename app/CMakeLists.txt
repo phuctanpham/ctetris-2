@@ -72,9 +72,23 @@ else()
 endif()
 
 # -----------------------------------------------------------------------------
+# nlohmann/json headers: build.sh hoặc build.ps1 truyen path qua -DNLOHMANN_INCLUDE_DIR.
+# -----------------------------------------------------------------------------
+if(NLOHMANN_INCLUDE_DIR AND EXISTS "${NLOHMANN_INCLUDE_DIR}/nlohmann/json.hpp")
+    target_include_directories(cTetris PRIVATE "${NLOHMANN_INCLUDE_DIR}")
+    message(STATUS "[cTetris] nlohmann/json: ${NLOHMANN_INCLUDE_DIR}")
+elseif(EXISTS "${CMAKE_SOURCE_DIR}/src/gameStory/include/nlohmann/json.hpp")
+    target_include_directories(cTetris PRIVATE "${CMAKE_SOURCE_DIR}/src/gameStory/include")
+    message(STATUS "[cTetris] nlohmann/json: source tree (vendored)")
+else()
+    message(WARNING "[cTetris] nlohmann/json header khong tim thay -- compile co the fail")
+endif()
+
+# -----------------------------------------------------------------------------
 # SDL3 dependency: tim qua CMake config package.
 # Cho native build, SDL3 nam o /usr/local/lib/cmake/SDL3 hoac
-# /opt/homebrew/lib/cmake/SDL3 (Homebrew silicon). Cho WASM build, build.sh hoặc build.ps1
+# /opt/homebrew/lib/cmake/SDL3 (Homebrew silicon).
+# Cho WASM build, build.sh hoặc build.ps1
 # install SDL3 tinh vao $APP_DIR/libs/<OS>/downloads/sdl3-wasm/ va truyen
 # -DSDL3_DIR=... + -DCMAKE_PREFIX_PATH=... khi goi emcmake.
 # -----------------------------------------------------------------------------
@@ -110,11 +124,13 @@ if(BUILD_WASM)
     #   - ASYNCIFY=1: cho phep dung vong lap dong bo + SDL_PollEvent
     #     thay vi phai chia tach main loop qua emscripten_set_main_loop.
     #   - shell-file: HTML wrapper tuy bien (favicon, title, no PWA).
+    #   - preload-file: Dong goi file JSON vao virtual filesystem de doc tai runtime.
     # Dung "SHELL:..." prefix de CMake KHONG deduplicate / mangle args.
     target_link_options(cTetris PRIVATE
         "SHELL:-sALLOW_MEMORY_GROWTH=1"
         "SHELL:-sASYNCIFY=1"
         "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/src/gameConsole/gameConsole_board.json@gameConsole_board.json"
     )
 
     # Sinh ra cTetris.html (kem .js + .wasm) thay vi binary mac dinh
