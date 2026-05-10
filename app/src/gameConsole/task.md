@@ -78,13 +78,15 @@
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-nen-nhan-vat-12
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 12 và trên 14.
     - Dựa vào sự lựa chọn tuyến truyện ở gameStory để hiện hình nền tương ứng.
-    - Xây dựng thên nút "Chapter", khi bấm vào sẽ hiển thị popup với các component như mô tả bên dưới:
+    - Xây dựng thêm nút "Stories", khi bấm vào sẽ hiển thị popup với các component như mô tả bên dưới:
         - Nút Đóng (X): Nằm ở góc trên cùng bên phải, chiếm tỷ lệ kích thước rất nhỏ.
-        - Khung Ảnh (Thumbnail): Nằm ngay dưới nút đóng, chiếm toàn bộ chiều ngang (có lề) và khoảng 25-30% chiều cao màn hình.
-        - Danh sách Truyện: Nằm ở giữa, chiếm phần diện tích lớn nhất (khoảng 45-50% chiều cao). Gồm 9 dòng, mỗi dòng chứa: Nút hình tròn (trái) + Tên truyện (giữa) + Nút Play (phải). Đặc điểm: phân biệt cách hiển thị giữa 3 trạng thái: đã hoàn thành thử thách's tuyến truyện, chưa mở thử thức's tuyến truyện, đang mở thử thách's tuyến truyện. Nút play không hiển thị với trạng thái "chưa mở thử thức's tuyến truyện".
-        - Khu vực Điều hướng: Nằm ở dưới cùng, chiếm khoảng 15-20% chiều cao. Bao gồm tiêu đề chương ("chapper's title") nằm trên, bên dưới là mũi tên trái/phải để chuyển chương. Vì chỉ có 3 chương nên hiển thị số trang ("1/3") nằm chính giữa. Mỗi chương luôn gồm 9 tuyến truyện theo cấu trúc bên dưới:
-            - Score driven chapper: chương luôn mở
-
+        - Khung Ảnh (Thumbnail): Nằm ngay dưới nút đóng, được thu hẹp chiều ngang (dạng hình vuông hoặc gần vuông) và căn giữa màn hình, chiếm khoảng 35-40% chiều cao màn hình.
+        - Danh sách Truyện: Nằm ngay dưới khung ảnh, chiếm khoảng 40-45% chiều cao. Gồm 9 dòng, mỗi dòng chứa: Nút hình tròn (trái) + Tên truyện (giữa) + Nút Play (phải, để chạy lại xem lại phần gameStory tương ứng). Đặc điểm: phân biệt cách hiển thị giữa 3 trạng thái: đã hoàn thành thử thách's tuyến truyện, chưa mở thử thách's tuyến truyện, đang mở thử thách's tuyến truyện. Nút play không hiển thị với trạng thái "chưa mở thử thách's tuyến truyện".
+        - Khu vực Điều hướng: Nằm ở dưới cùng, chiếm khoảng 15% chiều cao. Bao gồm tiêu đề chương ("chapper's title") nằm trên, bên dưới là mũi tên trái/phải để chuyển chương. Vì chỉ có 3 chương nên hiển thị số trang ("1/x") nằm chính giữa. Với x là số lượng chương đã mở ra.
+        - Sử dụng sqlite làm database và đặt tên file database theo idUser lưu trữ gồm 3 bảng:
+            + idUser_Records: Mỗi lần chơi lại sẽ dựa vào nhóm thông số gồm: idUsers, starting timestamp, ending timestamp, idStory, idChapter, totalScores, totalSeconds, avgSpeed (totalScores/totalSeconds), retryNo. Mỗi lần kết thúc chơi lại sẽ tạo mới 1 hàng lưu.  
+            + idUser_Stories: Mỗi lần khởi động gameStory sẽ kiểm tra bảng này để sửa cập nhật lại cột isActivatied và isSeclected cho tuyến truyện mới hoặc chơi lại tuyến truyên cũ. Bẳng này gồm các cột: idUser, idStory, idChapter, isActivated, isSelected, totalRetries, lastMaxScore, lastMaxSpeed.
+            + shared_data: idStory, storyName, idChapter,chapterName, minScore, minSpeed, minRetries, requiredStories, nextBlockScore, nextBlockSpeed, tableMatrix, xmlDialogue và thubmnailPath. Trong đó, nextBlockScore và nextBlockSpeed tương ứng với điều kiện để mở ra nextBLock_II và nextBlock_III trong gameCore. tableMatrix chứa vị trí các ô và màu sắc cần hiển thị sẵn trên bàn cờ khi bắt đầu game.
 [ ] Task 2.7: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameConsole/app.cpp là: integration/v2
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v1
@@ -94,6 +96,12 @@
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-tich-hop-backend-13
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 12 và trên 14.
     - Chỉ cần lấy và đọc (read) từ API thay vì dùng file `gameConsole_board.json`.
+    - Làm nút "load" trong popup của setting để lấy đồng bộ file sqllite lên mongo atlas. Không dùng cơ chế login, yêu cầu nhập email (hoặc username) và dùng OTP. Tìm document được tạo mới nhất có chứa email và để download file sqlite tường ứng.
+    - Làm nút "save" trong popup của setting để lấy cập nhật file sqllite lên mongo atlas. Không dùng cơ chế login, yêu cầu nhập email hoặc username. Nếu idUser khớp với idUser trong document mới nhât khi tìm kiếm bằng email hoặc không tìm ra bất kỳ document nào theo email cung cấp, và xác lập đồng ý bằng otp rồi tạo doucment mới với và upload file sql tương ứng.
+    - Trong mongo gồm 3 collections: 
+        - user: chứa các document lưu trữ việc upload file sqllite của các user gồm: sqlFile, 
+        - board: chứa các document thành tích kỷ lục mới mỗi khi có user upload file idUser, nameUser, sqlFite, emailUser.
+        - story: chứa các document mô tả các story, mỗi document gồm các phần: idChapter, titleChapter, data. Trong data là chứa dữ liệu để gameStory download và import vào bảng shared_data ở lần đầu mở game hoặc không có cache.
 [ ] Task 3.2: viết v3 gameConsole/app.cpp - tạo sort theo time trong popup board.
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-sort-by-time-in-board-14
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 13 và trên 15.
