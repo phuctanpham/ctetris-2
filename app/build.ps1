@@ -9,13 +9,12 @@
 #    - Searches: libs\windows\downloads\sdl3-native\bin\ or \lib\
 #    - Status: ENABLED - no manual deployment needed
 #
-# 2. Duplicate Symbol Linker Error (v3 fix in CMakeLists.txt):
+# 2. Duplicate Symbol Linker Error (v6 fix in CMakeLists.txt):
 #    - Fixed LNK2005 "already defined" for nanosvg symbols
 #    - Root cause: Both gameStory/app.cpp and gameConsole/app.cpp
 #      defined NANOSVG_IMPLEMENTATION, causing duplicate public symbols
-#    - Solution: CMakeLists.txt wraps gameConsole TU with declaration-only nanosvg
-#      (includes nanosvg.h BEFORE source to set include guards)
-#    - gameStory/app.cpp remains sole provider of nanosvg symbols
+#    - Solution: compile a single shared TU: src/shared/nanosvg_impl.cpp
+#      and keep module .cpp files declaration-only
 #    - Status: ENABLED - no duplicate object files in final link
 #
 # 3. Console Window Hidden on Windows (v5 fix - NEW):
@@ -285,15 +284,9 @@ function Initialize-Nlohmann {
 }
 
 # =============================================================================
-# nanosvg -- check committed -> check libs\downloads -> download
+# nanosvg -- shared headers in libs\downloads\nanosvg -> download if missing
 # =============================================================================
 function Initialize-Nanosvg {
-    $vendored = Join-Path $AppDir 'src\gameStory\include\nanosvg.h'
-    if (Test-Path $vendored) {
-        Write-Ok 'nanosvg da co trong source tree (vendored)'
-        return
-    }
-
     $nanoDir   = Join-Path $DownloadDir 'nanosvg'
     $nano      = Join-Path $nanoDir 'nanosvg.h'
     $nanoRast  = Join-Path $nanoDir 'nanosvgrast.h'

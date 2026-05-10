@@ -37,40 +37,12 @@ option(BUILD_WASM "Build for WebAssembly via Emscripten" OFF)
 # -----------------------------------------------------------------------------
 # Source files cua game (modules: gameStory, gameConsole, gameCore)
 # -----------------------------------------------------------------------------
-set(_gameconsole_source "src/gameConsole/app.cpp")
-set(_nanosvg_include_dir "")
-if(NANOSVG_INCLUDE_DIR AND EXISTS "${NANOSVG_INCLUDE_DIR}/nanosvg.h")
-    set(_nanosvg_include_dir "${NANOSVG_INCLUDE_DIR}")
-elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/gameStory/include/nanosvg.h")
-    set(_nanosvg_include_dir "${CMAKE_CURRENT_SOURCE_DIR}/src/gameStory/include")
-endif()
-
-if(_nanosvg_include_dir)
-    # gameConsole/app.cpp co include NANOSVG_IMPLEMENTATION khong phu hop.
-    # Tao 1 wrapper TU cho gameConsole: no include ban declaration-only
-    # truoc, sau do moi include source goc. Khi do include guard cua nanosvg
-    # se chan khong cho implementation block trong app.cpp duoc nap lan thu hai.
-    set(_nanosvg_declonly_header "${CMAKE_CURRENT_BINARY_DIR}/nanosvg_declonly.h")
-    file(GENERATE
-        OUTPUT "${_nanosvg_declonly_header}"
-        CONTENT "#pragma once\n#include \"nanosvg.h\"\n#include \"nanosvgrast.h\"\n"
-    )
-
-    set(_gameconsole_wrapper "${CMAKE_CURRENT_BINARY_DIR}/gameConsole_app_wrapped.cpp")
-    file(TO_CMAKE_PATH "${_nanosvg_declonly_header}" _nanosvg_declonly_header_cmake)
-    file(TO_CMAKE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/gameConsole/app.cpp" _gameconsole_source_cmake)
-    file(GENERATE
-        OUTPUT "${_gameconsole_wrapper}"
-        CONTENT "#include \"${_nanosvg_declonly_header_cmake}\"\n#include \"${_gameconsole_source_cmake}\"\n"
-    )
-    set(_gameconsole_source "${_gameconsole_wrapper}")
-endif()
-
 set(GAME_SOURCES
     main.cpp
     src/gameStory/app.cpp
-    ${_gameconsole_source}
+    src/gameConsole/app.cpp
     src/gameCore/app.cpp
+    src/shared/nanosvg_impl.cpp
 )
 
 # Include directories: moi module co thu muc include rieng + src/ cho logger.h
@@ -104,16 +76,32 @@ endif()
 # -----------------------------------------------------------------------------
 # nanosvg headers: build.sh hoặc build.ps1 truyen path qua -DNANOSVG_INCLUDE_DIR.
 # Neu khong co (vi du user mo project trong IDE truc tiep), thu tim trong
-# source tree (vendored) hoac libs/<OS>/downloads/nanosvg/.
+# libs/<OS>/downloads/nanosvg/.
 # -----------------------------------------------------------------------------
+set(_nanosvg_include_dir "")
 if(NANOSVG_INCLUDE_DIR AND EXISTS "${NANOSVG_INCLUDE_DIR}/nanosvg.h")
-    target_include_directories(cTetris PRIVATE "${NANOSVG_INCLUDE_DIR}")
-    message(STATUS "[cTetris] nanosvg: ${NANOSVG_INCLUDE_DIR}")
-elseif(_nanosvg_include_dir)
+    set(_nanosvg_include_dir "${NANOSVG_INCLUDE_DIR}")
+else()
+    foreach(_cand IN ITEMS
+        "${CMAKE_SOURCE_DIR}/libs/windows/downloads/nanosvg"
+        "${CMAKE_SOURCE_DIR}/libs/macos/downloads/nanosvg"
+        "${CMAKE_SOURCE_DIR}/libs/linux/downloads/nanosvg"
+        "${CMAKE_SOURCE_DIR}/libs/ubuntu/downloads/nanosvg"
+        "${CMAKE_SOURCE_DIR}/libs/fedora/downloads/nanosvg"
+        "${CMAKE_SOURCE_DIR}/libs/arch/downloads/nanosvg"
+        "${CMAKE_SOURCE_DIR}/libs/alpine/downloads/nanosvg"
+        "${CMAKE_SOURCE_DIR}/libs/opensuse/downloads/nanosvg"
+    )
+        if(EXISTS "${_cand}/nanosvg.h")
+            set(_nanosvg_include_dir "${_cand}")
+            break()
+        endif()
+    endforeach()
+endif()
+
+if(_nanosvg_include_dir)
     target_include_directories(cTetris PRIVATE "${_nanosvg_include_dir}")
     message(STATUS "[cTetris] nanosvg: ${_nanosvg_include_dir}")
-elseif(EXISTS "${CMAKE_SOURCE_DIR}/src/gameStory/include/nanosvg.h")
-    message(STATUS "[cTetris] nanosvg: source tree (vendored)")
 else()
     message(WARNING "[cTetris] nanosvg headers khong tim thay -- compile co the fail")
 endif()

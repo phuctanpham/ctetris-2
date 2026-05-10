@@ -20,14 +20,9 @@
 
 // =========================================================
 // [B.2] nanosvg SVG rasterizer -- single-header library.
-// Each translation unit (gameStory/app.cpp + gameConsole/app.cpp)
-// instantiates its OWN static copy via NANOSVG_IMPLEMENTATION;
-// no link-time clash (static functions are TU-local).
+// Implementation duoc build mot lan tai src/shared/nanosvg_impl.cpp.
 // =========================================================
-#define NANOSVG_IMPLEMENTATION
-#define NANOSVG_ALL_COLOR_KEYWORDS
 #include "nanosvg.h"
-#define NANOSVGRAST_IMPLEMENTATION
 #include "nanosvgrast.h"
 
 // [B.1] Background SVG da embed san duoi dang raw string

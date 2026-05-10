@@ -2,12 +2,9 @@
 #include "gameStory_layout.h"
 
 // nanosvg single-header library: parser + rasterizer.
-// Define implementation TRUOC khi include de bung phan code thuc thi.
-// NANOSVG_ALL_COLOR_KEYWORDS bat ho tro toan bo ten mau theo chuan SVG.
-#define NANOSVG_IMPLEMENTATION
-#define NANOSVG_ALL_COLOR_KEYWORDS
+// Implementation duoc compile mot lan duy nhat trong src/shared/nanosvg_impl.cpp
+// de tranh duplicate symbols khi link.
 #include "nanosvg.h"
-#define NANOSVGRAST_IMPLEMENTATION
 #include "nanosvgrast.h"
 
 // =========================================================

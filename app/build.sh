@@ -74,10 +74,6 @@ check_cmd_version() {
 
 ensure_nanosvg() {
     local nano_dir="$DOWNLOAD_DIR/nanosvg"
-    if [ -f "$APP_DIR/src/gameStory/include/nanosvg.h" ]; then
-        log_ok "nanosvg da co trong source tree (vendored)"
-        return 0
-    fi
     if [ -f "$nano_dir/nanosvg.h" ]; then return 0; fi
 
     log_info "Tai nanosvg headers..."
