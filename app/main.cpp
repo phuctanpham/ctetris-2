@@ -17,6 +17,7 @@
 // trong SDL canvas vi SDL_RenderDebugText chi ho tro ASCII).
 #include <SDL3/SDL.h>
 #include "gameConsole_layout.h"   // [D.6] SettingsConfig contract
+#include "logger.h"               // File logging system
 
 extern int runGameStory  (SDL_Window* window, SDL_Renderer* renderer);
 extern int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
@@ -26,32 +27,59 @@ extern int runGameCore   (SDL_Window* window, SDL_Renderer* renderer,
 
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
+    
+    Logger& logger = Logger::getInstance();
+    logger.log("=== cTetris Application Started ===");
+    
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-        SDL_Log("Khong the khoi tao SDL3: %s", SDL_GetError());
+        logger.logError("Cannot initialize SDL3: %s", SDL_GetError());
         return -1;
     }
+    
+    logger.log("SDL3 initialized successfully (VIDEO | AUDIO)");
 
     // Tieu de cua so chinh: "cTetris ©" thay vi "cTetris - Integrated"
     SDL_Window*   window   = SDL_CreateWindow("cTetris \xC2\xA9", 270, 480, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
-    if (!window || !renderer) { SDL_Quit(); return -1; }
+    if (!window || !renderer) { 
+        logger.logError("Failed to create window or renderer");
+        SDL_Quit(); 
+        return -1; 
+    }
+    
+    logger.log("Window created: 270x480");
 
+    logger.logEvent("STORY", "Starting game story sequence");
     runGameStory(window, renderer);
 
     // [D.6] Settings persist across Console <-> Core round-trips.
     // Defaults from SettingsConfig (gameConsole_layout.h): volume=0.5,
     // all 7 colors enabled, story 0 / chapter 0.
     SettingsConfig cfg;
+    
+    logger.logEvent("CONSOLE", "Entering main game loop");
 
     while (true) {
         int next = runGameConsole(window, renderer, cfg);
-        if (next != 1) break;                  // QUIT tu console
+        if (next != 1) {
+            logger.log("User quit from console menu");
+            break;
+        }
+        
         int back = runGameCore(window, renderer, cfg);
-        if (back != 2) break;                  // 0 = thoat, 2 = ve console
+        if (back != 2) {
+            logger.log("User quit from game core");
+            break;
+        }
+        
+        logger.logEvent("CONSOLE", "Returning to console");
     }
 
+    logger.log("=== cTetris Application Shutdown ===");
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+    logger.close();
+    
     return 0;
 }

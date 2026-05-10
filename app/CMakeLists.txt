@@ -37,15 +37,45 @@ option(BUILD_WASM "Build for WebAssembly via Emscripten" OFF)
 # -----------------------------------------------------------------------------
 # Source files cua game (modules: gameStory, gameConsole, gameCore)
 # -----------------------------------------------------------------------------
+set(_gameconsole_source "src/gameConsole/app.cpp")
+set(_nanosvg_include_dir "")
+if(NANOSVG_INCLUDE_DIR AND EXISTS "${NANOSVG_INCLUDE_DIR}/nanosvg.h")
+    set(_nanosvg_include_dir "${NANOSVG_INCLUDE_DIR}")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/gameStory/include/nanosvg.h")
+    set(_nanosvg_include_dir "${CMAKE_CURRENT_SOURCE_DIR}/src/gameStory/include")
+endif()
+
+if(_nanosvg_include_dir)
+    # gameConsole/app.cpp co include NANOSVG_IMPLEMENTATION khong phu hop.
+    # Tao 1 wrapper TU cho gameConsole: no include ban declaration-only
+    # truoc, sau do moi include source goc. Khi do include guard cua nanosvg
+    # se chan khong cho implementation block trong app.cpp duoc nap lan thu hai.
+    set(_nanosvg_declonly_header "${CMAKE_CURRENT_BINARY_DIR}/nanosvg_declonly.h")
+    file(GENERATE
+        OUTPUT "${_nanosvg_declonly_header}"
+        CONTENT "#pragma once\n#include \"nanosvg.h\"\n#include \"nanosvgrast.h\"\n"
+    )
+
+    set(_gameconsole_wrapper "${CMAKE_CURRENT_BINARY_DIR}/gameConsole_app_wrapped.cpp")
+    file(TO_CMAKE_PATH "${_nanosvg_declonly_header}" _nanosvg_declonly_header_cmake)
+    file(TO_CMAKE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/gameConsole/app.cpp" _gameconsole_source_cmake)
+    file(GENERATE
+        OUTPUT "${_gameconsole_wrapper}"
+        CONTENT "#include \"${_nanosvg_declonly_header_cmake}\"\n#include \"${_gameconsole_source_cmake}\"\n"
+    )
+    set(_gameconsole_source "${_gameconsole_wrapper}")
+endif()
+
 set(GAME_SOURCES
     main.cpp
     src/gameStory/app.cpp
-    src/gameConsole/app.cpp
+    ${_gameconsole_source}
     src/gameCore/app.cpp
 )
 
-# Include directories: moi module co thu muc include rieng
+# Include directories: moi module co thu muc include rieng + src/ cho logger.h
 set(GAME_INCLUDE_DIRS
+    src
     src/gameStory/include
     src/gameConsole/include
     src/gameCore/include
@@ -53,9 +83,23 @@ set(GAME_INCLUDE_DIRS
 
 # -----------------------------------------------------------------------------
 # Tao executable (ten dau ra: cTetris)
+# WIN32: an console window tren Windows, chi hien GUI (co hieu luc tren Windows only)
 # -----------------------------------------------------------------------------
-add_executable(cTetris ${GAME_SOURCES})
+add_executable(cTetris WIN32 ${GAME_SOURCES})
 target_include_directories(cTetris PRIVATE ${GAME_INCLUDE_DIRS})
+
+# Add Windows SDK paths for linking on Windows
+if(WIN32)
+    target_link_directories(cTetris PRIVATE
+        "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64"
+        "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64"
+    )
+    # Use main() as entry point even with Windows subsystem (hides console)
+    target_link_options(cTetris PRIVATE 
+        /SUBSYSTEM:WINDOWS 
+        /ENTRY:mainCRTStartup
+    )
+endif()
 
 # -----------------------------------------------------------------------------
 # nanosvg headers: build.sh hoặc build.ps1 truyen path qua -DNANOSVG_INCLUDE_DIR.
@@ -65,6 +109,9 @@ target_include_directories(cTetris PRIVATE ${GAME_INCLUDE_DIRS})
 if(NANOSVG_INCLUDE_DIR AND EXISTS "${NANOSVG_INCLUDE_DIR}/nanosvg.h")
     target_include_directories(cTetris PRIVATE "${NANOSVG_INCLUDE_DIR}")
     message(STATUS "[cTetris] nanosvg: ${NANOSVG_INCLUDE_DIR}")
+elseif(_nanosvg_include_dir)
+    target_include_directories(cTetris PRIVATE "${_nanosvg_include_dir}")
+    message(STATUS "[cTetris] nanosvg: ${_nanosvg_include_dir}")
 elseif(EXISTS "${CMAKE_SOURCE_DIR}/src/gameStory/include/nanosvg.h")
     message(STATUS "[cTetris] nanosvg: source tree (vendored)")
 else()
@@ -206,6 +253,25 @@ else()
     endif()
 
     # Khong tao .rc cho Windows tu day -- icon chi copy tu brandkit neu co.
+
+    # -------------------------------------------------------------------------
+    # Windows post-build: copy SDL3.dll to executable directory so runtime can find it
+    # -------------------------------------------------------------------------
+    if(WIN32)
+        get_target_property(_SDL3_LOCATION SDL3::SDL3 IMPORTED_LOCATION_RELEASE)
+        if(NOT _SDL3_LOCATION)
+            get_target_property(_SDL3_LOCATION SDL3::SDL3 IMPORTED_LOCATION)
+        endif()
+        if(_SDL3_LOCATION)
+            add_custom_command(TARGET cTetris POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${_SDL3_LOCATION}"
+                    "$<TARGET_FILE_DIR:cTetris>/SDL3.dll"
+                COMMENT "[cTetris] Copying SDL3.dll to output directory"
+            )
+            message(STATUS "[cTetris] SDL3.dll post-build copy: ${_SDL3_LOCATION}")
+        endif()
+    endif()
 endif()
 
 # -----------------------------------------------------------------------------
