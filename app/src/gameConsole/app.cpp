@@ -7,6 +7,7 @@
 // [C.4/C.5] STL for board data (vector<BoardEntry>) + ISO 8601 parsing
 #include <vector>
 #include <string>
+#include <utility>
 #include <cstdint>
 #include <cstdio>
 #include <ctime>
@@ -331,6 +332,9 @@ struct AppState {
     bool showSettings = false;   // [A.3] Settings popup visibility
     bool showStories  = false;   // [F.2] Stories popup visibility
     int  currentStoryChapter = 1;   // [F.3] active chapter shown in stories popup
+    std::vector<StoryRow> storiesCache;
+    int  storiesCacheChapter = -1;
+    int  storiesMaxChapter   = 1;
     bool isRunning    = true;
     int  nextScene    = 0;
     int  boardScroll  = 0;
@@ -713,6 +717,104 @@ bool dbSeedSharedData() {
     return true;
 }
 
+std::vector<StoryRow> dbLoadStories(const char* idUser, int idChapter) {
+    std::vector<StoryRow> out;
+    if (!g_db || !idUser || !*idUser) return out;
+
+    // LEFT JOIN shared_data (catalogue) with idUser_Stories (per-user overlay).
+    // COALESCE turns NULL overlays into safe defaults so untouched stories
+    // render as locked/unplayed without separate code paths.
+    const char* sql =
+        "SELECT s.idStory, s.storyName, s.idChapter, s.chapterName,"
+        "       s.minScore, s.minSpeed, s.minRetries, s.requiredStories,"
+        "       s.nextBlockScore, s.nextBlockSpeed,"
+        "       s.tableMatrix, s.xmlDialogue, s.thumbnailPath,"
+        "       COALESCE(u.isActivated,  0),"
+        "       COALESCE(u.isSelected,   0),"
+        "       COALESCE(u.totalRetries, 0),"
+        "       COALESCE(u.lastMaxScore, 0),"
+        "       COALESCE(u.lastMaxSpeed, 0.0) "
+        "FROM shared_data s "
+        "LEFT JOIN idUser_Stories u "
+        "  ON s.idStory = u.idStory "
+        " AND s.idChapter = u.idChapter "
+        " AND u.idUser = ?1 "
+        "WHERE s.idChapter = ?2 "
+        "ORDER BY s.idStory;";
+
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbLoadStories prepare fail: %s",
+                sqlite3_errmsg(g_db));
+        return out;
+    }
+    sqlite3_bind_text(st, 1, idUser, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(st, 2, idChapter);
+
+    auto colText = [](sqlite3_stmt* s, int i) -> std::string {
+        const unsigned char* p = sqlite3_column_text(s, i);
+        return p ? std::string((const char*)p) : std::string();
+    };
+
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        StoryRow r;
+        r.idStory         = sqlite3_column_int(st, 0);
+        r.storyName       = colText(st, 1);
+        r.idChapter       = sqlite3_column_int(st, 2);
+        r.chapterName     = colText(st, 3);
+        r.minScore        = sqlite3_column_int(st, 4);
+        r.minSpeed        = (float)sqlite3_column_double(st, 5);
+        r.minRetries      = sqlite3_column_int(st, 6);
+        r.requiredStories = colText(st, 7);
+        r.nextBlockScore  = sqlite3_column_int(st, 8);
+        r.nextBlockSpeed  = (float)sqlite3_column_double(st, 9);
+        r.tableMatrix     = colText(st, 10);
+        r.xmlDialogue     = colText(st, 11);
+        r.thumbnailPath   = colText(st, 12);
+        r.isActivated     = sqlite3_column_int(st, 13) != 0;
+        r.isSelected      = sqlite3_column_int(st, 14) != 0;
+        r.totalRetries    = sqlite3_column_int(st, 15);
+        r.lastMaxScore    = sqlite3_column_int(st, 16);
+        r.lastMaxSpeed    = (float)sqlite3_column_double(st, 17);
+
+        // Stories with no prerequisites are always open (e.g. intro).
+        // Cheap to compute here; saves needing a seed INSERT into
+        // idUser_Stories at DB-init time.
+        if (r.requiredStories.empty()) r.isActivated = true;
+
+        out.push_back(std::move(r));
+    }
+    sqlite3_finalize(st);
+
+    SDL_Log("[gameConsole_db] dbLoadStories chapter=%d user=%s rows=%d",
+            idChapter, idUser, (int)out.size());
+    return out;
+}
+
+int dbMaxActivatedChapter(const char* idUser) {
+    // Always return >= 1: intro chapter is unconditionally accessible.
+    if (!g_db || !idUser || !*idUser) return 1;
+
+    sqlite3_stmt* st = nullptr;
+    const char* sql =
+        "SELECT COALESCE(MAX(idChapter), 1) FROM idUser_Stories "
+        "WHERE idUser = ? AND isActivated = 1;";
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbMaxActivatedChapter prepare fail: %s",
+                sqlite3_errmsg(g_db));
+        return 1;
+    }
+    sqlite3_bind_text(st, 1, idUser, -1, SQLITE_TRANSIENT);
+
+    int maxCh = 1;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        maxCh = sqlite3_column_int(st, 0);
+        if (maxCh < 1) maxCh = 1;
+    }
+    sqlite3_finalize(st);
+    return maxCh;
+}
+
 // =========================================================
 // [A.2] Main button list -- 5 buttons (was 4 in v1)
 // Insert SETTINGS between PLAY and QUIT to keep QUIT as last.
@@ -783,9 +885,9 @@ static const float STORIES_THUMB_X = STORIES_POPUP.x +
 static const SDL_FRect STORIES_THUMB = { STORIES_THUMB_X, STORIES_THUMB_Y,
                                          STORIES_THUMB_W, STORIES_THUMB_H };
 
-static const int   STORIES_LIST_VISIBLE = 9;
+static const int   STORIES_LIST_VISIBLE = 10;
 static const float STORIES_LIST_Y       = STORIES_THUMB_Y + STORIES_THUMB_H + 10.0f; // 220
-static const float STORIES_ROW_H        = 20.0f;
+static const float STORIES_ROW_H        = 18.0f;
 static const float STORIES_ROW_X        = STORIES_POPUP.x + 8.0f;
 static const float STORIES_ROW_W        = STORIES_POPUP.w - 16.0f;
 
@@ -822,9 +924,6 @@ static const SDL_FRect STORIES_NAV_LEFT  = {
 static const SDL_FRect STORIES_NAV_RIGHT = {
     STORIES_POPUP.x + STORIES_POPUP.w - 70.0f, STORIES_NAV_BTN_Y, 20.0f, 16.0f
 };
-
-// Fixed for V2 seed (3 chapters); 2.6.9 replaces with dbMaxActivatedChapter().
-static const int STORIES_MAX_CHAPTER = 3;
 
 // =========================================================
 // [D.1] Volume slider geometry (absolute coords trong popup body)
@@ -1244,18 +1343,32 @@ static void drawSettingsLightbox(SDL_Renderer* renderer, const AppState& state) 
     drawCloseButton(renderer, SETTINGS_CLOSE);
 }
 
-// [F.2] Stories popup stub -- replaced by full layout in Step 2.6.7.
-// [F.3] Stories popup layout shell. Body sections (thumbnail texture,
-// real story rows, chapter title, page indicator) are still placeholder
-// here -- DB-driven content lands in 2.6.8/2.6.9.
 static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
+    // [F.4] Stories popup -- DB-driven body. Three visual states per row:
+    //   LOCKED    : isActivated == false  -> dim bg, dim outline radio,
+    //                                        no play button, muted text
+    //   ACTIVE    : isActivated, !played  -> normal row, white outline radio,
+    //                                        green play button
+    //   COMPLETED : isActivated, played   -> green-tinted bg, green-filled radio,
+    //                                        green play button, green text
+    // Play button hidden on locked rows per task.md spec.
+    enum StoryUiState { STORY_UI_LOCKED, STORY_UI_ACTIVE, STORY_UI_COMPLETED };
+
+    auto classifyStory = [](const StoryRow& r) -> StoryUiState {
+        if (!r.isActivated) return STORY_UI_LOCKED;
+        // V2 heuristic: any row with prior play history counts as completed.
+        // 2.6.10 will refine via dbCheckAndUnlockStories() unlock cascade.
+        if (r.totalRetries > 0 || r.lastMaxScore > 0) return STORY_UI_COMPLETED;
+        return STORY_UI_ACTIVE;
+    };
+
     // Background dimmer
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
     SDL_FRect screen = { 0, 0, (float)CONSOLE_SCREEN_WIDTH, (float)CONSOLE_SCREEN_HEIGHT };
     SDL_RenderFillRect(renderer, &screen);
 
-    // Panel (warm terracotta to distinguish from other popups)
+    // Panel (warm terracotta)
     SDL_SetRenderDrawColor(renderer, 90, 70, 60, 255);
     SDL_RenderFillRect(renderer, &STORIES_POPUP);
     SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
@@ -1268,7 +1381,7 @@ static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
                         STORIES_POPUP.x + (STORIES_POPUP.w - tl * 8.0f) / 2.0f,
                         STORIES_POPUP.y + 14, title);
 
-    // ===== Thumbnail box (placeholder fill + label) =====
+    // ===== Thumbnail (placeholder until thumbnail texture loading lands) =====
     SDL_SetRenderDrawColor(renderer, 50, 40, 35, 255);
     SDL_RenderFillRect(renderer, &STORIES_THUMB);
     SDL_SetRenderDrawColor(renderer, 160, 130, 100, 255);
@@ -1280,45 +1393,111 @@ static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
                         STORIES_THUMB.y + STORIES_THUMB.h / 2.0f - 4.0f,
                         thumbLbl);
 
-    // ===== 9 row slots (placeholder rows -- DB content in 2.6.8) =====
+    // ===== Story rows =====
+    int rowsToFill = (int)state.storiesCache.size();
+    if (rowsToFill > STORIES_LIST_VISIBLE) rowsToFill = STORIES_LIST_VISIBLE;
+
     for (int i = 0; i < STORIES_LIST_VISIBLE; i++) {
         SDL_FRect row = storiesRowRect(i);
 
-        // Alternating row background for visual rhythm
-        if (i & 1) {
-            SDL_SetRenderDrawColor(renderer, 70, 55, 50, 255);
+        if (i >= rowsToFill) {
+            // Empty slot (chapter has fewer stories than visible rows)
+            if (i & 1) {
+                SDL_SetRenderDrawColor(renderer, 75, 60, 55, 255);
+                SDL_RenderFillRect(renderer, &row);
+            }
+            continue;
+        }
+
+        const StoryRow& sr = state.storiesCache[i];
+        StoryUiState us = classifyStory(sr);
+
+        // Row background per state
+        bool fillBg = false;
+        SDL_Color bgColor = {0,0,0,0};
+        if (us == STORY_UI_LOCKED) {
+            bgColor = SDL_Color{60, 50, 45, 255};
+            fillBg = true;
+        } else if (us == STORY_UI_COMPLETED) {
+            bgColor = SDL_Color{55, 85, 60, 255};
+            fillBg = true;
+        } else if (i & 1) {
+            bgColor = SDL_Color{70, 55, 50, 255};
+            fillBg = true;
+        }
+        if (fillBg) {
+            SDL_SetRenderDrawColor(renderer, bgColor.r, bgColor.g, bgColor.b, 255);
             SDL_RenderFillRect(renderer, &row);
         }
 
-        // Radio button (outline only in placeholder; filled state in 2.6.8)
+        // Radio button
         SDL_FRect radio = storiesRadioRect(i);
-        SDL_SetRenderDrawColor(renderer, 140, 140, 140, 255);
-        SDL_RenderRect(renderer, &radio);
+        if (us == STORY_UI_LOCKED) {
+            SDL_SetRenderDrawColor(renderer, 100, 90, 85, 255);
+            SDL_RenderRect(renderer, &radio);
+        } else if (us == STORY_UI_COMPLETED) {
+            SDL_SetRenderDrawColor(renderer, 90, 200, 100, 255);
+            SDL_RenderFillRect(renderer, &radio);
+            SDL_SetRenderDrawColor(renderer, 220, 240, 220, 255);
+            SDL_RenderRect(renderer, &radio);
+        } else {
+            SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
+            SDL_RenderRect(renderer, &radio);
+        }
+        // Selected indicator -- yellow ring (story-click wiring lands in 2.6.11)
+        if (sr.isSelected) {
+            SDL_SetRenderDrawColor(renderer, HIGHLIGHT_Y.r, HIGHLIGHT_Y.g,
+                                   HIGHLIGHT_Y.b, 255);
+            for (int k = 0; k < 2; k++) {
+                SDL_FRect ring = { radio.x - 1 - k, radio.y - 1 - k,
+                                   radio.w + 2 + 2*k, radio.h + 2 + 2*k };
+                SDL_RenderRect(renderer, &ring);
+            }
+        }
 
-        // Row label
-        char label[24];
-        SDL_snprintf(label, sizeof(label), "Story slot %d", i + 1);
-        SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
-        SDL_RenderDebugText(renderer, row.x + 24.0f, row.y + 6.0f, label);
+        // Story name (truncated to fit if needed; row width ~244, minus
+        // 26 left margin and 20 right margin = ~198px usable = ~24 chars).
+        SDL_Color tc;
+        if      (us == STORY_UI_LOCKED)    tc = SDL_Color{125, 115, 105, 255};
+        else if (us == STORY_UI_COMPLETED) tc = SDL_Color{200, 240, 200, 255};
+        else                                tc = SOFT_WHITE;
+        SDL_SetRenderDrawColor(renderer, tc.r, tc.g, tc.b, 255);
 
-        // Play button (placeholder small green rect)
-        SDL_FRect play = storiesPlayRect(i);
-        SDL_SetRenderDrawColor(renderer, 100, 150, 100, 255);
-        SDL_RenderFillRect(renderer, &play);
-        SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
-        SDL_RenderRect(renderer, &play);
+        char buf[28];
+        int n = (int)sr.storyName.size();
+        if (n > 24) n = 24;
+        SDL_memcpy(buf, sr.storyName.c_str(), (size_t)n);
+        buf[n] = '\0';
+        SDL_RenderDebugText(renderer, row.x + 22.0f, row.y + 5.0f, buf);
+
+        // Play button -- HIDDEN for locked rows (per task.md spec)
+        if (us != STORY_UI_LOCKED) {
+            SDL_FRect play = storiesPlayRect(i);
+            SDL_SetRenderDrawColor(renderer, 100, 160, 100, 255);
+            SDL_RenderFillRect(renderer, &play);
+            SDL_SetRenderDrawColor(renderer, 220, 240, 220, 255);
+            SDL_RenderRect(renderer, &play);
+        }
     }
 
     // ===== Chapter navigator =====
-    // Chapter title (placeholder -- replaced with real chapterName in 2.6.8)
-    const char* navTitle = "Chapter title (placeholder)";
-    int ntl = (int)SDL_strlen(navTitle);
+    // Real chapterName from first cached row; fallback if empty.
+    std::string chapTitle;
+    if (!state.storiesCache.empty() && !state.storiesCache[0].chapterName.empty()) {
+        chapTitle = state.storiesCache[0].chapterName;
+    } else {
+        chapTitle = "(chapter)";
+    }
+    char chapBuf[48];
+    SDL_snprintf(chapBuf, sizeof(chapBuf), "%s", chapTitle.c_str());
+    int ntl = (int)SDL_strlen(chapBuf);
+    if (ntl > 30) ntl = 30;  // clamp to popup width
     SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
     SDL_RenderDebugText(renderer,
                         STORIES_POPUP.x + (STORIES_POPUP.w - ntl * 8.0f) / 2.0f,
-                        STORIES_NAV_TITLE_Y, navTitle);
+                        STORIES_NAV_TITLE_Y, chapBuf);
 
-    // Left/right arrow buttons
+    // Arrow buttons (click handling lands in 2.6.9)
     SDL_SetRenderDrawColor(renderer, 130, 100, 80, 255);
     SDL_RenderFillRect(renderer, &STORIES_NAV_LEFT);
     SDL_RenderFillRect(renderer, &STORIES_NAV_RIGHT);
@@ -1332,14 +1511,13 @@ static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
                         STORIES_NAV_RIGHT.x + STORIES_NAV_RIGHT.w / 2.0f - 4.0f,
                         STORIES_NAV_RIGHT.y + STORIES_NAV_RIGHT.h / 2.0f - 4.0f, ">");
 
-    // Page indicator "n/x" centered between arrows
+    // Page indicator from real maxChapter
+    int maxCh = state.storiesMaxChapter < 1 ? 1 : state.storiesMaxChapter;
+    int curCh = state.currentStoryChapter;
+    if (curCh < 1)     curCh = 1;
+    if (curCh > maxCh) curCh = maxCh;
     char pageLbl[16];
-    int x = STORIES_MAX_CHAPTER;
-    if (x < 1) x = 1;
-    int n = state.currentStoryChapter;
-    if (n < 1) n = 1;
-    if (n > x) n = x;
-    SDL_snprintf(pageLbl, sizeof(pageLbl), "%d/%d", n, x);
+    SDL_snprintf(pageLbl, sizeof(pageLbl), "%d/%d", curCh, maxCh);
     int pll = (int)SDL_strlen(pageLbl);
     SDL_RenderDebugText(renderer,
                         STORIES_POPUP.x + (STORIES_POPUP.w - pll * 8.0f) / 2.0f,
@@ -1379,8 +1557,15 @@ static void activateButton(AppState& state, int index) {
         case BTN_IDX_PLAY:
             state.isRunning = false; state.nextScene = 1; break;
         case BTN_IDX_STORIES:
-            // [F.2] Open stories popup
+            // [F.4] Open stories popup. Load DB rows for current chapter +
+            // refresh max-chapter counter. dbLoadStories already logs counts.
             state.showStories = true;
+            if (state.currentStoryChapter < 1) state.currentStoryChapter = 1;
+            state.storiesCache        = dbLoadStories("default",
+                                                     state.currentStoryChapter);
+            state.storiesCacheChapter = state.currentStoryChapter;
+            state.storiesMaxChapter   = dbMaxActivatedChapter("default");
+            if (state.storiesMaxChapter < 1) state.storiesMaxChapter = 1;
             sbResetInteraction(state.sb); break;
         case BTN_IDX_SETTINGS:
             // [A.3] Open settings popup
@@ -1416,6 +1601,7 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     if (dbOpen("default")) {
         dbInitSchema();
         dbSeedSharedData();
+        state.storiesMaxChapter = dbMaxActivatedChapter("default");
     }
 
     // [C.5] Load leaderboard tu JSON; fallback ve hardcoded array neu fail.

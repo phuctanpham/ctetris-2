@@ -209,7 +209,7 @@ if(BUILD_WASM)
         "SHELL:-sASYNCIFY=1"
         "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/src/gameConsole/gameConsole_board.json@gameConsole_board.json"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/chapters@chapters"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/../chapters@chapters"
     )
 
     # Sinh ra cTetris.html (kem .js + .wasm) thay vi binary mac dinh
@@ -319,7 +319,7 @@ else()
     )
     add_custom_command(TARGET cTetris POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/chapters"
+            "${CMAKE_SOURCE_DIR}/../chapters"
             "$<TARGET_FILE_DIR:cTetris>/chapters"
         COMMENT "[cTetris] Copying chapters/ directory to output"
     )

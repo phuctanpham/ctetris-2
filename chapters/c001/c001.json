@@ -1,0 +1,94 @@
+{
+  "shared_data": [
+    {
+      "idStory": 1, "storyName": "Falling Sky",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 0, "minSpeed": 0.0, "minRetries": 0,
+      "requiredStories": "",
+      "nextBlockScore": 50, "nextBlockSpeed": 1.0,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_001_FALLING_SKY.png"
+    },
+    {
+      "idStory": 2, "storyName": "Holy Sanctum",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 2, "minSpeed": 0.1, "minRetries": 1,
+      "requiredStories": "1",
+      "nextBlockScore": 100, "nextBlockSpeed": 1.2,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_002_ORDERCORP_TEMPLE.png"
+    },
+    {
+      "idStory": 3, "storyName": "Blood Tower",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 1, "minSpeed": 0.1, "minRetries": 2,
+      "requiredStories": "1",
+      "nextBlockScore": 100, "nextBlockSpeed": 1.2,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_003_UNDERCITY_SLUM.png"
+    },
+    {
+      "idStory": 4, "storyName": "Quantum Leap",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 1, "minSpeed": 1.1, "minRetries": 1,
+      "requiredStories": "1,2,3",
+      "nextBlockScore": 100, "nextBlockSpeed": 1.2,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_004_SHADOW_ALLEY.png"
+    },
+    {
+      "idStory": 5, "storyName": "Sanctified",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 20, "minSpeed": 0.1, "minRetries": 1,
+      "requiredStories": "2",
+      "nextBlockScore": 200, "nextBlockSpeed": 1.5,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_005_HEAVEN_MATRIX.png"
+    },
+    {
+      "idStory": 6, "storyName": "Origin Glitch",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 1, "minSpeed": 0.1, "minRetries": 20,
+      "requiredStories": "3",
+      "nextBlockScore": 200, "nextBlockSpeed": 1.5,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_006_GLITCH_VIRUS.png"
+    },
+    {
+      "idStory": 7, "storyName": "Algorithm Master",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 1, "minSpeed": 10.1, "minRetries": 1,
+      "requiredStories": "4",
+      "nextBlockScore": 200, "nextBlockSpeed": 1.5,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_007_FROZEN_TIME.png"
+    },
+    {
+      "idStory": 8, "storyName": "Dead Wall",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 1, "minSpeed": 0.1, "minRetries": 1,
+      "requiredStories": "5,6",
+      "nextBlockScore": 0, "nextBlockSpeed": 0.0,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_008_KILL_SCREEN.png"
+    },
+    {
+      "idStory": 9, "storyName": "Endless Record",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 1, "minSpeed": 0.1, "minRetries": 1,
+      "requiredStories": "5,7",
+      "nextBlockScore": 0, "nextBlockSpeed": 0.0,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_009_ENDLESS_LOOP.png"
+    },
+    {
+      "idStory": 10, "storyName": "Maxout 999999",
+      "idChapter": 1, "chapterName": "The Tetris Matrix",
+      "minScore": 1, "minSpeed": 0.1, "minRetries": 1,
+      "requiredStories": "5,6,7",
+      "nextBlockScore": 0, "nextBlockSpeed": 0.0,
+      "tableMatrix": "", "xmlDialogue": "",
+      "thumbnailPath": "THUMB_010_GOLDEN_MAXOUT.png"
+    }
+  ]
+}
