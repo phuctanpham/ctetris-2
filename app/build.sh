@@ -166,8 +166,113 @@ ensure_sqlite() {
     log_ok "SQLite amalgamation $SQLITE_VERSION san sang ($((size/1048576)) MB)"
 }
 
-# (Các hàm ensure_emsdk, ensure_sdl3_native, ensure_sdl3_wasm, build_sdl3_from_source giữ nguyên logic như file cũ)
-# ... [Lược bỏ phần mã nguồn trùng lặp để tập trung vào các điểm thay đổi] ...
+ensure_emsdk() {
+    if command -v emcmake >/dev/null 2>&1 && command -v em++ >/dev/null 2>&1; then
+        return 0
+    fi
+
+    local emsdk_root="${EMSDK:-$HOME/emsdk}"
+    if [ -f "$emsdk_root/emsdk_env.sh" ]; then
+        # shellcheck disable=SC1090
+        . "$emsdk_root/emsdk_env.sh" >/dev/null 2>&1 || true
+    fi
+
+    if command -v emcmake >/dev/null 2>&1 && command -v em++ >/dev/null 2>&1; then
+        return 0
+    fi
+
+    log_error "emsdk khong san sang -- can emcmake/em++ de build WASM"
+    return 1
+}
+
+build_sdl3_from_source() {
+    local target="$1"
+    local version="$2"
+    local install_prefix="$3"
+
+    local sdl_src="$DOWNLOAD_DIR/SDL-$version"
+    local sdl_build="$sdl_src/build-$target"
+
+    mkdir -p "$DOWNLOAD_DIR"
+    if [ ! -d "$sdl_src/.git" ]; then
+        rm -rf "$sdl_src"
+        log_info "Clone SDL3 release-$version vao $sdl_src..."
+        git clone --depth 1 --branch "release-$version" https://github.com/libsdl-org/SDL "$sdl_src"
+    fi
+
+    rm -rf "$sdl_build"
+    mkdir -p "$sdl_build"
+
+    local -a cmake_args=(
+        -S "$sdl_src"
+        -B "$sdl_build"
+        -G Ninja
+        -DCMAKE_INSTALL_PREFIX="$install_prefix"
+        -DSDL_INSTALL=ON
+        -DSDL_TESTS=OFF
+        -DSDL_EXAMPLES=OFF
+    )
+
+    if [ "$target" = "wasm" ]; then
+        cmake_args+=(-DSDL_SHARED=OFF -DSDL_STATIC=ON)
+        emcmake cmake "${cmake_args[@]}"
+    else
+        cmake_args+=(-DSDL_SHARED=ON -DSDL_STATIC=ON)
+        cmake "${cmake_args[@]}"
+    fi
+
+    cmake --build "$sdl_build" -j
+    cmake --install "$sdl_build"
+}
+
+ensure_sdl3_native() {
+    local sdl_install="$DOWNLOAD_DIR/sdl3-native"
+    local sdl_config=""
+
+    for cand in \
+        "$sdl_install/cmake" \
+        "$sdl_install/lib/cmake/SDL3" \
+        "$sdl_install/lib64/cmake/SDL3"; do
+        if [ -f "$cand/SDL3Config.cmake" ]; then
+            sdl_config="$cand"
+            break
+        fi
+    done
+
+    if [ -n "$sdl_config" ]; then
+        log_ok "SDL3 native da co tai $sdl_config"
+        return 0
+    fi
+
+    local target_version="${DETECTED_SDL3_VERSION:-$SDL3_VERSION}"
+    DETECTED_SDL3_VERSION="$target_version"
+    log_info "Build SDL3 $target_version cho native vao $sdl_install..."
+    build_sdl3_from_source native "$target_version" "$sdl_install"
+}
+
+ensure_sdl3_wasm() {
+    local target_version="${DETECTED_SDL3_VERSION:-$SDL3_VERSION}"
+    local sdl_install="$DOWNLOAD_DIR/sdl3-wasm-$target_version"
+    local sdl_config=""
+
+    for cand in \
+        "$sdl_install/cmake" \
+        "$sdl_install/lib/cmake/SDL3" \
+        "$sdl_install/lib64/cmake/SDL3"; do
+        if [ -f "$cand/SDL3Config.cmake" ]; then
+            sdl_config="$cand"
+            break
+        fi
+    done
+
+    if [ -n "$sdl_config" ]; then
+        log_ok "SDL3 wasm da co tai $sdl_config"
+        return 0
+    fi
+
+    log_info "Build SDL3 $target_version cho WASM vao $sdl_install..."
+    build_sdl3_from_source wasm "$target_version" "$sdl_install"
+}
 
 # =============================================================================
 # Build entry points
@@ -183,11 +288,25 @@ build_native() {
 
     # ... [Xử lý icon và SDL3_DIR giống như file gốc] ...
 
+    local sdl_install="$DOWNLOAD_DIR/sdl3-native"
+    local sdl_dir=""
+    local -a sdl_dir_arg=()
+    for cand in \
+        "$sdl_install/cmake" \
+        "$sdl_install/lib/cmake/SDL3" \
+        "$sdl_install/lib64/cmake/SDL3"; do
+        if [ -f "$cand/SDL3Config.cmake" ]; then
+            sdl_dir="$cand"
+            sdl_dir_arg=(-DSDL3_DIR="$sdl_dir")
+            break
+        fi
+    done
+
     mkdir -p "$BUILD_NATIVE_DIR"
     cmake -S "$APP_DIR" -B "$BUILD_NATIVE_DIR" \
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_WASM=OFF \
-          -DCMAKE_PREFIX_PATH="$DOWNLOAD_DIR/sdl3-native" \
+          -DCMAKE_PREFIX_PATH="$sdl_install" \
           -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg" \
           -DNLOHMANN_INCLUDE_DIR="$DOWNLOAD_DIR/nlohmann" \
           -DSQLITE_DIR="$DOWNLOAD_DIR/sqlite" \
@@ -216,15 +335,30 @@ build_wasm() {
 
     # ... [Xử lý sdl_dir giống như file gốc] ...
 
+    local target_version="${DETECTED_SDL3_VERSION:-$SDL3_VERSION}"
+    local sdl_install="$DOWNLOAD_DIR/sdl3-wasm-$target_version"
+    local sdl_dir=""
+    local -a sdl_dir_arg=()
+    for cand in \
+        "$sdl_install/cmake" \
+        "$sdl_install/lib/cmake/SDL3" \
+        "$sdl_install/lib64/cmake/SDL3"; do
+        if [ -f "$cand/SDL3Config.cmake" ]; then
+            sdl_dir="$cand"
+            sdl_dir_arg=(-DSDL3_DIR="$sdl_dir")
+            break
+        fi
+    done
+
     mkdir -p "$BUILD_WASM_DIR"
     emcmake cmake -S "$APP_DIR" -B "$BUILD_WASM_DIR" \
                   -DCMAKE_BUILD_TYPE=Release \
                   -DBUILD_WASM=ON \
-                  -DSDL3_DIR="$sdl_dir" \
                   -DCMAKE_PREFIX_PATH="$sdl_install" \
                   -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg" \
                   -DNLOHMANN_INCLUDE_DIR="$DOWNLOAD_DIR/nlohmann" \
-                  -DSQLITE_DIR="$DOWNLOAD_DIR/sqlite" # [cite: 10, 11]
+                  -DSQLITE_DIR="$DOWNLOAD_DIR/sqlite" \
+                  "${sdl_dir_arg[@]}" # [cite: 10, 11]
     cmake --build "$BUILD_WASM_DIR" -j
 
     # ... [Copy favicon và PWA assets giống như file gốc] ...
