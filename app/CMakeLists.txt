@@ -25,7 +25,7 @@
 # =============================================================================
 
 cmake_minimum_required(VERSION 3.16)
-project(cTetris LANGUAGES CXX)
+project(cTetris LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -125,7 +125,7 @@ endif()
 # Tat warnings cho file nay vi day la third-party amalgamation co nhieu
 # warning vo hai (unused-function, missing-prototypes, sign-compare).
 # -----------------------------------------------------------------------------
-if(SQLITE_DIR AND EXISTS "${SQLITE_DIR}/sqlite3.c" AND EXISTS "${SQLITE_DIR}/sqlite3.h")
+if(SQLITE_DIR)
     target_sources(cTetris PRIVATE "${SQLITE_DIR}/sqlite3.c")
     target_include_directories(cTetris PRIVATE "${SQLITE_DIR}")
 

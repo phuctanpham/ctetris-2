@@ -135,6 +135,40 @@ function Test-CommandVersion {
     return $false
 }
 
+function Get-PythonCommandVersion {
+    param([string]$Cmd)
+    if (-not (Get-Command $Cmd -ErrorAction SilentlyContinue)) { return $null }
+    try {
+        $out = & $Cmd --version 2>&1 | Select-Object -First 1
+        if ($out -match '(\d+\.\d+(?:\.\d+)?)') { return $Matches[1] }
+    } catch {}
+    return $null
+}
+
+function Test-PythonForEmsdk {
+    $pyVersion = Get-PythonCommandVersion 'py'
+    $pythonVersion = Get-PythonCommandVersion 'python'
+
+    if ($pyVersion) {
+        Write-Info "py --version = $pyVersion"
+    } else {
+        Write-Info 'py --version = not available'
+    }
+
+    if ($pythonVersion) {
+        Write-Info "python --version = $pythonVersion"
+        return $true
+    }
+
+    if ($pyVersion) {
+        Write-Warn "py co san nhung python khong co trong PATH; emsdk can python de chay. Cai thu cong python va chay lai."
+    } else {
+        Write-Warn "Khong co ca py lan python; emsdk can python de chay. Cai thu cong python va chay lai."
+    }
+
+    return $false
+}
+
 
 # =============================================================================
 # FIX: Import-VsEnv -- Tim va load MSVC compiler environment vao PowerShell
@@ -249,6 +283,30 @@ function Import-VsEnv {
     }
 }
 
+# =============================================================================
+# Package installation helpers for winget and choco
+# =============================================================================
+function Install-WingetPackagesIfMissing {
+    param([string[]]$Ids)
+    foreach ($id in $Ids) {
+        Write-Info "Installing $id via winget..."
+        & winget install -e --id $id --accept-source-agreements --accept-package-agreements 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "winget install $id may have failed (exit $LASTEXITCODE)"
+        }
+    }
+}
+
+function Install-ChocoPackagesIfMissing {
+    param([string[]]$Packages)
+    foreach ($pkg in $Packages) {
+        Write-Info "Installing $pkg via choco..."
+        & choco install $pkg -y 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "choco install $pkg may have failed (exit $LASTEXITCODE)"
+        }
+    }
+}
 
 # =============================================================================
 # nlohmann/json -- check committed -> check libs\downloads -> download
@@ -384,6 +442,10 @@ function Import-EmsdkEnv {
 #   4. Clone moi (last resort)
 # =============================================================================
 function Initialize-Emsdk {
+    if (-not (Test-PythonForEmsdk)) {
+        throw 'Python 3 is required for emsdk. Install python manually and ensure `python --version` works.'
+    }
+
     # Priority 1: em++ tren PATH
     if (Get-Command em++ -ErrorAction SilentlyContinue) {
         $cur = (em++ --version 2>$null | Select-Object -First 1) `
@@ -412,9 +474,18 @@ function Initialize-Emsdk {
             Push-Location $userEmsdk
             try {
                 & .\emsdk.bat install $EmsdkVersion
+                if ($LASTEXITCODE -ne 0) { 
+                    throw "emsdk install failed (exit $LASTEXITCODE). Ensure Python 3 is installed and in PATH."
+                }
                 & .\emsdk.bat activate $EmsdkVersion
+                if ($LASTEXITCODE -ne 0) { 
+                    throw "emsdk activate failed (exit $LASTEXITCODE). Ensure Python 3 is installed and in PATH."
+                }
             } finally { Pop-Location }
             Import-EmsdkEnv $userEmsdk
+            if (-not (Get-Command emcmake -ErrorAction SilentlyContinue)) {
+                throw "emcmake not available after emsdk activation. emsdk may not be properly installed."
+            }
             return
         }
     }
@@ -437,9 +508,18 @@ function Initialize-Emsdk {
         Push-Location $managed
         try {
             & .\emsdk.bat install $EmsdkVersion
+            if ($LASTEXITCODE -ne 0) { 
+                throw "emsdk install failed (exit $LASTEXITCODE). Ensure Python 3 is installed and in PATH."
+            }
             & .\emsdk.bat activate $EmsdkVersion
+            if ($LASTEXITCODE -ne 0) { 
+                throw "emsdk activate failed (exit $LASTEXITCODE). Ensure Python 3 is installed and in PATH."
+            }
         } finally { Pop-Location }
         Import-EmsdkEnv $managed
+        if (-not (Get-Command emcmake -ErrorAction SilentlyContinue)) {
+            throw "emcmake not available after emsdk activation. emsdk may not be properly installed."
+        }
         return
     }
 
@@ -450,9 +530,18 @@ function Initialize-Emsdk {
     Push-Location $managed
     try {
         & .\emsdk.bat install $EmsdkVersion
+        if ($LASTEXITCODE -ne 0) { 
+            throw "emsdk install failed (exit $LASTEXITCODE). Ensure Python 3 is installed and in PATH."
+        }
         & .\emsdk.bat activate $EmsdkVersion
+        if ($LASTEXITCODE -ne 0) { 
+            throw "emsdk activate failed (exit $LASTEXITCODE). Ensure Python 3 is installed and in PATH."
+        }
     } finally { Pop-Location }
     Import-EmsdkEnv $managed   # FIX: dung Import-EmsdkEnv thay vi & .ps1
+    if (-not (Get-Command emcmake -ErrorAction SilentlyContinue)) {
+        throw "emcmake not available after emsdk activation. emsdk may not be properly installed."
+    }
     Write-Ok "emsdk active: $(em++ --version | Select-Object -First 1)"
 }
 
@@ -626,9 +715,11 @@ function Initialize-WindowsTools {
         $ids = @()
         if ($needCmake)  { $ids += 'Kitware.CMake' }
         if ($needGit)    { $ids += 'Git.Git' }
-        if ($needPython) { $ids += 'Python.Python.3.12' }
         if ($needCurl)   { $ids += 'cURL.cURL' }
         Install-WingetPackagesIfMissing -Ids $ids
+        if ($needPython) {
+            Write-Warn 'Python khong co trong PATH; cai thu cong truoc khi build WASM/emsdk.'
+        }
         return
     }
 
@@ -636,9 +727,11 @@ function Initialize-WindowsTools {
         $pkgs = @()
         if ($needCmake)  { $pkgs += 'cmake' }
         if ($needGit)    { $pkgs += 'git' }
-        if ($needPython) { $pkgs += 'python' }
         if ($needCurl)   { $pkgs += 'curl' }
         Install-ChocoPackagesIfMissing -Packages $pkgs
+        if ($needPython) {
+            Write-Warn 'Python khong co trong PATH; cai thu cong truoc khi build WASM/emsdk.'
+        }
         return
     }
 
