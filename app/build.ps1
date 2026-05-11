@@ -634,6 +634,11 @@ function Build-Sdl3FromSource {
         Write-Ok "SDL3 source $Version da co tai $sdlSrc"
     }
 
+    # Remove stale CMakeCache to avoid generator mismatch on re-runs
+    if (Test-Path $sdlBuild) {
+        Remove-Item -Recurse -Force $sdlBuild
+    }
+
     $cfg = @(
         '-S', $sdlSrc, '-B', $sdlBuild,
         '-DCMAKE_BUILD_TYPE=Release',

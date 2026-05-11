@@ -48,6 +48,7 @@ NLOHMANN_VERSION="3.11.3" #
 SQLITE_VERSION="3460100"
 SQLITE_YEAR="2024"
 DETECTED_SDL3_VERSION=""
+BUILD_MODE="${1:-}"
 
 # -----------------------------------------------------------------------------
 # Logging & Helpers
