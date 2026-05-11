@@ -857,6 +857,126 @@ function Validate-LoggerIntegration {
 }
 
 # =============================================================================
+# Show Python server guide for running WASM build on localhost
+# =============================================================================
+function Show-PythonServerGuide {
+    param([string]$BuildDir)
+    
+    Write-Host ""
+    Write-Host "================================================================================" -ForegroundColor Cyan
+    Write-Host "WASM BUILD COMPLETE! Run on localhost with Python HTTP server:" -ForegroundColor Cyan
+    Write-Host "================================================================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Step 1: OPEN NEW PowerShell terminal and navigate to build directory" -ForegroundColor Yellow
+    Write-Host "  cd `"$BuildDir`"" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Full path (if needed):" -ForegroundColor Gray
+    Write-Host "  cd D:\projects\ctetris-2\app\build\wasm\windows" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Step 2: Verify files exist in current directory" -ForegroundColor Yellow
+    Write-Host "  dir" -ForegroundColor White
+    Write-Host "  (You should see: cTetris.html, cTetris.js, cTetris.wasm)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Step 3: Start Python HTTP server (pick ONE command):" -ForegroundColor Yellow
+    Write-Host "  python -m http.server 8000" -ForegroundColor White
+    Write-Host "  OR" -ForegroundColor Gray
+    Write-Host "  py -m http.server 8000" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Expected output: 'Serving HTTP on :: port 8000'" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Step 4: Open browser and navigate to:" -ForegroundColor Yellow
+    Write-Host "  http://localhost:8000/cTetris.html" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Step 5: Stop server when done" -ForegroundColor Yellow
+    Write-Host "  Press Ctrl+C in the server terminal" -ForegroundColor White
+    Write-Host ""
+    Write-Host "================================================================================" -ForegroundColor Cyan
+    Write-Host ""
+}
+
+# =============================================================================
+# Show Windows guidance when Smart App Control blocks the native EXE
+# =============================================================================
+function Show-SmartAppControlGuide {
+    param([string]$ExePath)
+
+    Write-Host ""
+    Write-Host "================================================================================" -ForegroundColor Yellow
+    Write-Host "WINDOWS SMART APP CONTROL NOTICE:" -ForegroundColor Yellow
+    Write-Host "================================================================================" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "If Windows blocks $ExePath with Smart App Control or SmartScreen, the real fix is code signing." -ForegroundColor White
+    Write-Host "This build is unsigned unless a code-signing certificate was configured, so Windows may not trust it yet." -ForegroundColor White
+    Write-Host ""
+    Write-Host "Recommended next steps:" -ForegroundColor Yellow
+    Write-Host "  1. Configure a real Authenticode code-signing certificate and rebuild." -ForegroundColor White
+    Write-Host "  2. For local development only, run the EXE from this workspace on a trusted machine." -ForegroundColor White
+    Write-Host "  3. If you are testing your own build, use the file directly from the build output folder." -ForegroundColor White
+    Write-Host ""
+    Write-Host "Build output location:" -ForegroundColor Yellow
+    Write-Host "  $ExePath" -ForegroundColor White
+    Write-Host ""
+    Write-Host "================================================================================" -ForegroundColor Yellow
+    Write-Host ""
+}
+
+# =============================================================================
+# Optional Windows code signing for Smart App Control / SmartScreen trust.
+# Requires a real code-signing certificate.
+# Supported inputs:
+#   CTETRIS_SIGN_CERT_PATH : path to a .pfx file
+#   CTETRIS_SIGN_CERT_PWD   : password for the .pfx file
+#   CTETRIS_SIGN_TIMESTAMP  : timestamp server URL
+# =============================================================================
+function Sign-WindowsBinary {
+    param([string]$ExePath)
+
+    if ($env:OS -ne 'Windows_NT') { return }
+    if (-not (Test-Path $ExePath)) {
+        Write-Warn "Signing skipped: EXE not found at $ExePath"
+        return
+    }
+
+    $certPath = $env:CTETRIS_SIGN_CERT_PATH
+    if ([string]::IsNullOrWhiteSpace($certPath)) {
+        Write-Warn 'No CTETRIS_SIGN_CERT_PATH configured; native EXE remains unsigned.'
+        return
+    }
+    if (-not (Test-Path $certPath)) {
+        Write-Warn "Signing skipped: certificate not found at $certPath"
+        return
+    }
+
+    $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
+    if (-not $signtool) {
+        Write-Warn 'Signing skipped: signtool.exe not found in PATH. Install Windows SDK signing tools.'
+        return
+    }
+
+    $timestamp = $env:CTETRIS_SIGN_TIMESTAMP
+    if ([string]::IsNullOrWhiteSpace($timestamp)) {
+        $timestamp = 'http://timestamp.digicert.com'
+    }
+
+    $args = @('sign', '/fd', 'SHA256', '/f', $certPath)
+    if (-not [string]::IsNullOrWhiteSpace($env:CTETRIS_SIGN_CERT_PWD)) {
+        $args += @('/p', $env:CTETRIS_SIGN_CERT_PWD)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($timestamp)) {
+        $args += @('/tr', $timestamp, '/td', 'SHA256')
+    }
+    $args += $ExePath
+
+    Write-Info "Signing native EXE with Authenticode certificate: $certPath"
+    & $signtool.Path @args
+    if ($LASTEXITCODE -ne 0) {
+        throw "signtool sign failed (exit $LASTEXITCODE)"
+    }
+
+    Write-Ok 'Native EXE signed successfully'
+}
+
+# =============================================================================
 # Build entry points
 # =============================================================================
 function Build-Native {
@@ -918,6 +1038,8 @@ function Build-Native {
 
 
     Write-Ok "Native build hoan tat: $BuildNativeDir"
+    Sign-WindowsBinary -ExePath (Join-Path $BuildNativeDir 'cTetris.exe')
+    Show-SmartAppControlGuide -ExePath (Join-Path $BuildNativeDir 'cTetris.exe')
 }
 
 function Build-Wasm {
@@ -1006,6 +1128,7 @@ function Build-Wasm {
     Copy-PwaAssets -OutDir $BuildWasmDir
 
     Write-Ok "WASM build hoan tat: $BuildWasmDir"
+    Show-PythonServerGuide -BuildDir $BuildWasmDir
 }
 
 switch ($Mode) {
