@@ -21,6 +21,39 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+
+// [F.7] IDBFS persistence for sqlite file across browser tab reloads.
+// FS.syncfs is async; Asyncify.handleSleep blocks the C caller until JS
+// resolves. Requires -sASYNCIFY=1 (already set in CMakeLists.txt WASM link
+// options). All three helpers degrade to no-op if FS isn't ready.
+EM_JS(void, idbfs_mount_dir, (const char* path), {
+    var p = UTF8ToString(path);
+    try {
+        FS.mkdirTree(p);
+        var nodeMount = FS.lookupPath(p).node.mount;
+        // Skip if this dir is already an IDBFS mount (Console re-entry).
+        if (nodeMount && nodeMount.type && nodeMount.type.name === 'IDBFS') return;
+        FS.mount(IDBFS, {}, p);
+    } catch (e) {
+        console.warn('[IDBFS] mount fail at', p, e);
+    }
+});
+EM_JS(void, idbfs_load_from_idb, (), {
+    Asyncify.handleSleep(function(wakeUp) {
+        FS.syncfs(true, function(err) {
+            if (err) console.warn('[IDBFS] load fail:', err);
+            wakeUp();
+        });
+    });
+});
+EM_JS(void, idbfs_save_to_idb, (), {
+    Asyncify.handleSleep(function(wakeUp) {
+        FS.syncfs(false, function(err) {
+            if (err) console.warn('[IDBFS] save fail:', err);
+            wakeUp();
+        });
+    });
+});
 #endif
 
 // =========================================================
@@ -533,6 +566,15 @@ static bool dbExec(const char* sql, const char* what) {
     return true;
 }
 
+// [F.7] Flush in-memory MEMFS contents to IndexedDB so the sqlite file
+// survives a browser tab close + reload. No-op on native (DB file is
+// already on real disk).
+static void dbSyncToPersistent() {
+#ifdef __EMSCRIPTEN__
+    if (g_db) idbfs_save_to_idb();
+#endif
+}
+
 bool dbOpen(const char* idUser) {
     if (!idUser || !*idUser) {
         SDL_Log("[gameConsole_db] dbOpen: idUser rong");
@@ -551,8 +593,18 @@ bool dbOpen(const char* idUser) {
         SDL_Log("[gameConsole_db] SDL_GetPrefPath fail: %s", SDL_GetError());
         return false;
     }
-    g_dbPath = std::string(pref) + idUser + ".sqlite";
+    std::string prefDir(pref);
     SDL_free(pref);   // SDL3: SDL_GetPrefPath returns SDL-allocated string
+
+#ifdef __EMSCRIPTEN__
+    // [F.7] Mount IDBFS on the pref dir + preload previously persisted
+    // contents BEFORE sqlite3_open so the DB file is read off IDBFS,
+    // not from a blank MEMFS.
+    idbfs_mount_dir(prefDir.c_str());
+    idbfs_load_from_idb();
+#endif
+
+    g_dbPath = prefDir + idUser + ".sqlite";
 
     int rc = sqlite3_open(g_dbPath.c_str(), &g_db);
     if (rc != SQLITE_OK) {
@@ -714,6 +766,7 @@ bool dbSeedSharedData() {
         return false;
     }
     SDL_Log("[gameConsole_db] %d chapter(s) seeded vao shared_data", totalLoaded);
+    dbSyncToPersistent();   // [F.7]
     return true;
 }
 
@@ -813,6 +866,178 @@ int dbMaxActivatedChapter(const char* idUser) {
     }
     sqlite3_finalize(st);
     return maxCh;
+}
+
+int dbCheckAndUnlockStories(const char* idUser) {
+    if (!g_db || !idUser || !*idUser) return 0;
+
+    // Pass 1: collect catalogue rows with prerequisites
+    std::vector<StoryRow> candidates;
+    {
+        sqlite3_stmt* st = nullptr;
+        const char* sql =
+            "SELECT idStory, idChapter, minScore, minSpeed, minRetries, "
+            "       requiredStories "
+            "FROM shared_data "
+            "WHERE requiredStories != '';";
+        if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+            SDL_Log("[gameConsole_db] unlock list prepare fail: %s",
+                    sqlite3_errmsg(g_db));
+            return 0;
+        }
+        while (sqlite3_step(st) == SQLITE_ROW) {
+            StoryRow r;
+            r.idStory    = sqlite3_column_int   (st, 0);
+            r.idChapter  = sqlite3_column_int   (st, 1);
+            r.minScore   = sqlite3_column_int   (st, 2);
+            r.minSpeed   = (float)sqlite3_column_double(st, 3);
+            r.minRetries = sqlite3_column_int   (st, 4);
+            const unsigned char* rs = sqlite3_column_text(st, 5);
+            r.requiredStories = rs ? (const char*)rs : "";
+            candidates.push_back(std::move(r));
+        }
+        sqlite3_finalize(st);
+    }
+
+    // Pass 2: prepare reusable statements
+    sqlite3_stmt* lookupParent = nullptr;
+    sqlite3_prepare_v2(g_db,
+        "SELECT lastMaxScore, lastMaxSpeed, totalRetries "
+        "FROM idUser_Stories WHERE idUser = ? AND idStory = ?;",
+        -1, &lookupParent, nullptr);
+
+    sqlite3_stmt* checkExisting = nullptr;
+    sqlite3_prepare_v2(g_db,
+        "SELECT isActivated FROM idUser_Stories "
+        "WHERE idUser = ? AND idStory = ? AND idChapter = ?;",
+        -1, &checkExisting, nullptr);
+
+    sqlite3_stmt* doUnlock = nullptr;
+    sqlite3_prepare_v2(g_db,
+        "INSERT INTO idUser_Stories (idUser, idStory, idChapter, isActivated) "
+        "VALUES (?, ?, ?, 1) "
+        "ON CONFLICT(idUser, idStory, idChapter) DO UPDATE SET isActivated = 1;",
+        -1, &doUnlock, nullptr);
+
+    int unlocked = 0;
+
+    for (const auto& c : candidates) {
+        // Parse parent CSV (idStory IDs)
+        std::vector<int> parents;
+        const std::string& s = c.requiredStories;
+        size_t pos = 0;
+        while (pos < s.size()) {
+            size_t comma = s.find(',', pos);
+            if (comma == std::string::npos) comma = s.size();
+            std::string tok = s.substr(pos, comma - pos);
+            while (!tok.empty() && (tok.front() == ' ' || tok.front() == '\t'))
+                tok.erase(0, 1);
+            while (!tok.empty() && (tok.back() == ' ' || tok.back() == '\t'))
+                tok.pop_back();
+            if (!tok.empty()) {
+                int pid = std::atoi(tok.c_str());
+                if (pid > 0) parents.push_back(pid);
+            }
+            pos = comma + 1;
+        }
+        if (parents.empty()) continue;
+
+        // Every parent must satisfy this child's min thresholds
+        bool allPass = true;
+        for (int pid : parents) {
+            sqlite3_reset(lookupParent);
+            sqlite3_bind_text(lookupParent, 1, idUser, -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int (lookupParent, 2, pid);
+            if (sqlite3_step(lookupParent) != SQLITE_ROW) {
+                allPass = false; break;
+            }
+            int   pScore   = sqlite3_column_int   (lookupParent, 0);
+            float pSpeed   = (float)sqlite3_column_double(lookupParent, 1);
+            int   pRetries = sqlite3_column_int   (lookupParent, 2);
+            if (pScore   < c.minScore   ||
+                pSpeed   < c.minSpeed   ||
+                pRetries < c.minRetries) {
+                allPass = false; break;
+            }
+        }
+        if (!allPass) continue;
+
+        // Skip if already unlocked (idempotent re-runs on Console re-entry)
+        sqlite3_reset(checkExisting);
+        sqlite3_bind_text(checkExisting, 1, idUser, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int (checkExisting, 2, c.idStory);
+        sqlite3_bind_int (checkExisting, 3, c.idChapter);
+        int already = 0;
+        if (sqlite3_step(checkExisting) == SQLITE_ROW) {
+            already = sqlite3_column_int(checkExisting, 0);
+        }
+        if (already == 1) continue;
+
+        // Unlock
+        sqlite3_reset(doUnlock);
+        sqlite3_bind_text(doUnlock, 1, idUser, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int (doUnlock, 2, c.idStory);
+        sqlite3_bind_int (doUnlock, 3, c.idChapter);
+        if (sqlite3_step(doUnlock) == SQLITE_DONE) {
+            unlocked++;
+            SDL_Log("[gameConsole_db] unlock story=%d chapter=%d",
+                    c.idStory, c.idChapter);
+        }
+    }
+
+    sqlite3_finalize(lookupParent);
+    sqlite3_finalize(checkExisting);
+    sqlite3_finalize(doUnlock);
+
+    if (unlocked > 0) {
+        SDL_Log("[gameConsole_db] dbCheckAndUnlockStories: %d newly unlocked",
+                unlocked);
+        dbSyncToPersistent();   // [F.7] only sync if rows actually changed
+    }
+    return unlocked;
+}
+
+static bool dbSelectStory(const char* idUser, int idStory, int idChapter) {
+    if (!g_db || !idUser || !*idUser) return false;
+
+    // Single-select semantics: clear any prior selection for this user
+    sqlite3_stmt* clr = nullptr;
+    if (sqlite3_prepare_v2(g_db,
+        "UPDATE idUser_Stories SET isSelected = 0 "
+        "WHERE idUser = ? AND isSelected = 1;",
+        -1, &clr, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbSelectStory clear prepare fail: %s",
+                sqlite3_errmsg(g_db));
+        return false;
+    }
+    sqlite3_bind_text(clr, 1, idUser, -1, SQLITE_TRANSIENT);
+    sqlite3_step(clr);
+    sqlite3_finalize(clr);
+
+    // UPSERT new selection. Force isActivated=1 too, so selecting the intro
+    // (which has no idUser_Stories row before its first play) creates the
+    // row correctly and the radio "stays" highlighted across reopen.
+    sqlite3_stmt* up = nullptr;
+    if (sqlite3_prepare_v2(g_db,
+        "INSERT INTO idUser_Stories "
+        "  (idUser, idStory, idChapter, isActivated, isSelected) "
+        "VALUES (?, ?, ?, 1, 1) "
+        "ON CONFLICT(idUser, idStory, idChapter) DO UPDATE SET "
+        "  isActivated = 1, isSelected = 1;",
+        -1, &up, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbSelectStory upsert prepare fail: %s",
+                sqlite3_errmsg(g_db));
+        return false;
+    }
+    sqlite3_bind_text(up, 1, idUser, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int (up, 2, idStory);
+    sqlite3_bind_int (up, 3, idChapter);
+    sqlite3_step(up);
+    sqlite3_finalize(up);
+
+    SDL_Log("[gameConsole_db] select story=%d chapter=%d", idStory, idChapter);
+    dbSyncToPersistent();   // [F.7]
+    return true;
 }
 
 // =========================================================
@@ -1601,7 +1826,26 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     if (dbOpen("default")) {
         dbInitSchema();
         dbSeedSharedData();
+        dbCheckAndUnlockStories("default");   // [F.5] cascade-unlock on entry
         state.storiesMaxChapter = dbMaxActivatedChapter("default");
+
+        // [F.6] Restore last-selected story into SettingsConfig so the
+        // Console -> Core handoff has the right idStory/idChapter
+        // even after a full app restart (cfg is reset by main.cpp).
+        sqlite3_stmt* st = nullptr;
+        if (sqlite3_prepare_v2(g_db,
+            "SELECT idStory, idChapter FROM idUser_Stories "
+            "WHERE idUser = ? AND isSelected = 1 LIMIT 1;",
+            -1, &st, nullptr) == SQLITE_OK) {
+            sqlite3_bind_text(st, 1, "default", -1, SQLITE_TRANSIENT);
+            if (sqlite3_step(st) == SQLITE_ROW) {
+                cfgInOut.storyId   = sqlite3_column_int(st, 0);
+                cfgInOut.chapterId = sqlite3_column_int(st, 1);
+                SDL_Log("[gameConsole] restore selection: story=%d chapter=%d",
+                        cfgInOut.storyId, cfgInOut.chapterId);
+            }
+            sqlite3_finalize(st);
+        }
     }
 
     // [C.5] Load leaderboard tu JSON; fallback ve hardcoded array neu fail.
@@ -1784,11 +2028,57 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                         }
                     }
                 } else if (state.showStories) {
-                    // [F.2] Stories popup: only close-X hit test for now.
-                    // Story-row click + chapter-nav buttons added in 2.6.7+
                     if (hitTest(STORIES_CLOSE, mx, my)) {
                         state.showStories = false;
                         sbResetInteraction(state.sb);
+                    }
+                    // [F.5] Chapter navigator arrows. Clamp to [1, maxChapter];
+                    // reload cache when chapter changes so the row list refreshes.
+                    else if (hitTest(STORIES_NAV_LEFT, mx, my)) {
+                        if (state.currentStoryChapter > 1) {
+                            state.currentStoryChapter--;
+                            state.storiesCache        = dbLoadStories("default",
+                                                            state.currentStoryChapter);
+                            state.storiesCacheChapter = state.currentStoryChapter;
+                        }
+                    }
+                    else if (hitTest(STORIES_NAV_RIGHT, mx, my)) {
+                        if (state.currentStoryChapter < state.storiesMaxChapter) {
+                            state.currentStoryChapter++;
+                            state.storiesCache        = dbLoadStories("default",
+                                                            state.currentStoryChapter);
+                            state.storiesCacheChapter = state.currentStoryChapter;
+                        }
+                    }
+                    // [F.6] Row clicks: radio OR play -> select this story.
+                    // Locked rows ignore clicks. Play's "replay gameStory"
+                    // semantics remains TODO -- both buttons share selection
+                    // behaviour for now.
+                    else {
+                        int rowsCheckable = (int)state.storiesCache.size();
+                        if (rowsCheckable > STORIES_LIST_VISIBLE)
+                            rowsCheckable = STORIES_LIST_VISIBLE;
+                        for (int i = 0; i < rowsCheckable; i++) {
+                            const StoryRow& sr = state.storiesCache[i];
+                            if (!sr.isActivated) continue;   // locked
+                            SDL_FRect radio = storiesRadioRect(i);
+                            SDL_FRect play  = storiesPlayRect(i);
+                            if (hitTest(radio, mx, my) || hitTest(play, mx, my)) {
+                                // In-memory: clear all isSelected, set this one
+                                for (auto& r : state.storiesCache)
+                                    r.isSelected = false;
+                                // mark selected in cache
+                                state.storiesCache[i].isSelected = true;
+                                // Persist selection and ensure row is activated
+                                dbSelectStory("default", sr.idStory, sr.idChapter);
+                                // Pipe selection into cfg so PLAY handoff sees it
+                                if (state.cfg) {
+                                    state.cfg->storyId   = sr.idStory;
+                                    state.cfg->chapterId = sr.idChapter;
+                                }
+                                break;
+                            }
+                        }
                     }
                 } else {
                     for (int i = 0; i < NUM_MAIN_BUTTONS; i++) {
