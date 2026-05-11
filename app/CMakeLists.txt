@@ -120,6 +120,49 @@ else()
 endif()
 
 # -----------------------------------------------------------------------------
+# SQLite amalgamation: build.sh/build.ps1 truyen path qua -DSQLITE_DIR.
+# Compile sqlite3.c truc tiep voi target cTetris (giam phu thuoc shared lib).
+# Tat warnings cho file nay vi day la third-party amalgamation co nhieu
+# warning vo hai (unused-function, missing-prototypes, sign-compare).
+# -----------------------------------------------------------------------------
+if(SQLITE_DIR AND EXISTS "${SQLITE_DIR}/sqlite3.c" AND EXISTS "${SQLITE_DIR}/sqlite3.h")
+    target_sources(cTetris PRIVATE "${SQLITE_DIR}/sqlite3.c")
+    target_include_directories(cTetris PRIVATE "${SQLITE_DIR}")
+
+    # Common SQLite compile-time flags (giam binary size, omit features khong dung)
+    target_compile_definitions(cTetris PRIVATE
+        SQLITE_OMIT_LOAD_EXTENSION
+        SQLITE_DEFAULT_FOREIGN_KEYS=1
+        SQLITE_DQS=0
+    )
+
+    # WASM: bat buoc tat threadsafe vi single-thread runtime
+    if(BUILD_WASM)
+        target_compile_definitions(cTetris PRIVATE SQLITE_THREADSAFE=0)
+    else()
+        target_compile_definitions(cTetris PRIVATE SQLITE_THREADSAFE=1)
+    endif()
+
+    # Tat warnings cho sqlite3.c (third-party, khong sua duoc)
+    if(MSVC)
+        set_source_files_properties("${SQLITE_DIR}/sqlite3.c" PROPERTIES
+            COMPILE_FLAGS "/W0 /wd4244 /wd4267 /wd4996")
+    else()
+        set_source_files_properties("${SQLITE_DIR}/sqlite3.c" PROPERTIES
+            COMPILE_FLAGS "-w")
+    endif()
+
+    # Linux: sqlite3 can libdl + libpthread (neu THREADSAFE=1)
+    if(UNIX AND NOT APPLE AND NOT BUILD_WASM)
+        target_link_libraries(cTetris PRIVATE dl pthread)
+    endif()
+
+    message(STATUS "[cTetris] SQLite: ${SQLITE_DIR}")
+else()
+    message(WARNING "[cTetris] SQLite amalgamation khong tim thay -- Stories popup se compile fail")
+endif()
+
+# -----------------------------------------------------------------------------
 # SDL3 dependency: tim qua CMake config package.
 # Cho native build, SDL3 nam o /usr/local/lib/cmake/SDL3 hoac
 # /opt/homebrew/lib/cmake/SDL3 (Homebrew silicon).
@@ -166,6 +209,7 @@ if(BUILD_WASM)
         "SHELL:-sASYNCIFY=1"
         "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
         "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/src/gameConsole/gameConsole_board.json@gameConsole_board.json"
+        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/chapters@chapters"
     )
 
     # Sinh ra cTetris.html (kem .js + .wasm) thay vi binary mac dinh
@@ -260,6 +304,25 @@ else()
             message(STATUS "[cTetris] SDL3.dll post-build copy: ${_SDL3_LOCATION}")
         endif()
     endif()
+
+    # -------------------------------------------------------------------------
+    # Copy gameConsole_board.json + chapters/ directory to executable dir.
+    # WASM uses --preload-file above; native uses POST_BUILD copy here.
+    # When V3 adds API-driven chapter discovery, the local copy still serves
+    # as offline fallback (curl writes downloaded SQL into the same path).
+    # -------------------------------------------------------------------------
+    add_custom_command(TARGET cTetris POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/src/gameConsole/gameConsole_board.json"
+            "$<TARGET_FILE_DIR:cTetris>/gameConsole_board.json"
+        COMMENT "[cTetris] Copying gameConsole_board.json to output directory"
+    )
+    add_custom_command(TARGET cTetris POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/chapters"
+            "$<TARGET_FILE_DIR:cTetris>/chapters"
+        COMMENT "[cTetris] Copying chapters/ directory to output"
+    )
 endif()
 
 # -----------------------------------------------------------------------------

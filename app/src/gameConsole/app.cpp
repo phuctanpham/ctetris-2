@@ -14,6 +14,10 @@
 // [C.5] nlohmann/json for JSON-driven leaderboard
 #include <nlohmann/json.hpp>
 
+// [F.1] SQLite database for Stories / Records / Catalogue
+#include "gameConsole_db.h"
+#include "sqlite3.h"
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -325,6 +329,8 @@ struct AppState {
     bool showGuide    = false;
     bool showBoard    = false;
     bool showSettings = false;   // [A.3] Settings popup visibility
+    bool showStories  = false;   // [F.2] Stories popup visibility
+    int  currentStoryChapter = 1;   // [F.3] active chapter shown in stories popup
     bool isRunning    = true;
     int  nextScene    = 0;
     int  boardScroll  = 0;
@@ -501,6 +507,213 @@ static void loadBoardWithFallback() {
 }
 
 // =========================================================
+// [F.1] SQLite database layer (Stories + Records + Catalogue)
+// Path: SDL_GetPrefPath("uit", "cTetris") + "<idUser>.sqlite"
+// Lifetime: opened on runGameConsole entry, closed on exit.
+// WASM IDBFS persistence wired in Step 2.6.12.
+// =========================================================
+static sqlite3*    g_db = nullptr;
+static std::string g_dbCurrentUser;
+static std::string g_dbPath;
+
+static bool dbExec(const char* sql, const char* what) {
+    if (!g_db) return false;
+    char* errMsg = nullptr;
+    int rc = sqlite3_exec(g_db, sql, nullptr, nullptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] %s fail: %s",
+                what, errMsg ? errMsg : "(no msg)");
+        sqlite3_free(errMsg);
+        return false;
+    }
+    return true;
+}
+
+bool dbOpen(const char* idUser) {
+    if (!idUser || !*idUser) {
+        SDL_Log("[gameConsole_db] dbOpen: idUser rong");
+        return false;
+    }
+    if (g_db && g_dbCurrentUser == idUser) {
+        return true;  // already open for same user
+    }
+    if (g_db) {
+        sqlite3_close(g_db);
+        g_db = nullptr;
+    }
+
+    char* pref = SDL_GetPrefPath("uit", "cTetris");
+    if (!pref) {
+        SDL_Log("[gameConsole_db] SDL_GetPrefPath fail: %s", SDL_GetError());
+        return false;
+    }
+    g_dbPath = std::string(pref) + idUser + ".sqlite";
+    SDL_free(pref);   // SDL3: SDL_GetPrefPath returns SDL-allocated string
+
+    int rc = sqlite3_open(g_dbPath.c_str(), &g_db);
+    if (rc != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] sqlite3_open fail: %s",
+                g_db ? sqlite3_errmsg(g_db) : "(null)");
+        if (g_db) { sqlite3_close(g_db); g_db = nullptr; }
+        g_dbPath.clear();
+        return false;
+    }
+
+    g_dbCurrentUser = idUser;
+    SDL_Log("[gameConsole_db] DB mo: %s", g_dbPath.c_str());
+    return true;
+}
+
+void dbClose() {
+    if (g_db) {
+        sqlite3_close(g_db);
+        g_db = nullptr;
+        g_dbCurrentUser.clear();
+        SDL_Log("[gameConsole_db] DB dong");
+    }
+}
+
+bool dbInitSchema() {
+    if (!g_db) {
+        SDL_Log("[gameConsole_db] dbInitSchema: DB chua mo");
+        return false;
+    }
+
+    // Records: per-session game log
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS idUser_Records ("
+        "  id            INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  idUser        TEXT NOT NULL,"
+        "  startTS       INTEGER NOT NULL,"
+        "  endTS         INTEGER NOT NULL,"
+        "  idStory       INTEGER,"
+        "  idChapter     INTEGER,"
+        "  totalScore    INTEGER,"
+        "  totalSeconds  INTEGER,"
+        "  avgSpeed      REAL,"
+        "  retryNo       INTEGER"
+        ");",
+        "CREATE idUser_Records")) return false;
+
+    // Stories: per-user progress overlay
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS idUser_Stories ("
+        "  idUser        TEXT NOT NULL,"
+        "  idStory       INTEGER NOT NULL,"
+        "  idChapter     INTEGER NOT NULL,"
+        "  isActivated   INTEGER DEFAULT 0,"
+        "  isSelected    INTEGER DEFAULT 0,"
+        "  totalRetries  INTEGER DEFAULT 0,"
+        "  lastMaxScore  INTEGER DEFAULT 0,"
+        "  lastMaxSpeed  REAL    DEFAULT 0,"
+        "  PRIMARY KEY (idUser, idStory, idChapter)"
+        ");",
+        "CREATE idUser_Stories")) return false;
+
+    // Shared catalogue: static story data (seeded in Step 2.6.5)
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS shared_data ("
+        "  idStory         INTEGER NOT NULL,"
+        "  storyName       TEXT NOT NULL,"
+        "  idChapter       INTEGER NOT NULL,"
+        "  chapterName     TEXT,"
+        "  minScore        INTEGER DEFAULT 0,"
+        "  minSpeed        REAL    DEFAULT 0,"
+        "  minRetries      INTEGER DEFAULT 0,"
+        "  requiredStories TEXT    DEFAULT '',"
+        "  nextBlockScore  INTEGER DEFAULT 0,"
+        "  nextBlockSpeed  REAL    DEFAULT 0,"
+        "  tableMatrix     TEXT    DEFAULT '',"
+        "  xmlDialogue     TEXT    DEFAULT '',"
+        "  thumbnailPath   TEXT    DEFAULT '',"
+        "  PRIMARY KEY (idStory, idChapter)"
+        ");",
+        "CREATE shared_data")) return false;
+
+    SDL_Log("[gameConsole_db] schema initialized (3 tables)");
+    return true;
+}
+
+bool dbSeedSharedData() {
+    if (!g_db) return false;
+
+    // Idempotent guard: skip if shared_data already has rows.
+    // INSERT OR REPLACE inside each chapter SQL keeps updates safe even
+    // when this guard is bypassed in a future "force re-seed" V3 flow.
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db, "SELECT COUNT(*) FROM shared_data;",
+                           -1, &st, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] seed COUNT prepare fail: %s",
+                sqlite3_errmsg(g_db));
+        return false;
+    }
+    int existingCount = 0;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        existingCount = sqlite3_column_int(st, 0);
+    }
+    sqlite3_finalize(st);
+    if (existingCount > 0) {
+        SDL_Log("[gameConsole_db] shared_data da co %d rows, skip seed",
+                existingCount);
+        return true;
+    }
+
+    // V2: hardcoded chapter list bundled with binary.
+    // V3 (Task 3.1): GET https://<pages>/chapters/index.json to discover
+    // new chapter IDs, curl each <id>/<id>.sql, then re-run this exec loop.
+    const char* chapterDirs[] = { "c001" };
+    const int   nChapters     = (int)(sizeof(chapterDirs) / sizeof(chapterDirs[0]));
+
+    const char* basePath = SDL_GetBasePath();
+    int totalLoaded = 0;
+
+    for (int ci = 0; ci < nChapters; ci++) {
+        std::string sqlPath = (basePath && basePath[0] != '\0')
+            ? std::string(basePath) + "chapters/" + chapterDirs[ci] + "/" + chapterDirs[ci] + ".sql"
+            : std::string("chapters/") + chapterDirs[ci] + "/" + chapterDirs[ci] + ".sql";
+
+        SDL_IOStream* io = SDL_IOFromFile(sqlPath.c_str(), "rb");
+        if (!io) {
+            SDL_Log("[gameConsole_db] khong mo duoc %s -- skip chapter %s",
+                    sqlPath.c_str(), chapterDirs[ci]);
+            continue;
+        }
+        Sint64 sz = SDL_GetIOSize(io);
+        if (sz <= 0) { SDL_CloseIO(io); continue; }
+
+        std::string sqlText((size_t)sz, '\0');
+        size_t got = SDL_ReadIO(io, &sqlText[0], (size_t)sz);
+        SDL_CloseIO(io);
+        if (got != (size_t)sz) {
+            SDL_Log("[gameConsole_db] %s: read sai size (%zu/%lld)",
+                    sqlPath.c_str(), got, (long long)sz);
+            continue;
+        }
+
+        // sqlite3_exec handles multi-statement scripts (BEGIN/INSERT/COMMIT)
+        char* errMsg = nullptr;
+        int rc = sqlite3_exec(g_db, sqlText.c_str(), nullptr, nullptr, &errMsg);
+        if (rc != SQLITE_OK) {
+            SDL_Log("[gameConsole_db] %s exec fail: %s",
+                    chapterDirs[ci], errMsg ? errMsg : "(no msg)");
+            sqlite3_free(errMsg);
+            // Try next chapter; partial failure is non-fatal
+            continue;
+        }
+        SDL_Log("[gameConsole_db] chapter %s seeded tu %s",
+                chapterDirs[ci], sqlPath.c_str());
+        totalLoaded++;
+    }
+
+    if (totalLoaded == 0) {
+        SDL_Log("[gameConsole_db] khong load duoc chapter nao -- shared_data trong");
+        return false;
+    }
+    SDL_Log("[gameConsole_db] %d chapter(s) seeded vao shared_data", totalLoaded);
+    return true;
+}
+
+// =========================================================
 // [A.2] Main button list -- 5 buttons (was 4 in v1)
 // Insert SETTINGS between PLAY and QUIT to keep QUIT as last.
 // Layout math: each button 30px tall. y values stay in 30px stride
@@ -513,23 +726,28 @@ static void loadBoardWithFallback() {
 //   QUIT     y=320 .. 350
 //   (gap 30px) ; hint text starts y=380
 // =========================================================
+// [F.2] 6 buttons -- y range 130..360. Stride 40px keeps original rhythm;
+// start y shifted up from 160 to 130 to fit STORIES insertion without
+// pushing QUIT into the hint-text band (y=380..425).
 static const float BTN_W = 140.0f;
 static const float BTN_H = 30.0f;
 static const float BTN_X = (CONSOLE_SCREEN_WIDTH - BTN_W) / 2.0f;
 static const Button MAIN_BUTTONS[] = {
-    { { BTN_X, 160.0f, BTN_W, BTN_H }, "GUIDE",    { 70,  90, 160, 255} },
-    { { BTN_X, 200.0f, BTN_W, BTN_H }, "BOARD",    { 70, 130,  90, 255} },
-    { { BTN_X, 240.0f, BTN_W, BTN_H }, "PLAY",     {180,  70,  70, 255} },
-    { { BTN_X, 280.0f, BTN_W, BTN_H }, "SETTINGS", {120,  90, 150, 255} },
-    { { BTN_X, 320.0f, BTN_W, BTN_H }, "QUIT",     {110, 110, 110, 255} }
+    { { BTN_X, 130.0f, BTN_W, BTN_H }, "GUIDE",    { 70,  90, 160, 255} },
+    { { BTN_X, 170.0f, BTN_W, BTN_H }, "BOARD",    { 70, 130,  90, 255} },
+    { { BTN_X, 210.0f, BTN_W, BTN_H }, "PLAY",     {180,  70,  70, 255} },
+    { { BTN_X, 250.0f, BTN_W, BTN_H }, "STORIES",  {170, 110,  70, 255} },
+    { { BTN_X, 290.0f, BTN_W, BTN_H }, "SETTINGS", {120,  90, 150, 255} },
+    { { BTN_X, 330.0f, BTN_W, BTN_H }, "QUIT",     {110, 110, 110, 255} }
 };
 static const int NUM_MAIN_BUTTONS = (int)(sizeof(MAIN_BUTTONS)/sizeof(MAIN_BUTTONS[0]));
 // Index constants -- dung trong activateButton + ESC-jump-to-quit
 static const int BTN_IDX_GUIDE    = 0;
 static const int BTN_IDX_BOARD    = 1;
 static const int BTN_IDX_PLAY     = 2;
-static const int BTN_IDX_SETTINGS = 3;
-static const int BTN_IDX_QUIT     = 4;
+static const int BTN_IDX_STORIES  = 3;   // [F.2] new
+static const int BTN_IDX_SETTINGS = 4;
+static const int BTN_IDX_QUIT     = 5;
 
 static const SDL_FRect GUIDE_POPUP = { 5.0f, 20.0f, 260.0f, 440.0f };
 static const SDL_FRect GUIDE_CLOSE = { GUIDE_POPUP.x + GUIDE_POPUP.w - 22.0f,
@@ -543,6 +761,70 @@ static const SDL_FRect BOARD_CLOSE = { BOARD_POPUP.x + BOARD_POPUP.w - 22.0f,
 static const SDL_FRect SETTINGS_POPUP = { 5.0f, 20.0f, 260.0f, 440.0f };
 static const SDL_FRect SETTINGS_CLOSE = { SETTINGS_POPUP.x + SETTINGS_POPUP.w - 22.0f,
                                           SETTINGS_POPUP.y + 4.0f, 18.0f, 18.0f };
+
+// [F.2] Stories popup geometry -- same footprint as Settings/Guide for visual
+// consistency. Body (thumbnail, story list, chapter navigator) is populated
+// by drawStoriesLightbox in Step 2.6.7. This step ships a placeholder body.
+static const SDL_FRect STORIES_POPUP = { 5.0f, 20.0f, 260.0f, 440.0f };
+static const SDL_FRect STORIES_CLOSE = { STORIES_POPUP.x + STORIES_POPUP.w - 22.0f,
+                                         STORIES_POPUP.y + 4.0f, 18.0f, 18.0f };
+
+// [F.3] Stories popup body layout
+//   y range inside popup (popup y=20..460):
+//     20..50   title band
+//     60..210  thumbnail (150x150, centered)
+//    220..400  9 story rows (each 20px tall)
+//    408..446  chapter navigator (title + arrows + n/x)
+static const float STORIES_THUMB_Y = STORIES_POPUP.y + 40.0f;       // 60
+static const float STORIES_THUMB_W = 150.0f;
+static const float STORIES_THUMB_H = 150.0f;
+static const float STORIES_THUMB_X = STORIES_POPUP.x +
+                                     (STORIES_POPUP.w - STORIES_THUMB_W) / 2.0f;
+static const SDL_FRect STORIES_THUMB = { STORIES_THUMB_X, STORIES_THUMB_Y,
+                                         STORIES_THUMB_W, STORIES_THUMB_H };
+
+static const int   STORIES_LIST_VISIBLE = 9;
+static const float STORIES_LIST_Y       = STORIES_THUMB_Y + STORIES_THUMB_H + 10.0f; // 220
+static const float STORIES_ROW_H        = 20.0f;
+static const float STORIES_ROW_X        = STORIES_POPUP.x + 8.0f;
+static const float STORIES_ROW_W        = STORIES_POPUP.w - 16.0f;
+
+static SDL_FRect storiesRowRect(int i) {
+    return SDL_FRect{
+        STORIES_ROW_X,
+        STORIES_LIST_Y + i * STORIES_ROW_H,
+        STORIES_ROW_W,
+        STORIES_ROW_H - 1.0f
+    };
+}
+static SDL_FRect storiesRadioRect(int i) {
+    SDL_FRect row = storiesRowRect(i);
+    const float sz = 12.0f;
+    return SDL_FRect{ row.x + 4.0f,
+                      row.y + (row.h - sz) / 2.0f,
+                      sz, sz };
+}
+static SDL_FRect storiesPlayRect(int i) {
+    SDL_FRect row = storiesRowRect(i);
+    const float sz = 14.0f;
+    return SDL_FRect{ row.x + row.w - sz - 4.0f,
+                      row.y + (row.h - sz) / 2.0f,
+                      sz, sz };
+}
+
+// Chapter navigator (bottom band)
+static const float STORIES_NAV_TITLE_Y = STORIES_LIST_Y +
+                                         STORIES_LIST_VISIBLE * STORIES_ROW_H + 8.0f; // 408
+static const float STORIES_NAV_BTN_Y   = STORIES_NAV_TITLE_Y + 22.0f;                  // 430
+static const SDL_FRect STORIES_NAV_LEFT  = {
+    STORIES_POPUP.x + 50.0f, STORIES_NAV_BTN_Y, 20.0f, 16.0f
+};
+static const SDL_FRect STORIES_NAV_RIGHT = {
+    STORIES_POPUP.x + STORIES_POPUP.w - 70.0f, STORIES_NAV_BTN_Y, 20.0f, 16.0f
+};
+
+// Fixed for V2 seed (3 chapters); 2.6.9 replaces with dbMaxActivatedChapter().
+static const int STORIES_MAX_CHAPTER = 3;
 
 // =========================================================
 // [D.1] Volume slider geometry (absolute coords trong popup body)
@@ -962,6 +1244,110 @@ static void drawSettingsLightbox(SDL_Renderer* renderer, const AppState& state) 
     drawCloseButton(renderer, SETTINGS_CLOSE);
 }
 
+// [F.2] Stories popup stub -- replaced by full layout in Step 2.6.7.
+// [F.3] Stories popup layout shell. Body sections (thumbnail texture,
+// real story rows, chapter title, page indicator) are still placeholder
+// here -- DB-driven content lands in 2.6.8/2.6.9.
+static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
+    // Background dimmer
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
+    SDL_FRect screen = { 0, 0, (float)CONSOLE_SCREEN_WIDTH, (float)CONSOLE_SCREEN_HEIGHT };
+    SDL_RenderFillRect(renderer, &screen);
+
+    // Panel (warm terracotta to distinguish from other popups)
+    SDL_SetRenderDrawColor(renderer, 90, 70, 60, 255);
+    SDL_RenderFillRect(renderer, &STORIES_POPUP);
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderRect(renderer, &STORIES_POPUP);
+
+    // ===== Title =====
+    const char* title = "STORIES";
+    int tl = (int)SDL_strlen(title);
+    SDL_RenderDebugText(renderer,
+                        STORIES_POPUP.x + (STORIES_POPUP.w - tl * 8.0f) / 2.0f,
+                        STORIES_POPUP.y + 14, title);
+
+    // ===== Thumbnail box (placeholder fill + label) =====
+    SDL_SetRenderDrawColor(renderer, 50, 40, 35, 255);
+    SDL_RenderFillRect(renderer, &STORIES_THUMB);
+    SDL_SetRenderDrawColor(renderer, 160, 130, 100, 255);
+    SDL_RenderRect(renderer, &STORIES_THUMB);
+    const char* thumbLbl = "THUMBNAIL";
+    int thl = (int)SDL_strlen(thumbLbl);
+    SDL_RenderDebugText(renderer,
+                        STORIES_THUMB.x + (STORIES_THUMB.w - thl * 8.0f) / 2.0f,
+                        STORIES_THUMB.y + STORIES_THUMB.h / 2.0f - 4.0f,
+                        thumbLbl);
+
+    // ===== 9 row slots (placeholder rows -- DB content in 2.6.8) =====
+    for (int i = 0; i < STORIES_LIST_VISIBLE; i++) {
+        SDL_FRect row = storiesRowRect(i);
+
+        // Alternating row background for visual rhythm
+        if (i & 1) {
+            SDL_SetRenderDrawColor(renderer, 70, 55, 50, 255);
+            SDL_RenderFillRect(renderer, &row);
+        }
+
+        // Radio button (outline only in placeholder; filled state in 2.6.8)
+        SDL_FRect radio = storiesRadioRect(i);
+        SDL_SetRenderDrawColor(renderer, 140, 140, 140, 255);
+        SDL_RenderRect(renderer, &radio);
+
+        // Row label
+        char label[24];
+        SDL_snprintf(label, sizeof(label), "Story slot %d", i + 1);
+        SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+        SDL_RenderDebugText(renderer, row.x + 24.0f, row.y + 6.0f, label);
+
+        // Play button (placeholder small green rect)
+        SDL_FRect play = storiesPlayRect(i);
+        SDL_SetRenderDrawColor(renderer, 100, 150, 100, 255);
+        SDL_RenderFillRect(renderer, &play);
+        SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
+        SDL_RenderRect(renderer, &play);
+    }
+
+    // ===== Chapter navigator =====
+    // Chapter title (placeholder -- replaced with real chapterName in 2.6.8)
+    const char* navTitle = "Chapter title (placeholder)";
+    int ntl = (int)SDL_strlen(navTitle);
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderDebugText(renderer,
+                        STORIES_POPUP.x + (STORIES_POPUP.w - ntl * 8.0f) / 2.0f,
+                        STORIES_NAV_TITLE_Y, navTitle);
+
+    // Left/right arrow buttons
+    SDL_SetRenderDrawColor(renderer, 130, 100, 80, 255);
+    SDL_RenderFillRect(renderer, &STORIES_NAV_LEFT);
+    SDL_RenderFillRect(renderer, &STORIES_NAV_RIGHT);
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderRect(renderer, &STORIES_NAV_LEFT);
+    SDL_RenderRect(renderer, &STORIES_NAV_RIGHT);
+    SDL_RenderDebugText(renderer,
+                        STORIES_NAV_LEFT.x + STORIES_NAV_LEFT.w / 2.0f - 4.0f,
+                        STORIES_NAV_LEFT.y + STORIES_NAV_LEFT.h / 2.0f - 4.0f, "<");
+    SDL_RenderDebugText(renderer,
+                        STORIES_NAV_RIGHT.x + STORIES_NAV_RIGHT.w / 2.0f - 4.0f,
+                        STORIES_NAV_RIGHT.y + STORIES_NAV_RIGHT.h / 2.0f - 4.0f, ">");
+
+    // Page indicator "n/x" centered between arrows
+    char pageLbl[16];
+    int x = STORIES_MAX_CHAPTER;
+    if (x < 1) x = 1;
+    int n = state.currentStoryChapter;
+    if (n < 1) n = 1;
+    if (n > x) n = x;
+    SDL_snprintf(pageLbl, sizeof(pageLbl), "%d/%d", n, x);
+    int pll = (int)SDL_strlen(pageLbl);
+    SDL_RenderDebugText(renderer,
+                        STORIES_POPUP.x + (STORIES_POPUP.w - pll * 8.0f) / 2.0f,
+                        STORIES_NAV_BTN_Y + 4.0f, pageLbl);
+
+    drawCloseButton(renderer, STORIES_CLOSE);
+}
+
 // [D.5] Open silent BGM stream best-effort. V1 doesnt feed any samples
 // (no music files yet), but volume slider's gain calls are tracked so
 // that V2 -- when actual music is queued -- inherits volume control
@@ -992,6 +1378,10 @@ static void activateButton(AppState& state, int index) {
             sbResetInteraction(state.sb); break;
         case BTN_IDX_PLAY:
             state.isRunning = false; state.nextScene = 1; break;
+        case BTN_IDX_STORIES:
+            // [F.2] Open stories popup
+            state.showStories = true;
+            sbResetInteraction(state.sb); break;
         case BTN_IDX_SETTINGS:
             // [A.3] Open settings popup
             state.showSettings = true;
@@ -1019,6 +1409,14 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     SDL_Event event;
     playBackgroundMusic();
     applyVolumeToStream(cfgInOut.volume);   // [D.5] sync gain to current vol
+
+    // [F.1] Open DB + init schema + seed shared_data from JSON.
+    // Hardcoded user id "default" for V2; V3 (Step 3.1.x) replaces with
+    // email-based id after OTP flow. Seed is idempotent (skips if rows exist).
+    if (dbOpen("default")) {
+        dbInitSchema();
+        dbSeedSharedData();
+    }
 
     // [C.5] Load leaderboard tu JSON; fallback ve hardcoded array neu fail.
     // Re-load moi lan vao Console -- cho phep refresh data sau khi V3 add
@@ -1091,11 +1489,12 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                 bool isRight = (key == SDLK_RIGHT || key == SDLK_D);
 
                 if (key == SDLK_ESCAPE) {
-                    // [A.4] ESC closes any open lightbox first; only when
+                    // [A.4/F.2] ESC closes any open lightbox first; only when
                     // none are open does it jump focus to QUIT button.
                     if (state.showGuide)         { state.showGuide = false;    sbResetInteraction(state.sb); }
                     else if (state.showBoard)    { state.showBoard = false;    sbResetInteraction(state.sb); }
                     else if (state.showSettings) { state.showSettings = false; sbResetInteraction(state.sb); }
+                    else if (state.showStories)  { state.showStories = false;  sbResetInteraction(state.sb); }
                     else                          state.focusIndex = BTN_IDX_QUIT;
                 }
                 else if (state.showBoard && (isUp || isDown)) {
@@ -1118,7 +1517,7 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                     applyVolumeToStream(state.cfg->volume);
                 }
                 // [A.4] Block main-button TAB/arrow nav while ANY popup open
-                else if (!state.showGuide && !state.showBoard && !state.showSettings) {
+                else if (!state.showGuide && !state.showBoard && !state.showSettings && !state.showStories) {
                     if ((key == SDLK_TAB && !shiftHeld) || isLeft || isDown)
                         state.focusIndex = (state.focusIndex + 1) % NUM_MAIN_BUTTONS;
                     else if ((key == SDLK_TAB && shiftHeld) || isRight || isUp)
@@ -1198,6 +1597,13 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                             }
                         }
                     }
+                } else if (state.showStories) {
+                    // [F.2] Stories popup: only close-X hit test for now.
+                    // Story-row click + chapter-nav buttons added in 2.6.7+
+                    if (hitTest(STORIES_CLOSE, mx, my)) {
+                        state.showStories = false;
+                        sbResetInteraction(state.sb);
+                    }
                 } else {
                     for (int i = 0; i < NUM_MAIN_BUTTONS; i++) {
                         if (hitTest(MAIN_BUTTONS[i].rect, mx, my)) {
@@ -1254,14 +1660,15 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
         }
 
         drawBackground(renderer);
-        // [A.4] Main buttons hidden whenever ANY popup is open
-        if (!state.showGuide && !state.showBoard && !state.showSettings) {
+        // [A.4/F.2] Main buttons hidden whenever ANY popup is open
+        if (!state.showGuide && !state.showBoard && !state.showSettings && !state.showStories) {
             for (int i = 0; i < NUM_MAIN_BUTTONS; i++)
                 drawButton(renderer, MAIN_BUTTONS[i], i == state.focusIndex);
         }
         if (state.showGuide)    drawGuideLightbox(renderer, state);
         if (state.showBoard)    drawBoardLightbox(renderer, state);
         if (state.showSettings) drawSettingsLightbox(renderer, state);
+        if (state.showStories)  drawStoriesLightbox(renderer, state);
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
@@ -1281,6 +1688,11 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     // [D.5] Don dep audio stream -- moi lan exit + re-enter Console se
     // mo lai stream moi. Tranh leak khi user back-and-forth nhieu lan.
     closeAudioStream();
+
+    // [F.1] Close DB. Re-opened on next runGameConsole entry. Safe to
+    // call even if dbOpen failed earlier.
+    dbClose();
+
     return state.nextScene;
 }
 

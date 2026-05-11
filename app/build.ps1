@@ -88,6 +88,8 @@ $EmsdkVersion      = '3.1.72'
 $Sdl3VersionMin    = '3.2.0'
 $Sdl3Version       = '3.2.18'   # default pin
 $DetectedSdl3Version = ''        # se duoc set boi Initialize-Sdl3Native
+$SqliteVersion     = '3460100'   # SQLite 3.46.1
+$SqliteYear        = '2024'
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -281,6 +283,56 @@ function Initialize-Nlohmann {
         throw "nlohmann download truncated"
     }
     Write-Ok "nlohmann/json $NlohmannVersion san sang tai $nFile ($size bytes)"
+}
+
+# =============================================================================
+# SQLite amalgamation -- check vendored -> check libs\downloads -> download zip
+# Compile with -DSQLITE_THREADSAFE=0 for WASM (set later in CMakeLists.txt).
+# =============================================================================
+function Initialize-Sqlite {
+    $sqliteDir = Join-Path $DownloadDir 'sqlite'
+    $sqliteC   = Join-Path $sqliteDir 'sqlite3.c'
+    $sqliteH   = Join-Path $sqliteDir 'sqlite3.h'
+
+    if ((Test-Path $sqliteC) -and (Test-Path $sqliteH)) {
+        $size = (Get-Item $sqliteC).Length
+        if ($size -gt 5MB) {
+            Write-Ok "SQLite amalgamation da co tai $sqliteDir ($([math]::Round($size/1MB,1)) MB)"
+            return
+        }
+        Write-Warn "sqlite3.c kich thuoc bat thuong ($size bytes) -- re-download"
+    }
+
+    Write-Info "Tai SQLite amalgamation $SqliteVersion vao $sqliteDir..."
+    New-Item -ItemType Directory -Force -Path $sqliteDir | Out-Null
+
+    $zipUrl = "https://sqlite.org/$SqliteYear/sqlite-amalgamation-$SqliteVersion.zip"
+    $zipPath = Join-Path $sqliteDir 'sqlite-amalgamation.zip'
+    $tmpExtract = Join-Path $sqliteDir 'tmp_extract'
+
+    try {
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing
+        if (Test-Path $tmpExtract) { Remove-Item -Recurse -Force $tmpExtract }
+        Expand-Archive -Path $zipPath -DestinationPath $tmpExtract -Force
+
+        $innerDir = Join-Path $tmpExtract "sqlite-amalgamation-$SqliteVersion"
+        Copy-Item -Force (Join-Path $innerDir 'sqlite3.c') $sqliteC
+        Copy-Item -Force (Join-Path $innerDir 'sqlite3.h') $sqliteH
+
+        Remove-Item -Force $zipPath
+        Remove-Item -Recurse -Force $tmpExtract
+    } catch {
+        Write-Err "SQLite download/extract failed: $_"
+        throw "SQLite acquisition failed"
+    }
+
+    $size = (Get-Item $sqliteC).Length
+    if ($size -lt 5MB) {
+        Write-Err "sqlite3.c tai ve nho bat thuong ($size bytes) -- abort"
+        Remove-Item -Force $sqliteC, $sqliteH -ErrorAction SilentlyContinue
+        throw "SQLite amalgamation truncated"
+    }
+    Write-Ok "SQLite amalgamation $SqliteVersion san sang tai $sqliteDir ($([math]::Round($size/1MB,1)) MB)"
 }
 
 # =============================================================================
@@ -726,6 +778,7 @@ function Build-Native {
     Initialize-Sdl3Native
     Initialize-Nanosvg
     Initialize-Nlohmann   # FIX: gameConsole/app.cpp requires nlohmann/json.hpp
+    Initialize-Sqlite   # FIX 2.6.1: SQLite for Stories DB
 
     # Copy icon from brandkit to build output
     Copy-DesktopIcon -OutDir $BuildNativeDir
@@ -762,7 +815,8 @@ function Build-Native {
         '-G', 'Ninja',
         "-DCMAKE_PREFIX_PATH=$sdlInstall",
         "-DNANOSVG_INCLUDE_DIR=$(Join-Path $DownloadDir 'nanosvg')",
-        "-DNLOHMANN_INCLUDE_DIR=$(Join-Path $DownloadDir 'nlohmann')"
+        "-DNLOHMANN_INCLUDE_DIR=$(Join-Path $DownloadDir 'nlohmann')",
+        "-DSQLITE_DIR=$(Join-Path $DownloadDir 'sqlite')"
     ) + $sdlDirArgs + $iconArg
     & cmake @nativeArgs
     if ($LASTEXITCODE -ne 0) { throw "Native configure failed (exit $LASTEXITCODE)" }
@@ -789,6 +843,7 @@ function Build-Wasm {
     Initialize-Sdl3Wasm
     Initialize-Nanosvg
     Initialize-Nlohmann   # FIX: gameConsole/app.cpp requires nlohmann/json.hpp
+    Initialize-Sqlite   # FIX 2.6.1: SQLite for Stories DB
 
     # Derive sdl_install path tu version detect duoc
     $targetVersion = if ($script:DetectedSdl3Version) { $script:DetectedSdl3Version } else { $Sdl3Version }
@@ -821,7 +876,8 @@ function Build-Wasm {
         "-DSDL3_DIR=$sdlDir",
         "-DCMAKE_PREFIX_PATH=$sdlInstall",
         "-DNANOSVG_INCLUDE_DIR=$(Join-Path $DownloadDir 'nanosvg')",
-        "-DNLOHMANN_INCLUDE_DIR=$(Join-Path $DownloadDir 'nlohmann')"
+        "-DNLOHMANN_INCLUDE_DIR=$(Join-Path $DownloadDir 'nlohmann')",
+        "-DSQLITE_DIR=$(Join-Path $DownloadDir 'sqlite')"
     )
     & emcmake cmake @wasmArgs
     if ($LASTEXITCODE -ne 0) { throw "emcmake configure failed (exit $LASTEXITCODE)" }

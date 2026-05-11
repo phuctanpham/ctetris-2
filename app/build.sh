@@ -45,6 +45,8 @@ EMSDK_VERSION="3.1.72"
 SDL3_VERSION_MIN="3.2.0"
 SDL3_VERSION="3.2.18"
 NLOHMANN_VERSION="3.11.3" # 
+SQLITE_VERSION="3460100"
+SQLITE_YEAR="2024"
 DETECTED_SDL3_VERSION=""
 
 # -----------------------------------------------------------------------------
@@ -112,6 +114,57 @@ ensure_nlohmann() {
     log_ok "nlohmann/json $NLOHMANN_VERSION san sang tai $n_file ($size bytes)"
 }
 
+# SQLite amalgamation -- download zip, extract sqlite3.c + sqlite3.h
+ensure_sqlite() {
+    local sqlite_dir="$DOWNLOAD_DIR/sqlite"
+    local sqlite_c="$sqlite_dir/sqlite3.c"
+    local sqlite_h="$sqlite_dir/sqlite3.h"
+
+    if [ -f "$sqlite_c" ] && [ -f "$sqlite_h" ]; then
+        local size
+        size=$(stat -c%s "$sqlite_c" 2>/dev/null || stat -f%z "$sqlite_c" 2>/dev/null)
+        if [ -n "$size" ] && [ "$size" -gt 5242880 ]; then
+            log_ok "SQLite amalgamation da co tai $sqlite_dir ($((size/1048576)) MB)"
+            return 0
+        fi
+        log_warn "sqlite3.c kich thuoc bat thuong ($size bytes) -- re-download"
+    fi
+
+    log_info "Tai SQLite amalgamation $SQLITE_VERSION vao $sqlite_dir..."
+    mkdir -p "$sqlite_dir"
+
+    local zip_url="https://sqlite.org/$SQLITE_YEAR/sqlite-amalgamation-$SQLITE_VERSION.zip"
+    local zip_path="$sqlite_dir/sqlite-amalgamation.zip"
+    local tmp_extract="$sqlite_dir/tmp_extract"
+
+    curl -fsSL "$zip_url" -o "$zip_path" || {
+        log_error "SQLite download fail tu $zip_url"
+        return 1
+    }
+
+    rm -rf "$tmp_extract"
+    mkdir -p "$tmp_extract"
+    unzip -q "$zip_path" -d "$tmp_extract" || {
+        log_error "SQLite unzip fail"
+        return 1
+    }
+
+    cp -f "$tmp_extract/sqlite-amalgamation-$SQLITE_VERSION/sqlite3.c" "$sqlite_c"
+    cp -f "$tmp_extract/sqlite-amalgamation-$SQLITE_VERSION/sqlite3.h" "$sqlite_h"
+
+    rm -f "$zip_path"
+    rm -rf "$tmp_extract"
+
+    local size
+    size=$(stat -c%s "$sqlite_c" 2>/dev/null || stat -f%z "$sqlite_c" 2>/dev/null)
+    if [ -z "$size" ] || [ "$size" -lt 5242880 ]; then
+        log_error "sqlite3.c tai ve nho bat thuong ($size bytes) -- abort"
+        rm -f "$sqlite_c" "$sqlite_h"
+        return 1
+    fi
+    log_ok "SQLite amalgamation $SQLITE_VERSION san sang ($((size/1048576)) MB)"
+}
+
 # (Các hàm ensure_emsdk, ensure_sdl3_native, ensure_sdl3_wasm, build_sdl3_from_source giữ nguyên logic như file cũ)
 # ... [Lược bỏ phần mã nguồn trùng lặp để tập trung vào các điểm thay đổi] ...
 
@@ -125,6 +178,7 @@ build_native() {
     ensure_sdl3_native
     ensure_nanosvg
     ensure_nlohmann # [cite: 23]
+    ensure_sqlite   # FIX 2.6.1: SQLite for Stories DB
 
     # ... [Xử lý icon và SDL3_DIR giống như file gốc] ...
 
@@ -135,6 +189,7 @@ build_native() {
           -DCMAKE_PREFIX_PATH="$DOWNLOAD_DIR/sdl3-native" \
           -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg" \
           -DNLOHMANN_INCLUDE_DIR="$DOWNLOAD_DIR/nlohmann" \
+          -DSQLITE_DIR="$DOWNLOAD_DIR/sqlite" \
           "${sdl_dir_arg[@]}" \
           "${icon_arg[@]}" # [cite: 8, 9]
 
@@ -156,6 +211,7 @@ build_wasm() {
     ensure_sdl3_wasm
     ensure_nanosvg
     ensure_nlohmann # [cite: 30]
+    ensure_sqlite   # FIX 2.6.1: SQLite for Stories DB
 
     # ... [Xử lý sdl_dir giống như file gốc] ...
 
@@ -166,7 +222,8 @@ build_wasm() {
                   -DSDL3_DIR="$sdl_dir" \
                   -DCMAKE_PREFIX_PATH="$sdl_install" \
                   -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg" \
-                  -DNLOHMANN_INCLUDE_DIR="$DOWNLOAD_DIR/nlohmann" # [cite: 10, 11]
+                  -DNLOHMANN_INCLUDE_DIR="$DOWNLOAD_DIR/nlohmann" \
+                  -DSQLITE_DIR="$DOWNLOAD_DIR/sqlite" # [cite: 10, 11]
     cmake --build "$BUILD_WASM_DIR" -j
 
     # ... [Copy favicon và PWA assets giống như file gốc] ...
