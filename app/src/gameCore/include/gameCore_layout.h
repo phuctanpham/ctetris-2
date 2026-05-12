@@ -33,6 +33,8 @@ struct GameState {
     int board[BOARD_ROWS][BOARD_COLS] = {0};
     Tetromino currentBlock;
     Tetromino nextBlock;
+    Tetromino nextBlock2;
+    Tetromino nextBlock3;
     int  score = 0;
     bool isGameOver    = false;
     bool isPaused      = false;
@@ -40,6 +42,14 @@ struct GameState {
     bool softDrop      = false;     // SPACE / giu nut speed booster
     bool speedHeld     = false;     // chuot dang giu nut speed booster
     int  exitCode      = 0;
+    int  retryCount    = 0;
+
+    bool pendingClear  = false;
+    int  clearRowCount = 0;
+    int  clearRows[4]  = {0, 0, 0, 0};
+    int  flashTick     = 0;
+    bool flashOn       = false;
+    Uint32 flashTimer  = 0;
 
     // Theo doi tong thoi gian choi (HH:MM) - khong tinh thoi gian pause.
     // Logic: khi pause/quit-popup/game-over -> ngung tang elapsedMs;

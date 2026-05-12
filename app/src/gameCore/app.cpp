@@ -6,12 +6,18 @@
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
+#include <string>
+
+#include "gameConsole_db.h"
+#include "sqlite3.h"
 
 // Tren WASM build, can goi window.location.reload() khi user click "Reload"
 // o man hinh shutdown. Su dung emscripten_run_script de chen JS.
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
+
+static const SettingsConfig* s_cfg = nullptr;
 
 const SDL_Color COLORS[] = {
     {  0,   0,   0, 255},
@@ -20,7 +26,8 @@ const SDL_Color COLORS[] = {
     {  0, 255,   0, 255},
     {255, 255,   0, 255},
     {255, 165,   0, 255},
-    {128,   0, 128, 255}
+    {128,   0, 128, 255},
+    {255, 105, 180, 255}
 };
 
 // Mau thong nhat cho hieu ung "active" (chuot giu / phim giu)
@@ -53,10 +60,146 @@ static Tetromino spawnBlock() {
         }
     }
 
-    t.colorID = std::rand() % 6 + 1;
+    static const int PALETTE_TO_COLOR[7] = {2, 5, 7, 4, 3, 1, 6};
+    int enabledIds[7];
+    int n = 0;
+    if (s_cfg) {
+        for (int i = 0; i < 7; i++) {
+            if (s_cfg->colorEnabled[i]) enabledIds[n++] = PALETTE_TO_COLOR[i];
+        }
+    }
+    t.colorID = (n > 0) ? enabledIds[std::rand() % n] : (std::rand() % 6 + 1);
     t.x = BOARD_COLS / 2 - 1;
     t.y = 0;
     return t;
+}
+
+// gamecore-tang-do-kho-16
+static Uint32 getFallInterval(int score) {
+    if (score >= 50) return 100;
+    if (score >= 30) return 200;
+    if (score >= 15) return 300;
+    if (score >=  5) return 400;
+    return 500;
+}
+
+// gamecore-chen-nhac-nen-15
+static SDL_AudioStream* g_coreBgmStream = nullptr;
+
+static void coreOpenBgm(float volume) {
+    if (g_coreBgmStream) return;
+    SDL_AudioSpec spec = { SDL_AUDIO_F32, 2, 44100 };
+    g_coreBgmStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+                                                 &spec, NULL, NULL);
+    if (!g_coreBgmStream) {
+        SDL_Log("[gameCore] BGM open fail: %s", SDL_GetError());
+        return;
+    }
+    if (volume < 0.0f) volume = 0.0f;
+    if (volume > 1.0f) volume = 1.0f;
+    SDL_SetAudioStreamGain(g_coreBgmStream, volume);
+    SDL_ResumeAudioStreamDevice(g_coreBgmStream);
+    SDL_Log("[gameCore] BGM ready gain=%.2f", volume);
+}
+
+static void coreCloseBgm() {
+    if (g_coreBgmStream) {
+        SDL_DestroyAudioStream(g_coreBgmStream);
+        g_coreBgmStream = nullptr;
+    }
+}
+
+// gamecore-table-matrix-21
+// Format: semicolon-separated rows (bottom-aligned), comma-separated colorID values.
+// e.g. "1,0,2,0,3,0,4,0,5,0;6,1,2,3,4,5,6,1,2,3" = 2 pre-filled bottom rows.
+static void applyTableMatrix(GameState& state, const std::string& tm) {
+    if (tm.empty()) return;
+    int rowCount = 1;
+    for (char c : tm) if (c == ';') rowCount++;
+    int startRow = BOARD_ROWS - rowCount;
+    if (startRow < 0) startRow = 0;
+
+    int curRow = startRow, curCol = 0, val = 0;
+    bool hasVal = false;
+    for (size_t i = 0; i <= tm.size(); i++) {
+        char c = (i < tm.size()) ? tm[i] : ';';
+        if (c == ',' || c == ';') {
+            if (hasVal && curRow < BOARD_ROWS && curCol < BOARD_COLS)
+                state.board[curRow][curCol] = val;
+            curCol++; val = 0; hasVal = false;
+            if (c == ';') { curRow++; curCol = 0; }
+        } else if (c >= '0' && c <= '9') {
+            val = val * 10 + (c - '0');
+            hasVal = true;
+        }
+    }
+    SDL_Log("[gameCore] tableMatrix applied: %d rows", rowCount);
+}
+
+// gamecore-save-record-22 / gamecore-update-story-progress-23
+static void onGameOver(const GameState& state, Uint32 elapsedMs) {
+    if (!s_cfg) return;
+    if (!dbOpen("default")) {
+        SDL_Log("[gameCore] onGameOver: dbOpen fail");
+        return;
+    }
+
+    GameRecord rec;
+    rec.idUser       = "default";
+    rec.startTS      = (int64_t)state.gameStartTime;
+    rec.endTS        = (int64_t)SDL_GetTicks();
+    rec.idStory      = s_cfg->storyId;
+    rec.idChapter    = s_cfg->chapterId;
+    rec.totalScore   = state.score;
+    rec.totalSeconds = (int)(elapsedMs / 1000);
+    rec.avgSpeed     = rec.totalSeconds > 0
+        ? (float)rec.totalScore / (float)rec.totalSeconds : 0.0f;
+    rec.retryNo      = state.retryCount;
+    dbInsertRecord(rec);
+
+    if (s_cfg->storyId > 0) {
+        dbUpsertStoryProgress("default", s_cfg->storyId, s_cfg->chapterId, true, true);
+        dbCheckAndUnlockStories("default");
+    }
+    dbClose();
+    SDL_Log("[gameCore] onGameOver saved: score=%d story=%d retries=%d",
+            state.score, s_cfg->storyId, state.retryCount);
+}
+
+// gamecore-hieu-ung-khi-xoa-dong-18 / gamecore-diem-thuong-khi-xoa-nhieu-dong-19
+static void finishLineClear(GameState& state) {
+    state.score += state.clearRowCount * state.clearRowCount;
+    if (state.score > 99999) state.score = 99999;
+
+    for (int r = BOARD_ROWS - 1; r >= 0; r--) {
+        bool full = true;
+        for (int c = 0; c < BOARD_COLS; c++) {
+            if (state.board[r][c] == 0) { full = false; break; }
+        }
+        if (full) {
+            for (int y = r; y > 0; y--) {
+                for (int x = 0; x < BOARD_COLS; x++)
+                    state.board[y][x] = state.board[y - 1][x];
+            }
+            for (int x = 0; x < BOARD_COLS; x++) state.board[0][x] = 0;
+            r++;
+        }
+    }
+
+    state.currentBlock   = state.nextBlock;
+    state.currentBlock.x = BOARD_COLS / 2 - 1;
+    state.currentBlock.y = 0;
+    state.nextBlock  = state.nextBlock2;
+    state.nextBlock2 = state.nextBlock3;
+    state.nextBlock3 = spawnBlock();
+
+    if (checkCollision(state, state.currentBlock)) {
+        state.isGameOver    = true;
+        state.isPaused      = true;
+        state.showQuitPopup = true;
+    }
+    state.pendingClear  = false;
+    state.clearRowCount = 0;
 }
 
 static bool checkCollision(const GameState& state, const Tetromino& t) {
@@ -103,28 +246,6 @@ static void applyMoveOrRotate(GameState& state, SDL_Keycode key) {
     if (!checkCollision(state, nextT)) state.currentBlock = nextT;
 }
 
-// gamecore-xu-ly-xoa-dong-06
-// gamecore-tinh-diem-07
-static void clearLines(GameState& state) {
-    int linesCleared = 0;
-    for (int r = BOARD_ROWS - 1; r >= 0; r--) {
-        bool full = true;
-        for (int c = 0; c < BOARD_COLS; c++) {
-            if (state.board[r][c] == 0) { full = false; break; }
-        }
-        if (full) {
-            linesCleared++;
-            for (int y = r; y > 0; y--) {
-                for (int x = 0; x < BOARD_COLS; x++)
-                    state.board[y][x] = state.board[y - 1][x];
-            }
-            r++;
-        }
-    }
-    state.score += linesCleared;
-    if (state.score > 99999) state.score = 99999;
-}
-
 static void resetGame(GameState& state) {
     for (int r = 0; r < BOARD_ROWS; r++)
         for (int c = 0; c < BOARD_COLS; c++)
@@ -135,8 +256,15 @@ static void resetGame(GameState& state) {
     state.showQuitPopup = false;
     state.softDrop = false;
     state.speedHeld = false;
+    state.pendingClear  = false;
+    state.clearRowCount = 0;
+    state.flashTick     = 0;
+    state.flashOn       = false;
     state.currentBlock = spawnBlock();
     state.nextBlock    = spawnBlock();
+    state.nextBlock2   = spawnBlock();
+    state.nextBlock3   = spawnBlock();
+    if (s_cfg) applyTableMatrix(state, s_cfg->tableMatrix);
 
     state.gameStartTime  = SDL_GetTicks();
     state.pauseStartTime = 0;
@@ -159,15 +287,34 @@ static void lockBlock(GameState& state) {
             state.board[ny][nx] = state.currentBlock.colorID;
         }
     }
-    clearLines(state);
-    state.currentBlock = state.nextBlock;
-    state.currentBlock.x = BOARD_COLS / 2 - 1;
-    state.currentBlock.y = 0;
-    state.nextBlock = spawnBlock();
-    if (checkCollision(state, state.currentBlock)) {
-        state.isGameOver    = true;
-        state.isPaused      = true;
-        state.showQuitPopup = true;
+
+    state.clearRowCount = 0;
+    for (int r = BOARD_ROWS - 1; r >= 0; r--) {
+        bool full = true;
+        for (int c = 0; c < BOARD_COLS; c++) {
+            if (state.board[r][c] == 0) { full = false; break; }
+        }
+        if (full && state.clearRowCount < 4)
+            state.clearRows[state.clearRowCount++] = r;
+    }
+
+    if (state.clearRowCount > 0) {
+        state.pendingClear = true;
+        state.flashTick    = 0;
+        state.flashOn      = true;
+        state.flashTimer   = SDL_GetTicks();
+    } else {
+        state.currentBlock   = state.nextBlock;
+        state.currentBlock.x = BOARD_COLS / 2 - 1;
+        state.currentBlock.y = 0;
+        state.nextBlock  = state.nextBlock2;
+        state.nextBlock2 = state.nextBlock3;
+        state.nextBlock3 = spawnBlock();
+        if (checkCollision(state, state.currentBlock)) {
+            state.isGameOver    = true;
+            state.isPaused      = true;
+            state.showQuitPopup = true;
+        }
     }
 }
 
@@ -392,6 +539,11 @@ static void drawSidebar(SDL_Renderer* renderer, const GameState& state,
     drawScoreInSlot(renderer, RECT_SCORE, state.score);
     drawTimerInSlot(renderer, RECT_TIMER, elapsedMs);
     drawNextPreview(renderer, RECT_NEXT1, state.nextBlock);
+    bool showNext2 = s_cfg && s_cfg->nextBlockScore > 0
+                     && state.score >= s_cfg->nextBlockScore;
+    bool showNext3 = showNext2 && state.score >= s_cfg->nextBlockScore * 2;
+    if (showNext2) drawNextPreview(renderer, RECT_NEXT2, state.nextBlock2);
+    if (showNext3) drawNextPreview(renderer, RECT_NEXT3, state.nextBlock3);
     drawArrowIcon(renderer, RECT_ARR_UP,    0, aUp);
     drawArrowIcon(renderer, RECT_ARR_DOWN,  1, aDown);
     drawArrowIcon(renderer, RECT_ARR_LEFT,  2, aLeft);
@@ -546,6 +698,23 @@ static void renderBoard(SDL_Renderer* renderer, const GameState& state) {
         int ny = state.currentBlock.y + state.currentBlock.blocks[i].y;
         drawCell(nx, ny, COLORS[state.currentBlock.colorID]);
     }
+
+    if (state.pendingClear) {
+        SDL_Color fc = state.flashOn ? SDL_Color{255, 255, 255, 255}
+                                     : SDL_Color{20, 20, 20, 255};
+        SDL_SetRenderDrawColor(renderer, fc.r, fc.g, fc.b, 255);
+        for (int ri = 0; ri < state.clearRowCount; ri++) {
+            for (int c = 0; c < BOARD_COLS; c++) {
+                SDL_FRect cell = {
+                    (float)(c * BLOCK_SIZE + BLOCK_PAD),
+                    (float)(state.clearRows[ri] * BLOCK_SIZE + BLOCK_PAD),
+                    (float)(BLOCK_SIZE - 2 * BLOCK_PAD),
+                    (float)(BLOCK_SIZE - 2 * BLOCK_PAD)
+                };
+                SDL_RenderFillRect(renderer, &cell);
+            }
+        }
+    }
 }
 
 static void openQuitPopup(GameState& state) {
@@ -585,19 +754,22 @@ static void handleQuitAction(GameState& state) {
 int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
                 const SettingsConfig& cfg) {
     (void)window;
-    (void)cfg; // [D.6] reserved for V2 (audio + colored piece spawn)
+    s_cfg = &cfg;                          // [C6/C7] module cfg pointer
+    coreOpenBgm(cfg.volume);               // [C1]
     std::srand((unsigned)std::time(nullptr));
 
     GameState state;
     state.currentBlock = spawnBlock();
     state.nextBlock    = spawnBlock();
+    state.nextBlock2   = spawnBlock();
+    state.nextBlock3   = spawnBlock();
+    applyTableMatrix(state, cfg.tableMatrix); // [C7]
 
     SDL_Event event;
     Uint32 lastFallTime = SDL_GetTicks();
-    const Uint32 FALL_INTERVAL_NORMAL = 500;
-    const Uint32 FALL_INTERVAL_FAST   = 500 / 5;
 
-    bool quitRequested = false;
+    bool quitRequested    = false;
+    bool gameOverRecorded = false;
     // Swipe gesture state (touch / mobile)
     bool  swipeActive    = false;
     float swipeStartX    = 0.0f;
@@ -614,6 +786,26 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
         }
 
         state.softDrop = false;
+
+        if (state.pendingClear && !state.isPaused && !state.wasmShutdown) {
+            if (nowMs - state.flashTimer > 80) {
+                state.flashTick++;
+                state.flashOn    = (state.flashTick % 2 == 0);
+                state.flashTimer = nowMs;
+                if (state.flashTick >= 6) {
+                    finishLineClear(state);
+                    lastFallTime = SDL_GetTicks();
+                }
+            }
+        }
+
+        if (state.isGameOver && !gameOverRecorded) {
+            Uint32 _elapsed = state.pauseStartTime > 0
+                ? state.pauseStartTime - state.gameStartTime - state.totalPausedMs
+                : nowMs - state.gameStartTime - state.totalPausedMs;
+            onGameOver(state, _elapsed);
+            gameOverRecorded = true;
+        }
 
         while (SDL_PollEvent(&event)) {
             if (state.wasmShutdown) {
@@ -671,7 +863,9 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
                     if (hitTest(POPUP_CLOSE, mx, my) || hitTest(POPUP_CANCEL, mx, my)) {
                         state.showQuitPopup = false;
                     } else if (hitTest(POPUP_RESTART, mx, my)) {
+                        state.retryCount++;           // [C8]
                         resetGame(state);
+                        gameOverRecorded = false;     // [C8] allow re-recording next game-over
                         lastFallTime = SDL_GetTicks();
                     } else if (hitTest(POPUP_CONSOLE, mx, my)) {
                         state.exitCode = 2;
@@ -777,9 +971,10 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
             elapsedMs = state.pauseStartTime - state.gameStartTime - state.totalPausedMs;
         }
 
-        if (active) {
+        if (active && !state.pendingClear) {   // [C4] no fall while flashing
             Uint32 currentTime = SDL_GetTicks();
-            Uint32 interval = state.softDrop ? FALL_INTERVAL_FAST : FALL_INTERVAL_NORMAL;
+            Uint32 fi       = getFallInterval(state.score); // [C2]
+            Uint32 interval = state.softDrop ? fi / 5 : fi;
             if (currentTime - lastFallTime > interval) {
                 Tetromino nextT = state.currentBlock;
                 nextT.y += 1;
@@ -801,6 +996,7 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
         SDL_Delay(16);
     }
 
+    coreCloseBgm();   // [C1]
     return state.exitCode;
 }
 
