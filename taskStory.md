@@ -37,66 +37,150 @@
     - Viết hướng dẫn sử dụng/tích hợp cho developer mới (README hoặc comment chi tiết trong code).
 
 ### V2
-[ ] Task 2.1: Tổ chức lại cấu trúc thư mục dự án, di chuyển thư mục "chapter" ra ngoài "app" để tách biệt nội dung (content) và mã nguồn (source code).
-    - Đảm bảo cấu trúc phân cấp mới: `/chapter` nằm cùng cấp với `/app`.
-    - Cập nhật các đường dẫn liên quan trong logic xử lý của module gameStory.
+[ ] Task 2.1: Tổ chức lại cấu trúc thư mục theo chuẩn mới.
+    - Di chuyển nội dung chapter ra ngoài thư mục `app/`, đặt `chapters/` cùng cấp với `app/`.
+    - Cấu trúc thư mục chuẩn sau khi hoàn thành:
+      ```
+      /
+      ├── app/
+      └── chapters/
+          ├── manifest.json        ← auto-generated bởi CI, không commit tay
+          ├── prompts/
+          │   ├── json.md          ← prompt định nghĩa cấu trúc JSON và quy tắc thư mục src
+          │   ├── c001.md          ← prompt tuyến truyện, nhân vật, hội thoại, hình ảnh, âm thanh
+          │   └── c002.md
+          └── src/
+              ├── c001/
+              │   ├── c001.json
+              │   └── media/
+              │       ├── intro_scene.png
+              │       └── opening_bgm.mp3
+              └── c002/
+                  ├── c002.json
+                  └── media/
+      ```
+    - Cập nhật toàn bộ đường dẫn liên quan trong logic xử lý của module gameStory.
+    - Cập nhật CMakeLists.txt và build script để phản ánh đường dẫn mới.
 
-[ ] Task 2.2: Thiết lập quy chuẩn thư mục nội dung chương, cấu trúc dữ liệu và quy trình CI/CD qua GitHub.
-    - **Cấu trúc thư mục chuẩn**: Mỗi chương mới phải được đặt trong một thư mục con riêng biệt theo cú pháp `chapter/c{chapterID}` (Ví dụ: `chapter/c001`).
-    - **Quy tắc các file văn bản và dữ liệu**:
-        - **File Markdown (`c{chapterID}.md`)**: Đóng vai trò là Prompt cho GenAI để thiết kế cốt truyện, sinh lời thoại và prompt hình ảnh.
-        - **File JSON (`c{chapterID}.json`)**: Nguồn dữ liệu gốc. Cấu trúc bắt buộc có object gốc chứa mảng `shared_data`.
-        - **File SQL (`c{chapterID}.sql`)**: File đầu ra được tự động generate từ JSON.
-    - **Quy tắc đặt tên file Media**:
-        - Ảnh Thumbnail: `{chapterID}_{idStory}_{Tên_Gợi_Nhớ}.png`.
-        - Ảnh Dialogue: `{chapterID}_s{idStory}_d{dialogueID}_{Tên_Gợi_Nhớ}.png`.
-        - Âm thanh hiệu ứng Dialogue: `c{chapterID}_s{idStory}_d{dialogueID}_{Tên_Gợi_Nhớ}.mp3`.
-        - Âm thanh nền Dialogue: `c{chapterID}_s{idStory}_d{dialogueID}_{Tên_Gợi_Nhớ}.mp3`.
-    - **Quy trình CI/CD (GitHub Action)**: 
-        - Kích hoạt khi file `.json` hoặc file media thay đổi.
-        - Tự động lấy **mã Commit ID mới nhất** của từng file đó.
-        - Chạy script parse JSON thành SQL (`INSERT OR REPLACE INTO...`). **Quan trọng**: Đổi tên file media theo commit ID và cấu hình lại URL trong file SQL để ứng dụng tải trực tiếp bằng raw link.
-          *Ví dụ URL: `https://raw.githubusercontent.com/{owner}/{repo}/chapters/tênFile-commitID.mp3` (hoặc `.png`)*
-        - Upload file SQL kết quả này lên thành `https://raw.githubusercontent.com/{owner}/{repo}/chapters/c{chapterID}-commitID.sql` (Ví dụ: `c001-commitID.sql`).
+[ ] Task 2.2: Thiết lập quy chuẩn nội dung chapter và quy trình CI/CD qua GitHub Actions.
 
-[ ] Task 2.3: Viết v2 gameStory/app.cpp - Xây dựng cơ chế đồng bộ CSDL SQL từ xa.
-    - Khi module gameStory khởi động, dùng `curl` gọi GitHub API để lấy Commit ID mới nhất của chương.
-    - Truy vết Commit ID hiện tại trong SQLite cục bộ.
-    - Nếu Commit ID trên server mới hơn, tự động tải trực tiếp file `c{chapterID}-commitID.sql` từ Raw URL.
-    - Chạy thẳng file SQL vừa tải vào SQLite cục bộ để cập nhật dữ liệu.
+    **Cấu trúc file trong mỗi chapter:**
+    - `chapters/prompts/json.md`: Prompt dùng cho GenAI để định nghĩa cấu trúc file JSON và quy tắc đặt tên trong thư mục src. File này là nguồn tham chiếu chính khi tạo chapter mới.
+    - `chapters/prompts/c{id}.md`: Prompt tuyến truyện của từng chapter — nhân vật, hội thoại, lựa chọn, mô tả hình ảnh và âm thanh.
+    - `chapters/src/c{id}/c{id}.json`: Dữ liệu gốc của chapter, sinh ra từ prompt. Cấu trúc bắt buộc gồm object gốc chứa mảng `shared_data`.
+    - `chapters/src/c{id}/media/`: Chứa tất cả media của chapter. **Tên file không chứa ID chapter hay ID story** — đặt tên theo nội dung gợi nhớ (ví dụ: `intro_scene.png`, `battle_bgm.mp3`, `hero_enter_sfx.mp3`). Phân biệt âm thanh nền và hiệu ứng qua suffix `_bgm` và `_sfx`.
 
-[ ] Task 2.4: viết v2 gameStory/app.cpp - tạo dialogue story đơn giản để giới thiệu game kèm nhạc nền phù hợp.
-    - Comment codeblock này trong gameStory/app.cpp là: gamestory-phan-cot-game-05
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 04 và trên 06.
-    - Cần hỗ trợ phím enter và space thay vì chỉ click next để chuyển tiếp cảnh.
-    - Cần đa dạng chuyển cảnh, ví dụ làm 2 route đơn giản cho kịch bản truyện. Hỗ trợ phím tab để chuyển đổi các option.
+    **Cấu trúc JSON mỗi chapter (`c{id}.json`):**
+    ```json
+    {
+      "shared_data": [
+        {
+          "idStory": 1,
+          "thumbnail": "media/intro_scene.png",
+          "dialogues": [
+            {
+              "id": 1,
+              "speaker": "Narrator",
+              "text": "...",
+              "image": "media/scene_01.png",
+              "sfx": "media/door_open_sfx.mp3",
+              "bgm": "media/town_bgm.mp3",
+              "next": 2
+            },
+            {
+              "id": 2,
+              "speaker": "Hero",
+              "text": "...",
+              "image": "media/hero_speak.png",
+              "choices": [
+                { "label": "Đồng ý",   "next": 3 },
+                { "label": "Từ chối",  "next": 5 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    ```
+    - Trường `next` dùng cho thoại tuyến tính. Trường `choices` kích hoạt phân nhánh — không dùng cả hai cùng lúc trong một dialogue node.
+    - Trường media (`image`, `sfx`, `bgm`) chứa đường dẫn tương đối từ gốc chapter, ví dụ: `"media/intro_scene.png"`.
+
+    **Quy trình CI/CD (GitHub Actions — `sync-chapters.yml`):**
+    - Trigger: push có thay đổi trong `chapters/src/**/*.json` hoặc `chapters/src/**/media/**`.
+    - Bước 1 — Parse JSON thành SQL: chạy `parse.py`, sinh file SQL với câu lệnh `INSERT OR REPLACE INTO dialogues(...)`. URL media được chuyển thành raw GitHub URL đầy đủ: `https://raw.githubusercontent.com/{owner}/{repo}/main/chapters/src/c{id}/media/{filename}`.
+    - Bước 2 — Rebuild `chapters/manifest.json`: lấy git commit SHA của từng file `c{id}.json` (dùng `git log -1 --format=%H -- chapters/src/c{id}/c{id}.json`), ghi vào manifest.
+    - Bước 3 — Commit lại: commit toàn bộ file SQL và manifest.json được sinh ra vào repo với message `[skip ci] sync chapters`. Dùng điều kiện `if: github.actor != 'github-actions[bot]'` để chống vòng lặp vô hạn.
+    - Cấu trúc `chapters/manifest.json` sau khi CI chạy:
+      ```json
+      {
+        "chapters": [
+          { "id": "c001", "sha": "a1b2c3d4..." },
+          { "id": "c002", "sha": "e5f6g7h8..." }
+        ]
+      }
+      ```
+
+[ ] Task 2.3: Viết v2 gameStory/app.cpp — Cơ chế đồng bộ CSDL SQLite từ xa dùng manifest.json.
+    - Comment codeblock này trong gameStory/app.cpp là: gamestory-dong-bo-sqlite-05a
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 04 và trước gamestory-phan-cot-game-05b.
+
+    **Schema bảng meta trong SQLite local:**
+    ```sql
+    CREATE TABLE IF NOT EXISTS meta (
+        chapter_id TEXT PRIMARY KEY,
+        sha        TEXT NOT NULL,
+        updated_at INTEGER
+    );
+    ```
+
+    **Luồng xử lý khi khởi động module gameStory:**
+    1. Dùng `libcurl` fetch `chapters/manifest.json` từ raw GitHub URL.
+    2. Parse JSON manifest, duyệt từng entry `{ "id": "c001", "sha": "..." }`.
+    3. Với mỗi chapter: đọc `sha` hiện tại trong bảng `meta` của SQLite local.
+    4. Nếu SHA khớp → bỏ qua chapter đó.
+    5. Nếu SHA mới hơn hoặc chapter chưa có trong local → fetch file SQL của chapter từ raw URL → chạy `sqlite3_exec()` vào DB local → cập nhật bảng `meta` với SHA mới.
+    6. Nếu không có kết nối mạng (fetch manifest thất bại) → bỏ qua toàn bộ bước sync, dùng dữ liệu local đang có, tiếp tục khởi động bình thường.
+
+    **Tách biệt Desktop và WASM:**
+    - Desktop: dùng `libcurl` + file SQLite thông thường như mô tả trên.
+    - WASM (`#ifdef __EMSCRIPTEN__`): không gọi `libcurl` trực tiếp. Thay vào đó bundle sẵn file SQL vào build output của Emscripten, hoặc dùng `emscripten_fetch` kết hợp IndexedDB. Tách logic này thành hàm riêng để dễ bảo trì.
+
+[ ] Task 2.4: viết v2 gameStory/app.cpp - tạo dialogue story engine để hiển thị cốt truyện kèm nhạc nền.
+    - Comment codeblock này trong gameStory/app.cpp là: gamestory-phan-cot-game-05b
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 05a và trên 06.
+    - Đọc dữ liệu hội thoại từ SQLite local (đã được đồng bộ bởi Task 2.3).
+    - Hỗ trợ phím Enter và Space để chuyển thoại tiếp theo (ngoài click chuột).
+    - Hỗ trợ tuyến tính (`next`) và phân nhánh (`choices`). Khi có `choices`, dùng phím Tab để chuyển đổi giữa các lựa chọn, Enter/Space để xác nhận.
+    - Mỗi dialogue node hiển thị: hình ảnh scene, tên nhân vật, nội dung thoại, nhạc nền nếu có `bgm`.
 
 [ ] Task 2.5: viết v2 gameStory/app.cpp - nút skip để bỏ qua phần cốt truyện.
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-nut-bo-qua-cot-truyen-06
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 05 và trên 07.
-    - Sau khi skip chuyển qua nhịp nhàng phần game console.
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 05b và trên 07.
+    - Sau khi skip, chuyển nhịp nhàng sang màn hình gameConsole.
 
-[ ] Task 2.6: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp
+[ ] Task 2.6: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp.
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là: integration/v2
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v1
+    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v1.
 
 ### V3
 [ ] Task 3.1: viết v3 gameStory/app.cpp - Cơ chế tải file Media độc lập từ Raw URL (Trace theo Commit ID).
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-tich-hop-backend-07
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 06 và trên 08.
-    - Hệ thống C++ sẽ đọc trực tiếp CSDL SQLite (đã có đường dẫn dạng `https://raw.githubusercontent.com/{owner}/{repo}/chapters/tênFile-commitID.mp3`).
-    - Ứng dụng duyệt qua các URL này, dùng `curl` để tải từng file đơn lẻ lưu vào cache cục bộ. Nếu file đã tồn tại trên disk với đúng định dạng tên `tênFile-commitID`, bỏ qua tải lại.
+    - Hệ thống C++ đọc các URL media từ SQLite (đã được đồng bộ bởi V2), dùng `libcurl` để tải từng file về cache local.
+    - Nếu file đã tồn tại trên disk với đúng tên → bỏ qua tải lại.
     - Tự động skip nếu không kết nối internet.
 
-[ ] Task 3.2: viết v3 gameStory/app.cpp - thay tốc độ loading bar bằng tốc độ download, hiển thị phần dowload và tốc độ download và repeat hiệu ứng logo cho đến khi download xong hết.
+[ ] Task 3.2: viết v3 gameStory/app.cpp - thay tốc độ loading bar bằng tốc độ download, hiển thị phần download và tốc độ download và repeat hiệu ứng logo cho đến khi download xong hết.
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-hieu-chinh-loading-bar-theo-download-speed-08
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 07 và trên 09.
     - Theo dõi tiến trình tải các file đơn lẻ (từ Task 3.1) và cập nhật thanh loading.
     - Đảm bảo cốt truyện và hình ảnh/âm thanh tải đầy đủ rồi mới bắt đầu chạy kịch bản.
 
-[ ] Task 3.3: tích hợp v3 với các modules còn lại trong app/src qua file app/main.cpp
+[ ] Task 3.3: tích hợp v3 với các modules còn lại trong app/src qua file app/main.cpp.
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là: integration/v3
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v2
+
+---
 
 ## Issues (Changes, Bugs and Usabilities)
 ### V1
@@ -122,8 +206,128 @@
 ### V3
 [ ] bổ sung sau
 
+---
+
+## Hướng dẫn thực hiện V2
+
+### Thứ tự triển khai khuyến nghị
+
+Thực hiện theo đúng thứ tự sau để tránh phụ thuộc ngược:
+
+```
+2.1 (thư mục) → json.md schema → 2.2 (CI/CD) → 2.3 Desktop → 2.4/2.5/2.6 → 2.3 WASM
+```
+
+Lý do: CI/CD cần cấu trúc thư mục ổn định (2.1) trước khi viết workflow. Schema JSON cần được định nghĩa trước khi viết `parse.py` trong CI. Runtime sync Desktop (2.3) cần SQLite có dữ liệu mới viết được dialogue engine (2.4). WASM là nhánh riêng, để cuối cùng.
+
+### Kiến trúc dữ liệu
+
+**`chapters/manifest.json`** là điểm kết nối duy nhất giữa CI và runtime. CI ghi, runtime đọc. Không có thành phần nào khác cần biết về nhau.
+
+```
+CI pipeline                    Runtime C++
+──────────────────────         ──────────────────────
+push c001.json          →      fetch manifest.json
+  ↓                              ↓
+parse.py chạy           →      diff vs meta table
+  ↓                              ↓
+sinh c001.sql           →      download c001.sql nếu SHA mới
+  ↓                              ↓
+cập nhật manifest.json  →      sqlite3_exec + update meta
+  ↓                              ↓
+commit [skip ci]        →      start game story
+```
+
+### Thiết kế bảng SQLite
+
+Ngoài bảng `meta` (tracking phiên bản), cần tạo bảng `dialogues` để lưu nội dung hội thoại:
+
+```sql
+CREATE TABLE IF NOT EXISTS meta (
+    chapter_id TEXT PRIMARY KEY,
+    sha        TEXT NOT NULL,
+    updated_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS stories (
+    id         INTEGER PRIMARY KEY,
+    chapter_id TEXT NOT NULL,
+    id_story   INTEGER NOT NULL,
+    thumbnail  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS dialogues (
+    id         INTEGER PRIMARY KEY,
+    chapter_id TEXT NOT NULL,
+    id_story   INTEGER NOT NULL,
+    id_dialogue INTEGER NOT NULL,
+    speaker    TEXT,
+    text       TEXT,
+    image_url  TEXT,
+    sfx_url    TEXT,
+    bgm_url    TEXT,
+    next_id    INTEGER,
+    has_choices INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS choices (
+    id          INTEGER PRIMARY KEY,
+    dialogue_id INTEGER NOT NULL,
+    label       TEXT,
+    next_id     INTEGER
+);
+```
+
+### Lưu ý kỹ thuật quan trọng
+
+**CI/CD — chống infinite loop:**  
+Workflow commit lại repo sẽ tự trigger chính nó. Dùng điều kiện sau trong job:
+```yaml
+if: github.actor != 'github-actions[bot]'
+```
+hoặc kiểm tra message commit:
+```yaml
+if: "!contains(github.event.head_commit.message, '[skip ci]')"
+```
+
+**Raw URL format cho media:**  
+```
+https://raw.githubusercontent.com/{owner}/{repo}/main/chapters/src/{chapterId}/media/{filename}
+```
+URL này stable miễn là file không bị đổi tên. `parse.py` sẽ tự động ghép URL đầy đủ khi sinh SQL.
+
+**WASM — không dùng libcurl trực tiếp:**  
+Emscripten không hỗ trợ `libcurl` theo cách thông thường do CORS và sandbox. Tách biệt bằng:
+```cpp
+#ifdef __EMSCRIPTEN__
+    // Bundle SQL sẵn vào build, hoặc dùng emscripten_fetch
+    syncChapters_WASM();
+#else
+    // Desktop: libcurl + sqlite file thông thường
+    syncChapters_Desktop();
+#endif
+```
+
+**Dialogue engine — state machine tối giản:**  
+Trạng thái runtime chỉ cần lưu `currentDialogueId` (integer). Mỗi frame: đọc row từ SQLite theo ID, render, chờ input. Khi có `choices`, render danh sách options và track `selectedChoiceIndex`.
+
+### Kiểm tra hoàn thành V2
+
+Trước khi đánh dấu V2 done, xác nhận:
+- [ ] `chapters/manifest.json` được CI tự động tạo khi push JSON mới
+- [ ] Thêm `c003/` mới vào repo, runtime tự phát hiện và tải về khi khởi động
+- [ ] Sửa nội dung `c001.json`, runtime nhận SHA mới và cập nhật DB
+- [ ] Mất kết nối mạng → app vẫn chạy bình thường với dữ liệu local
+- [ ] Dialogue hiển thị đúng, phân nhánh `choices` hoạt động, Tab/Enter/Space phản hồi đúng
+- [ ] Nút skip chuyển cảnh mượt sang gameConsole
+
+---
+
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.
     - Các *.h phải để trong thư mục include của ứng dụng (app/src/gameStory/include).
     - Cần tách 1 file layout.h (app/src/gameStory/include/layout.h) để đảm bảo ứng dụng chạy theo khung hình có tỷ lệ 9:16.
-    - Các file hình ảnh, âm thanh, phim... phải để trong chính thư mục đang làm việc và đặt tên bắt đầu bằng tiền tố là tên thư mục. VD: cần thêm 1 file nhạc nền tên music.mp3 cho gameStory thì phải để trong app/src/gameStory/gameStory_music.mp3.
+    - Các file hình ảnh, âm thanh, phim... của module app phải để trong chính thư mục đang làm việc và đặt tên bắt đầu bằng tiền tố là tên thư mục. VD: cần thêm 1 file nhạc nền tên music.mp3 cho gameStory thì phải để trong app/src/gameStory/gameStory_music.mp3.
+    - Nội dung chapter (JSON, media) được đặt trong `chapters/src/c{id}/`, không nằm trong thư mục `app/`. Tên file media không chứa ID chapter hay ID story — đặt tên theo nội dung gợi nhớ kèm suffix `_sfx` hoặc `_bgm` để phân biệt loại âm thanh.
+    - File `chapters/manifest.json` và các file `*.sql` được tự động sinh bởi CI. Không commit hoặc chỉnh sửa tay các file này.
+    - File `chapters/prompts/json.md` là nguồn tham chiếu duy nhất cho cấu trúc JSON và quy tắc thư mục. Khi thay đổi schema, cập nhật file này trước, sau đó mới chỉnh `parse.py` và code C++.
