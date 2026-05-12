@@ -19,6 +19,11 @@
 #include "gameConsole_db.h"
 #include "sqlite3.h"
 
+// [G/H] Smart Sorting Engine v2.0 -- powers sort-by-time + sort-by-score
+//        in the board popup. Router picks Insertion for n<=64 by default,
+//        so our 30-row leaderboard runs near O(n).
+#include "gameConsole_sort.h"
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 
@@ -359,6 +364,14 @@ static void drawConsoleWasmShutdown(SDL_Renderer* renderer, bool reloadHover) {
 // =========================================================
 // AppState
 // =========================================================
+// [G/H] gameconsole-sort-by-time-in-board-14 / -by-score-in-board-15
+enum BoardSortMode {
+    BOARD_SORT_SCORE_DESC = 0,   // default: highest score first
+    BOARD_SORT_SCORE_ASC,
+    BOARD_SORT_TIME_DESC,        // newest first
+    BOARD_SORT_TIME_ASC
+};
+
 struct AppState {
     bool showGuide    = false;
     bool showBoard    = false;
@@ -372,6 +385,7 @@ struct AppState {
     int  nextScene    = 0;
     int  boardScroll  = 0;
     int  guideScroll  = 0;
+    BoardSortMode boardSortMode = BOARD_SORT_SCORE_DESC;   // [G/H]
     int  focusIndex   = 0;
     SBInteraction sb;
 
@@ -541,6 +555,41 @@ static void loadBoardWithFallback() {
         SDL_Log("[gameConsole] board fallback: %d entries", (int)g_board.size());
     }
     g_boardTotal = (int)g_board.size();
+}
+
+// Apply current sort mode via the Smart Engine. Logs the algorithm the
+// router picked so the engine is transparent during development.
+// CTX_DEFAULT + n=30 -> Insertion Sort (near-O(n) on already-sorted data,
+// which is the common case for repeat opens of the popup).
+static void applyBoardSort(AppState& state) {
+    using namespace SortEngine;
+    SortAlgo picked = ALGO_AUTO;
+    const size_t n = g_board.size();
+    switch (state.boardSortMode) {
+        case BOARD_SORT_SCORE_DESC:
+            picked = sort(g_board.data(), n,
+                [](const BoardEntry& a, const BoardEntry& b){ return a.score > b.score; },
+                CTX_DEFAULT);
+            break;
+        case BOARD_SORT_SCORE_ASC:
+            picked = sort(g_board.data(), n,
+                [](const BoardEntry& a, const BoardEntry& b){ return a.score < b.score; },
+                CTX_DEFAULT);
+            break;
+        case BOARD_SORT_TIME_DESC:
+            picked = sort(g_board.data(), n,
+                [](const BoardEntry& a, const BoardEntry& b){ return a.timeEpoch > b.timeEpoch; },
+                CTX_DEFAULT);
+            break;
+        case BOARD_SORT_TIME_ASC:
+            picked = sort(g_board.data(), n,
+                [](const BoardEntry& a, const BoardEntry& b){ return a.timeEpoch < b.timeEpoch; },
+                CTX_DEFAULT);
+            break;
+    }
+    SDL_Log("[gameConsole] board sort mode=%d algo=%s n=%d",
+            (int)state.boardSortMode, algoName(picked), (int)n);
+    state.boardScroll = 0;
 }
 
 // =========================================================
@@ -1257,6 +1306,23 @@ static const float BOARD_SB_X  = BOARD_POPUP.x + BOARD_POPUP.w - 12.0f;
 static const float BOARD_SB_Y  = BOARD_POPUP.y + 60.0f;
 static const float BOARD_SB_H  = BOARD_VISIBLE * BOARD_ROW_H;
 
+// [G/H] Clickable column-header buttons. Positions are computed from the
+// 8px-per-char SDL_RenderDebugText grid so the rect aligns with the
+// rendered "SCORE" / "TIME" text below.
+static const float    BOARD_HDR_Y           = BOARD_POPUP.y + 38.0f;
+static const float    BOARD_HDR_HASH_X      = BOARD_POPUP.x + 8.0f;
+static const float    BOARD_HDR_USER_X      = BOARD_POPUP.x + 8.0f + 24.0f;
+static const float    BOARD_HDR_SCORE_X     = BOARD_POPUP.x + 8.0f + 128.0f;
+static const float    BOARD_HDR_SCORE_ARR_X = BOARD_HDR_SCORE_X + 40.0f;
+static const float    BOARD_HDR_TIME_X      = BOARD_POPUP.x + 8.0f + 184.0f;
+static const float    BOARD_HDR_TIME_ARR_X  = BOARD_HDR_TIME_X + 32.0f;
+static const SDL_FRect BOARD_HDR_SCORE_BTN  = {
+    BOARD_HDR_SCORE_X - 2.0f, BOARD_HDR_Y - 3.0f, 50.0f, 14.0f
+};
+static const SDL_FRect BOARD_HDR_TIME_BTN   = {
+    BOARD_HDR_TIME_X - 2.0f, BOARD_HDR_Y - 3.0f, 42.0f, 14.0f
+};
+
 static int drawWrappedText(SDL_Renderer* renderer, const char* text,
                            float x, float y, int maxCharsPerLine, int maxLines) {
     int len = (int)SDL_strlen(text);
@@ -1431,8 +1497,41 @@ static void drawBoardLightbox(SDL_Renderer* renderer, const AppState& state) {
     SDL_RenderRect(renderer, &BOARD_POPUP);
 
     SDL_RenderDebugText(renderer, BOARD_POPUP.x + 80, BOARD_POPUP.y + 14, "LEADERBOARD");
-    SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8, BOARD_POPUP.y + 38,
-                        "#  USER         SCORE TIME");
+
+    // [G/H] Column header row with clickable SCORE / TIME buttons.
+    bool scoreActive = (state.boardSortMode == BOARD_SORT_SCORE_DESC ||
+                        state.boardSortMode == BOARD_SORT_SCORE_ASC);
+    bool timeActive  = (state.boardSortMode == BOARD_SORT_TIME_DESC  ||
+                        state.boardSortMode == BOARD_SORT_TIME_ASC);
+    const char* scoreArrow =
+        (state.boardSortMode == BOARD_SORT_SCORE_DESC) ? "v" :
+        (state.boardSortMode == BOARD_SORT_SCORE_ASC ) ? "^" : " ";
+    const char* timeArrow  =
+        (state.boardSortMode == BOARD_SORT_TIME_DESC ) ? "v" :
+        (state.boardSortMode == BOARD_SORT_TIME_ASC  ) ? "^" : " ";
+
+    // Static columns
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderDebugText(renderer, BOARD_HDR_HASH_X, BOARD_HDR_Y, "#");
+    SDL_RenderDebugText(renderer, BOARD_HDR_USER_X, BOARD_HDR_Y, "USER");
+
+    // SCORE button background (only when active)
+    if (scoreActive) {
+        SDL_SetRenderDrawColor(renderer, 50, 130, 50, 255);
+        SDL_RenderFillRect(renderer, &BOARD_HDR_SCORE_BTN);
+    }
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderDebugText(renderer, BOARD_HDR_SCORE_X,     BOARD_HDR_Y, "SCORE");
+    SDL_RenderDebugText(renderer, BOARD_HDR_SCORE_ARR_X, BOARD_HDR_Y, scoreArrow);
+
+    // TIME button background (only when active)
+    if (timeActive) {
+        SDL_SetRenderDrawColor(renderer, 50, 130, 50, 255);
+        SDL_RenderFillRect(renderer, &BOARD_HDR_TIME_BTN);
+    }
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderDebugText(renderer, BOARD_HDR_TIME_X,     BOARD_HDR_Y, "TIME");
+    SDL_RenderDebugText(renderer, BOARD_HDR_TIME_ARR_X, BOARD_HDR_Y, timeArrow);
 
     const float ROW_Y0 = BOARD_SB_Y;
     char line[64];
@@ -1441,15 +1540,13 @@ static void drawBoardLightbox(SDL_Renderer* renderer, const AppState& state) {
         if (idx >= g_boardTotal) break;
         const BoardEntry& e = g_board[idx];
         float y = ROW_Y0 + i * BOARD_ROW_H;
-        // [C.5] e.time is std::string -- use .c_str() / .size().
-        // Display format already "MM-DD HH:MM" (11 chars) so the legacy
-        // "trim to last 5 chars" branch only fires for unparseable rows.
-        const char* tFull = e.time.c_str();
-        size_t tLen = e.time.size();
-        const char* tShort = tFull;
-        if (tLen >= 5) tShort = tFull + tLen - 5;
+        // Keep the compact HH:MM display used by the popup while sorting
+        // still uses the full timeEpoch value.
+        const char* timeText = e.time.c_str();
+        size_t timeLen = e.time.size();
+        if (timeLen >= 5) timeText += timeLen - 5;
         SDL_snprintf(line, sizeof(line), "%2d %-12.12s %5d %s",
-                     idx + 1, e.user.c_str(), e.score, tShort);
+                     idx + 1, e.user.c_str(), e.score, timeText);
         SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8, y, line);
     }
 
@@ -1852,6 +1949,10 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     // Re-load moi lan vao Console -- cho phep refresh data sau khi V3 add
     // sync tu MongoDB. Cost ~300us, khong noticeable.
     loadBoardWithFallback();
+    // [G/H] Apply default sort (SCORE_DESC) right after load -- locks in
+    // a deterministic order regardless of whether JSON or fallback array
+    // was the source, and logs the algorithm the router picked.
+    applyBoardSort(state);
 
     while (state.isRunning || state.wasmShutdown) {
         Uint32 nowMs = SDL_GetTicks();
@@ -1977,7 +2078,24 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                     if (hitTest(BOARD_CLOSE, mx, my)) {
                         state.showBoard = false;
                         sbResetInteraction(state.sb);
-                    } else {
+                    }
+                    // [G] gameconsole-sort-by-time-in-board-14
+                    else if (hitTest(BOARD_HDR_TIME_BTN, mx, my)) {
+                        state.boardSortMode =
+                            (state.boardSortMode == BOARD_SORT_TIME_DESC)
+                                ? BOARD_SORT_TIME_ASC
+                                : BOARD_SORT_TIME_DESC;
+                        applyBoardSort(state);
+                    }
+                    // [H] gameconsole-sort-by-score-in-board-15
+                    else if (hitTest(BOARD_HDR_SCORE_BTN, mx, my)) {
+                        state.boardSortMode =
+                            (state.boardSortMode == BOARD_SORT_SCORE_DESC)
+                                ? BOARD_SORT_SCORE_ASC
+                                : BOARD_SORT_SCORE_DESC;
+                        applyBoardSort(state);
+                    }
+                    else {
                         SBLayout sb = layoutSB(BOARD_SB_X, BOARD_SB_Y, BOARD_SB_H,
                                                g_boardTotal, BOARD_VISIBLE,
                                                state.boardScroll);

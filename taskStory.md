@@ -37,33 +37,62 @@
     - Viết hướng dẫn sử dụng/tích hợp cho developer mới (README hoặc comment chi tiết trong code).
 
 ### V2
-[ ] Task 2.1: viết v2 gameStory/app.cpp - tạo dialogue story đơn giản để giới thiệu game kèm nhạc nền phù hợp.
+[ ] Task 2.1: Tổ chức lại cấu trúc thư mục dự án, di chuyển thư mục "chapter" ra ngoài "app" để tách biệt nội dung (content) và mã nguồn (source code).
+    - Đảm bảo cấu trúc phân cấp mới: `/chapter` nằm cùng cấp với `/app`.
+    - Cập nhật các đường dẫn liên quan trong logic xử lý của module gameStory.
+
+[ ] Task 2.2: Thiết lập quy chuẩn thư mục nội dung chương, cấu trúc dữ liệu và quy trình CI/CD qua GitHub.
+    - **Cấu trúc thư mục chuẩn**: Mỗi chương mới phải được đặt trong một thư mục con riêng biệt theo cú pháp `chapter/c{chapterID}` (Ví dụ: `chapter/c001`).
+    - **Quy tắc các file văn bản và dữ liệu**:
+        - **File Markdown (`c{chapterID}.md`)**: Đóng vai trò là Prompt cho GenAI để thiết kế cốt truyện, sinh lời thoại và prompt hình ảnh.
+        - **File JSON (`c{chapterID}.json`)**: Nguồn dữ liệu gốc. Cấu trúc bắt buộc có object gốc chứa mảng `shared_data`.
+        - **File SQL (`c{chapterID}.sql`)**: File đầu ra được tự động generate từ JSON.
+    - **Quy tắc đặt tên file Media**:
+        - Ảnh Thumbnail: `{chapterID}_{idStory}_{Tên_Gợi_Nhớ}.png`.
+        - Ảnh Dialogue: `{chapterID}_s{idStory}_d{dialogueID}_{Tên_Gợi_Nhớ}.png`.
+        - Âm thanh hiệu ứng Dialogue: `c{chapterID}_s{idStory}_d{dialogueID}_{Tên_Gợi_Nhớ}.mp3`.
+        - Âm thanh nền Dialogue: `c{chapterID}_s{idStory}_d{dialogueID}_{Tên_Gợi_Nhớ}.mp3`.
+    - **Quy trình CI/CD (GitHub Action)**: 
+        - Kích hoạt khi file `.json` hoặc file media thay đổi.
+        - Tự động lấy **mã Commit ID mới nhất** của từng file đó.
+        - Chạy script parse JSON thành SQL (`INSERT OR REPLACE INTO...`). **Quan trọng**: Đổi tên file media theo commit ID và cấu hình lại URL trong file SQL để ứng dụng tải trực tiếp bằng raw link.
+          *Ví dụ URL: `https://raw.githubusercontent.com/{owner}/{repo}/chapters/tênFile-commitID.mp3` (hoặc `.png`)*
+        - Upload file SQL kết quả này lên thành `https://raw.githubusercontent.com/{owner}/{repo}/chapters/c{chapterID}-commitID.sql` (Ví dụ: `c001-commitID.sql`).
+
+[ ] Task 2.3: Viết v2 gameStory/app.cpp - Xây dựng cơ chế đồng bộ CSDL SQL từ xa.
+    - Khi module gameStory khởi động, dùng `curl` gọi GitHub API để lấy Commit ID mới nhất của chương.
+    - Truy vết Commit ID hiện tại trong SQLite cục bộ.
+    - Nếu Commit ID trên server mới hơn, tự động tải trực tiếp file `c{chapterID}-commitID.sql` từ Raw URL.
+    - Chạy thẳng file SQL vừa tải vào SQLite cục bộ để cập nhật dữ liệu.
+
+[ ] Task 2.4: viết v2 gameStory/app.cpp - tạo dialogue story đơn giản để giới thiệu game kèm nhạc nền phù hợp.
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-phan-cot-game-05
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 04 và trên 06.
     - Cần hỗ trợ phím enter và space thay vì chỉ click next để chuyển tiếp cảnh.
-    - Cần đa dạng chuyển cảnh, ví dụ làm 2 route đơn giản cho kịch bản truyện, chọn A thì ra phân cảnh khác, chọn B thì ra phân cảnh khác. Hỗ trợ phím tab để chuyển đổi các option.
+    - Cần đa dạng chuyển cảnh, ví dụ làm 2 route đơn giản cho kịch bản truyện. Hỗ trợ phím tab để chuyển đổi các option.
 
-[ ] Task 2.2: viết v2 gameStory/app.cpp - nút skip để bỏ qua phần cốt truyện.
+[ ] Task 2.5: viết v2 gameStory/app.cpp - nút skip để bỏ qua phần cốt truyện.
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-nut-bo-qua-cot-truyen-06
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 05 và trên 07.
     - Sau khi skip chuyển qua nhịp nhàng phần game console.
 
-[ ] Task 2.3: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp
+[ ] Task 2.6: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là: integration/v2
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v1
 
 ### V3
-[ ] Task 3.1: viết v3 gameStory/app.cpp - download âm thanh và các hình ảnh trong story mỗi lần khởi động qua API thay vì build trực tiếp vào .exe file.
+[ ] Task 3.1: viết v3 gameStory/app.cpp - Cơ chế tải file Media độc lập từ Raw URL (Trace theo Commit ID).
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-tich-hop-backend-07
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 06 và trên 08.
-    - Trừ loading bar, không để các file ảnh nặng và nhạc nền trong file .exe nữa mà sẽ phải gọi API để download các hình ảnh rồi mới chạy được phần cốt game.
+    - Hệ thống C++ sẽ đọc trực tiếp CSDL SQLite (đã có đường dẫn dạng `https://raw.githubusercontent.com/{owner}/{repo}/chapters/tênFile-commitID.mp3`).
+    - Ứng dụng duyệt qua các URL này, dùng `curl` để tải từng file đơn lẻ lưu vào cache cục bộ. Nếu file đã tồn tại trên disk với đúng định dạng tên `tênFile-commitID`, bỏ qua tải lại.
     - Tự động skip nếu không kết nối internet.
 
 [ ] Task 3.2: viết v3 gameStory/app.cpp - thay tốc độ loading bar bằng tốc độ download, hiển thị phần dowload và tốc độ download và repeat hiệu ứng logo cho đến khi download xong hết.
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-hieu-chinh-loading-bar-theo-download-speed-08
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 07 và trên 09.
-    - Như tên task, tác vụ này nhằm đảm bảo cốt truyện tải đầy đủ rồi mới chạy.
-    - Mục tiêu đưa các media lên đám mây để lưu trữ, không build trực tiếp vào file.
+    - Theo dõi tiến trình tải các file đơn lẻ (từ Task 3.1) và cập nhật thanh loading.
+    - Đảm bảo cốt truyện và hình ảnh/âm thanh tải đầy đủ rồi mới bắt đầu chạy kịch bản.
 
 [ ] Task 3.3: tích hợp v3 với các modules còn lại trong app/src qua file app/main.cpp
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là: integration/v3
