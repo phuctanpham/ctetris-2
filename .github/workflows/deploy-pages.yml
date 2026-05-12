@@ -20,8 +20,9 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   BUILD_OS: ubuntu   # ← Only line to change: 'ubuntu' | 'windows'
 
+# Updated permissions to ensure GitHub Actions can write the deployment
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -161,6 +162,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     permissions:
+      contents: write
       pages: write
       id-token: write
       actions: write        # required to list + delete artifacts
