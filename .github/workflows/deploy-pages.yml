@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - db
+      - test
     paths:
       - 'app/src/**'
       - 'app/main.cpp'
