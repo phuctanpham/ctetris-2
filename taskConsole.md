@@ -54,27 +54,27 @@
     - Viết hướng dẫn sử dụng/tích hợp cho developer mới (README hoặc comment chi tiết trong code).
 
 ### V2
-[ ] Task 2.1: viết v2 gameConsole/app.cpp - chèn 1 hình ảnh làm background đẹp và tự full-fit theo tỷ lệ phóng lớn thu nhỏ.
+[x] Task 2.1: viết v2 gameConsole/app.cpp - chèn 1 hình ảnh làm background đẹp và tự full-fit theo tỷ lệ phóng lớn thu nhỏ.
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-chen-backgound-08
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 07 và trên 09.
     - Kỹ thuật chèn background và resize đảm bảo màn hình kéo giãn luôn theo 9:16 để không bể điểm ảnh. Áp dụng chung cho các app/src/game* khác.
-[ ] Task 2.2: viết v2 gameConsole/app.cpp - sử dụng file JSON để trình diễn cấu trúc thông tin thay vì mảng C++ cứng. (Dời từ v1)
+[x] Task 2.2: viết v2 gameConsole/app.cpp - sử dụng file JSON để trình diễn cấu trúc thông tin thay vì mảng C++ cứng. (Dời từ v1)
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-doc-du-lieu-json-09
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 08 và trên 10.
     - Lấy dữ liệu từ file `gameConsole/gameConsole_board.json`. Tìm hướng đặt file json hợp lý để sau này chuyển đổi sang gọi API lấy về lưu trữ tạm.
-[ ] Task 2.3: viết v2 gameConsole/app.cpp - tạo nút setting và nút close popup setting.
+[x] Task 2.3: viết v2 gameConsole/app.cpp - tạo nút setting và nút close popup setting.
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-nut-setting-10
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 09 và trên 11.
     - Nơi chứa các cấu hình khác cho setting.
-[ ] Task 2.4: viết v2 gameConsole/app.cpp - điều chỉnh âm lượng.
+[x] Task 2.4: viết v2 gameConsole/app.cpp - điều chỉnh âm lượng.
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-dieu-chinh-am-luong-11
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 10 và trên 12.
     - Chú ý thông số vì đây có thể sẽ là input đầu cho cấu hình về âm lượng ở gameCore.
-[ ] Task 2.5: viết v2 gameConsole/app.cpp - tuỳ chỉnh màu cho các khối xếp hình.
+[x] Task 2.5: viết v2 gameConsole/app.cpp - tuỳ chỉnh màu cho các khối xếp hình.
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-tuy-chinh-mau-cho-cac-khoi-xep-hinh-12
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 11 và trên 13.
     - Cho phép click multi choice (red, orange, pink, yellow, green, blue, purple) làm thông số cấu hình đầu vào cho gameCore.
-[ ] Task 2.6: viết v2 gameConsole/app.cpp - hiển thị background nền ứng nội dung tuyến truyện
+[x] Task 2.6: viết v2 gameConsole/app.cpp - hiển thị background nền ứng nội dung tuyến truyện
     - Comment codeblock này trong gameConsole/app.cpp là: gameconsole-nen-nhan-vat-12
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 12 và trên 14.
     - Dựa vào sự lựa chọn tuyến truyện ở gameStory để hiện hình nền tương ứng.
