@@ -18,9 +18,8 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  BUILD_OS: ubuntu   # ← Only line to change: 'ubuntu' | 'windows'
+  BUILD_OS: ubuntu   # ← Change to: 'ubuntu' | 'windows' | 'macos'
 
-# Updated permissions to ensure GitHub Actions can write the deployment
 permissions:
   contents: write
   pages: write
@@ -32,8 +31,7 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Job 0: CONFIG  (env context is forbidden in runs-on; derive runner here
-  #                 and expose it via needs.config.outputs.runner)
+  # Job 0: CONFIG  
   # ---------------------------------------------------------------------------
   config:
     name: Resolve runner
@@ -46,12 +44,14 @@ jobs:
         run: |
           if [ "${{ env.BUILD_OS }}" = "windows" ]; then
             echo "runner=windows-latest" >> $GITHUB_OUTPUT
+          elif [ "${{ env.BUILD_OS }}" = "macos" ]; then
+            echo "runner=macos-latest" >> $GITHUB_OUTPUT
           else
             echo "runner=ubuntu-latest" >> $GITHUB_OUTPUT
           fi
 
   # ---------------------------------------------------------------------------
-  # Job 1: BUILD
+  # Job 1: BUILD & UPLOAD
   # ---------------------------------------------------------------------------
   build:
     name: Build WASM
@@ -61,7 +61,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Cache heavy downloads -- path and key both driven by BUILD_OS
       - name: Cache heavy downloads
         uses: actions/cache@v4
         with:
@@ -70,29 +69,32 @@ jobs:
           restore-keys: |
             libs-${{ env.BUILD_OS }}-
 
-      # ---------- Ubuntu setup ----------
+      # ---------- OS-Specific Setup ----------
       - name: Install build tools (Ubuntu)
         if: env.BUILD_OS == 'ubuntu'
         run: sudo apt-get install -y ninja-build
 
-      # ---------- Windows setup ----------
+      - name: Install Ninja (macOS)
+        if: env.BUILD_OS == 'macos'
+        run: brew install ninja
+
       - name: Install Ninja (Windows)
         if: env.BUILD_OS == 'windows'
         shell: pwsh
         run: choco install ninja -y --no-progress
 
       # ===================================================================
-      # Build WASM -- Ubuntu
+      # Build WASM -- Unix (Ubuntu & macOS)
       # emsdk bootstrap is inlined in the same run block so the sourced
-      # PATH persists for the build.sh wasm call (separate steps lose it).
+      # PATH persists for the build.sh wasm call.
       # ===================================================================
-      - name: Build WASM (Ubuntu)
-        if: env.BUILD_OS == 'ubuntu'
+      - name: Build WASM (Unix)
+        if: env.BUILD_OS == 'ubuntu' || env.BUILD_OS == 'macos'
         working-directory: app
         shell: bash
         run: |
-          EMSDK_DIR="libs/ubuntu/downloads/emsdk"
-          mkdir -p "libs/ubuntu/downloads"
+          EMSDK_DIR="libs/${{ env.BUILD_OS }}/downloads/emsdk"
+          mkdir -p "libs/${{ env.BUILD_OS }}/downloads"
           [ -d "$EMSDK_DIR" ] || git clone https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
           (cd "$EMSDK_DIR" && ./emsdk install 3.1.72 && ./emsdk activate 3.1.72)
           source "$EMSDK_DIR/emsdk_env.sh"
@@ -120,9 +122,7 @@ jobs:
           retention-days: 7
 
       # Stage Pages artifact
-      # bash is available on both ubuntu-latest and windows-latest (Git Bash),
-      # so a single shell: bash step works for both runners.
-      # Output dir is app/build/wasm/<BUILD_OS>/ in both build scripts.
+      # bash is available on ubuntu-latest, macos-latest, and windows-latest (Git Bash).
       - name: Stage Pages artifact
         shell: bash
         run: |
@@ -143,16 +143,17 @@ jobs:
           echo "--- public/ contents ---"
           ls -la public/
 
-      # Upload Pages artifact
+      # --- PAGES SETUP & UPLOAD ---
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: public
+          path: ./public
 
   # ---------------------------------------------------------------------------
   # Job 2: DEPLOY GITHUB PAGES
-  # deploy-pages action only runs on ubuntu -- runner is always ubuntu-latest
-  # regardless of which OS was used to build.
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to GitHub Pages
@@ -161,13 +162,8 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-      actions: write        # required to list + delete artifacts
     steps:
-      - name: Deploy
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 
