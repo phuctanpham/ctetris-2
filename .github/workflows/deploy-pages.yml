@@ -18,12 +18,13 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  BUILD_OS: ubuntu   # ← Change to: 'ubuntu' | 'windows' | 'macos'
+  BUILD_OS: macos   # ← Change to: 'ubuntu' | 'windows' | 'macos'
 
 permissions:
   contents: write
   pages: write
   id-token: write
+  actions: write    # ← Added to allow the cleanup step to delete artifacts
 
 concurrency:
   group: pages
@@ -85,8 +86,6 @@ jobs:
 
       # ===================================================================
       # Build WASM -- Unix (Ubuntu & macOS)
-      # emsdk bootstrap is inlined in the same run block so the sourced
-      # PATH persists for the build.sh wasm call.
       # ===================================================================
       - name: Build WASM (Unix)
         if: env.BUILD_OS == 'ubuntu' || env.BUILD_OS == 'macos'
@@ -122,7 +121,6 @@ jobs:
           retention-days: 7
 
       # Stage Pages artifact
-      # bash is available on ubuntu-latest, macos-latest, and windows-latest (Git Bash).
       - name: Stage Pages artifact
         shell: bash
         run: |
