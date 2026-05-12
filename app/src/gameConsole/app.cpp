@@ -1046,6 +1046,63 @@ int dbCheckAndUnlockStories(const char* idUser) {
     return unlocked;
 }
 
+bool dbInsertRecord(const GameRecord& rec) {
+    if (!g_db) return false;
+    const char* sql =
+        "INSERT INTO idUser_Records "
+        "(idUser,startTS,endTS,idStory,idChapter,"
+        " totalScore,totalSeconds,avgSpeed,retryNo) "
+        "VALUES (?,?,?,?,?,?,?,?,?);";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbInsertRecord prepare fail: %s", sqlite3_errmsg(g_db));
+        return false;
+    }
+    sqlite3_bind_text  (st, 1, rec.idUser.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64 (st, 2, rec.startTS);
+    sqlite3_bind_int64 (st, 3, rec.endTS);
+    sqlite3_bind_int   (st, 4, rec.idStory);
+    sqlite3_bind_int   (st, 5, rec.idChapter);
+    sqlite3_bind_int   (st, 6, rec.totalScore);
+    sqlite3_bind_int   (st, 7, rec.totalSeconds);
+    sqlite3_bind_double(st, 8, (double)rec.avgSpeed);
+    sqlite3_bind_int   (st, 9, rec.retryNo);
+    bool ok = (sqlite3_step(st) == SQLITE_DONE);
+    sqlite3_finalize(st);
+    if (ok) {
+        SDL_Log("[gameConsole_db] dbInsertRecord: user=%s score=%d story=%d",
+                rec.idUser.c_str(), rec.totalScore, rec.idStory);
+        dbSyncToPersistent();
+    }
+    return ok;
+}
+
+bool dbUpsertStoryProgress(const char* idUser, int idStory, int idChapter,
+                           bool isActivated, bool isSelected) {
+    if (!g_db || !idUser || !*idUser) return false;
+    const char* sql =
+        "INSERT INTO idUser_Stories "
+        "(idUser,idStory,idChapter,isActivated,isSelected) "
+        "VALUES (?,?,?,?,?) "
+        "ON CONFLICT(idUser,idStory,idChapter) DO UPDATE SET "
+        "  isActivated = MAX(isActivated, excluded.isActivated),"
+        "  isSelected  = excluded.isSelected;";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbUpsertStoryProgress prepare fail: %s", sqlite3_errmsg(g_db));
+        return false;
+    }
+    sqlite3_bind_text(st, 1, idUser, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int (st, 2, idStory);
+    sqlite3_bind_int (st, 3, idChapter);
+    sqlite3_bind_int (st, 4, isActivated ? 1 : 0);
+    sqlite3_bind_int (st, 5, isSelected  ? 1 : 0);
+    bool ok = (sqlite3_step(st) == SQLITE_DONE);
+    sqlite3_finalize(st);
+    if (ok) dbSyncToPersistent();
+    return ok;
+}
+
 static bool dbSelectStory(const char* idUser, int idStory, int idChapter) {
     if (!g_db || !idUser || !*idUser) return false;
 
@@ -2189,10 +2246,13 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                                 state.storiesCache[i].isSelected = true;
                                 // Persist selection and ensure row is activated
                                 dbSelectStory("default", sr.idStory, sr.idChapter);
-                                // Pipe selection into cfg so PLAY handoff sees it
+                                // Pipe selection + V2 story fields into cfg
                                 if (state.cfg) {
-                                    state.cfg->storyId   = sr.idStory;
-                                    state.cfg->chapterId = sr.idChapter;
+                                    state.cfg->storyId        = sr.idStory;
+                                    state.cfg->chapterId      = sr.idChapter;
+                                    state.cfg->nextBlockScore = sr.nextBlockScore;
+                                    state.cfg->nextBlockSpeed = sr.nextBlockSpeed;
+                                    state.cfg->tableMatrix    = sr.tableMatrix;
                                 }
                                 break;
                             }

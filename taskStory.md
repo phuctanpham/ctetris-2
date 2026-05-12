@@ -327,7 +327,72 @@ Trước khi đánh dấu V2 done, xác nhận:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.
     - Các *.h phải để trong thư mục include của ứng dụng (app/src/gameStory/include).
     - Cần tách 1 file layout.h (app/src/gameStory/include/layout.h) để đảm bảo ứng dụng chạy theo khung hình có tỷ lệ 9:16.
+<<<<<<< HEAD
     - Các file hình ảnh, âm thanh, phim... của module app phải để trong chính thư mục đang làm việc và đặt tên bắt đầu bằng tiền tố là tên thư mục. VD: cần thêm 1 file nhạc nền tên music.mp3 cho gameStory thì phải để trong app/src/gameStory/gameStory_music.mp3.
     - Nội dung chapter (JSON, media) được đặt trong `chapters/src/c{id}/`, không nằm trong thư mục `app/`. Tên file media không chứa ID chapter hay ID story — đặt tên theo nội dung gợi nhớ kèm suffix `_sfx` hoặc `_bgm` để phân biệt loại âm thanh.
     - File `chapters/manifest.json` và các file `*.sql` được tự động sinh bởi CI. Không commit hoặc chỉnh sửa tay các file này.
     - File `chapters/prompts/json.md` là nguồn tham chiếu duy nhất cho cấu trúc JSON và quy tắc thư mục. Khi thay đổi schema, cập nhật file này trước, sau đó mới chỉnh `parse.py` và code C++.
+=======
+### Phase B — Task 2.2: CI/CD
+- **B.1** Create `chapters/scripts/parse.py` (JSON → SQL emitter, rewrites `media/x.png` → raw GitHub URL)
+- **B.2** Create `chapters/scripts/build_manifest.py` (collects per-file `git log` SHA → manifest.json)
+- **B.3** Create `.github/workflows/sync-chapters.yml` (trigger, parse, commit `[skip ci]`, loop-guarded)
+- **I/O check**: run `python3 parse.py c001.json` locally, assert output contains expected `INSERT OR REPLACE INTO stories`, `dialogues`, `choices` statements
+
+### Phase C — Task 2.3: Remote sync `gamestory-dong-bo-sqlite-05a`
+- **C.1** Add `gameStory_db.h` (new file) declaring `dbInitStoryTables()` + 4-table schema
+- **C.2** Implement `dbInitStoryTables()` in `gameStory/app.cpp` (creates `meta`, `stories`, `dialogues`, `choices` if absent — does NOT touch gameConsole's `shared_data`)
+- **C.3** Create `app/src/shared/http.h` + `http_native.cpp` (libcurl) + `http_wasm.cpp` (`emscripten_fetch`)
+- **C.4** Add libcurl detection to `build.sh` (apt/brew/pacman) and `build.ps1` (vcpkg or pre-built)
+- **C.5** Implement `syncChaptersFromManifest()` in gameStory/app.cpp — fetch manifest → diff SHA → fetch+exec changed SQL → update `meta`
+- **C.6** WASM split: `#ifdef __EMSCRIPTEN__` calls `syncChapters_WASM()` (async emscripten_fetch + IDBFS persist); else `syncChapters_Desktop()`
+- **C.7** Offline fallback: any HTTP failure → log + skip, never block startup
+- **I/O check**: native run with `--offline` flag → assert no crash, log shows "offline"; native online → assert `meta` table has 1 row after first sync
+
+### Phase D — Task 2.4: Dialogue engine `gamestory-phan-cot-game-05b`
+- **D.1** Add `loadDialogueByChapter(chapterId, storyId)` → returns `std::map<int, DialogueNode>` from SQLite
+- **D.2** Define `DialogueNode { int id; string speaker; string text; string imageUrl; string bgmUrl; string sfxUrl; int nextId; vector<Choice> choices; }`
+- **D.3** Add `DialogueRuntime` state: `currentNodeId`, `selectedChoiceIdx`, `bgmStream`, `imageTexture`
+- **D.4** Render: full-screen `imageUrl` (load via `loadImageFromUrl()` — cache to memory), text box bottom 30%, speaker label
+- **D.5** Audio: `playBgm(url)` / `playSfx(url)` using `SDL_OpenAudioDeviceStream` (reuse gameConsole pattern)
+- **D.6** Input: ENTER/SPACE/click → `currentNodeId = next_id`; TAB cycles choices when `has_choices=1`; ENTER on choice → `currentNodeId = choices[idx].next_id`
+- **D.7** Terminate condition: `next_id = 0` (or no row) → break dialogue loop, return from gameStory
+- **I/O check**: seed SQLite with 3 nodes (linear→branch→ending), walk through, assert correct path taken for each TAB choice
+
+### Phase E — Task 2.5: Skip button `gamestory-nut-bo-qua-cot-truyen-06`
+- **E.1** Add `SKIP_BTN` rect top-right (40×20 px), fade-in synced with logo intro
+- **E.2** Event handler: hit-test + ESC key
+- **E.3** On skip: stop BGM, free textures, `running = false`, return 0 → main.cpp falls through to gameConsole
+- **I/O check**: native run, click skip during intro → window transitions to gameConsole within 1 frame, no error logs
+
+### Phase F — V3 Task 3.1: Per-file media cache
+- **F.1** After C.5 finishes, query distinct media URLs from `dialogues`
+- **F.2** For each URL, derive local path = `SDL_GetPrefPath/cache/<basename>`; skip if exists
+- **F.3** Download via `http.h` to that path
+- **F.4** Substitute URLs in `DialogueNode` to local paths at load time
+- **I/O check**: clear cache, run → assert 1 file per unique URL appears in cache dir; rerun → assert no new downloads
+
+### Phase G — V3 Task 3.2: Download-speed loading bar
+- **G.1** Track `bytesDone / bytesTotal` across all in-flight downloads
+- **G.2** Compute speed (KB/s) over 500ms windows
+- **G.3** Loop logo fade-in cycle while downloads active (currently single-shot fade)
+- **G.4** Render `"X.X MB/s   Y/Z files"` under bar
+- **I/O check**: throttle network, observe bar fills proportionally to bytes
+
+---
+
+## Execution order
+
+```
+A.1→A.6 → B.1→B.3 → C.1→C.7 → D.1→D.7 → E.1→E.3 → F.1→F.4 → G.1→G.4
+```
+
+Stop after each lettered item, verify I/O, then proceed.
+
+---
+
+**Confirm:**
+- `agree` → start at **A.1** (create `chapters/prompts/json.md`)
+- `agree, but skip Phase F+G` → V2 only
+- `change X.Y to ...` → adjust before starting
+>>>>>>> test

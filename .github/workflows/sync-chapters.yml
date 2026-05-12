@@ -1,0 +1,94 @@
+name: Sync chapters
+
+on:
+  push:
+    branches:
+      - main
+      - test
+    paths:
+      - 'chapters/src/**/*.json'
+      - 'chapters/src/**/media/**'
+      - 'chapters/scripts/**'
+      - 'chapters/prompts/json.md'
+      - '.github/workflows/sync-chapters.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-chapters-${{ github.ref }}
+  cancel-in-progress: false   # let an in-flight sync finish before the next
+
+jobs:
+  sync:
+    name: Parse JSON → SQL + manifest
+    # Loop guard: skip if this push was made by the bot itself.
+    # Belt-and-braces: also skip if the commit message carries [skip ci].
+    if: >
+      github.actor != 'github-actions[bot]'
+      && !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (full history for git log)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Parse each chapter JSON → SQL
+        env:
+          GITHUB_OWNER:  ${{ github.repository_owner }}
+          GITHUB_REPO:   ${{ github.event.repository.name }}
+          GITHUB_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          count=0
+          for jsonfile in chapters/src/c*/c*.json; do
+            echo "::group::parsing $jsonfile"
+            python3 chapters/scripts/parse.py "$jsonfile"
+            echo "::endgroup::"
+            count=$((count + 1))
+          done
+          echo "Parsed $count chapter(s)."
+          if [ "$count" = "0" ]; then
+            echo "::warning::No chapter JSON files found under chapters/src/c*/"
+          fi
+
+      - name: Rebuild manifest.json
+        run: python3 chapters/scripts/build_manifest.py
+
+      - name: Show generated artifacts
+        run: |
+          echo "=== manifest.json ==="
+          cat chapters/manifest.json
+          echo
+          echo "=== SQL files ==="
+          ls -la chapters/src/*/*.sql 2>/dev/null || echo "(none yet)"
+
+      - name: Commit & push (if changed)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add chapters/manifest.json
+          # SQL files may not exist if there are no chapters yet
+          git add chapters/src/*/*.sql 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "[skip ci] sync chapters: regenerate SQL + manifest"
+          git push origin HEAD:${{ github.ref_name }}
