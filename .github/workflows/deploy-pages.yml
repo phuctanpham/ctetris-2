@@ -31,11 +31,31 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Job 0: CONFIG  (env context is forbidden in runs-on; derive runner here
+  #                 and expose it via needs.config.outputs.runner)
+  # ---------------------------------------------------------------------------
+  config:
+    name: Resolve runner
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.pick.outputs.runner }}
+    steps:
+      - id: pick
+        shell: bash
+        run: |
+          if [ "${{ env.BUILD_OS }}" = "windows" ]; then
+            echo "runner=windows-latest" >> $GITHUB_OUTPUT
+          else
+            echo "runner=ubuntu-latest" >> $GITHUB_OUTPUT
+          fi
+
+  # ---------------------------------------------------------------------------
   # Job 1: BUILD
   # ---------------------------------------------------------------------------
   build:
     name: Build WASM
-    runs-on: ${{ env.BUILD_OS == 'windows' && 'windows-latest' || 'ubuntu-latest' }}
+    needs: config
+    runs-on: ${{ needs.config.outputs.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -135,7 +155,7 @@ jobs:
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to GitHub Pages
-    needs: build
+    needs: [config, build]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
