@@ -109,6 +109,11 @@ jobs:
         working-directory: app
         shell: bash
         run: |
+          EMSDK_DIR="libs/${{ matrix.os_label }}/downloads/emsdk"
+          mkdir -p "libs/${{ matrix.os_label }}/downloads"
+          [ -d "$EMSDK_DIR" ] || git clone https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
+          (cd "$EMSDK_DIR" && ./emsdk install 3.1.72 && ./emsdk activate 3.1.72)
+          source "$EMSDK_DIR/emsdk_env.sh"
           bash build.sh wasm 2>&1 | tee build-wasm.log
           exit ${PIPESTATUS[0]}
 
