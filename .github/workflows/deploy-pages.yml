@@ -4,19 +4,21 @@ on:
   push:
     branches:
       - main
-      - phucpt/github-pages
+      - db
     paths:
       - 'app/src/**'
       - 'app/main.cpp'
       - 'app/web/**'
       - 'app/brandkit/**'
       - 'app/CMakeLists.txt'
+      - 'app/build.sh'
       - 'app/build.ps1'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BUILD_OS: ubuntu   # ← Only line to change: 'ubuntu' | 'windows'
 
 permissions:
   contents: read
@@ -33,22 +35,54 @@ jobs:
   # ---------------------------------------------------------------------------
   build:
     name: Build WASM
-    runs-on: windows-latest
+    runs-on: ${{ env.BUILD_OS == 'windows' && 'windows-latest' || 'ubuntu-latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Cache heavy downloads (windows path)
-      - name: Cache heavy downloads (libs/windows/downloads/)
+      # Cache heavy downloads -- path and key both driven by BUILD_OS
+      - name: Cache heavy downloads
         uses: actions/cache@v4
         with:
-          path: app/libs/windows/downloads
-          key: libs-windows-${{ hashFiles('app/build.ps1') }}-${{ runner.os }}
+          path: app/libs/${{ env.BUILD_OS }}/downloads
+          key: libs-${{ env.BUILD_OS }}-${{ hashFiles('app/build.sh', 'app/build.ps1') }}-${{ runner.os }}
           restore-keys: |
-            libs-windows-
+            libs-${{ env.BUILD_OS }}-
 
-      # Build WASM via PowerShell script
-      - name: Build WASM
+      # ---------- Ubuntu setup ----------
+      - name: Install build tools (Ubuntu)
+        if: env.BUILD_OS == 'ubuntu'
+        run: sudo apt-get install -y ninja-build
+
+      # ---------- Windows setup ----------
+      - name: Install Ninja (Windows)
+        if: env.BUILD_OS == 'windows'
+        shell: pwsh
+        run: choco install ninja -y --no-progress
+
+      # ===================================================================
+      # Build WASM -- Ubuntu
+      # emsdk bootstrap is inlined in the same run block so the sourced
+      # PATH persists for the build.sh wasm call (separate steps lose it).
+      # ===================================================================
+      - name: Build WASM (Ubuntu)
+        if: env.BUILD_OS == 'ubuntu'
+        working-directory: app
+        shell: bash
+        run: |
+          EMSDK_DIR="libs/ubuntu/downloads/emsdk"
+          mkdir -p "libs/ubuntu/downloads"
+          [ -d "$EMSDK_DIR" ] || git clone https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
+          (cd "$EMSDK_DIR" && ./emsdk install 3.1.72 && ./emsdk activate 3.1.72)
+          source "$EMSDK_DIR/emsdk_env.sh"
+          bash build.sh wasm 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+
+      # ===================================================================
+      # Build WASM -- Windows
+      # ===================================================================
+      - name: Build WASM (Windows)
+        if: env.BUILD_OS == 'windows'
         working-directory: app
         shell: pwsh
         run: |
@@ -65,27 +99,28 @@ jobs:
           retention-days: 7
 
       # Stage Pages artifact
+      # bash is available on both ubuntu-latest and windows-latest (Git Bash),
+      # so a single shell: bash step works for both runners.
+      # Output dir is app/build/wasm/<BUILD_OS>/ in both build scripts.
       - name: Stage Pages artifact
-        shell: pwsh
+        shell: bash
         run: |
-          New-Item -ItemType Directory -Force -Path public | Out-Null
-          $src = "app/build/wasm/windows"
-          Copy-Item "$src/cTetris.html" "public/index.html"
-          Copy-Item "$src/cTetris.js"   "public/"
-          Copy-Item "$src/cTetris.wasm" "public/"
-          # Static assets -- copy neu ton tai
-          foreach ($asset in @("favicon.svg","favicon.ico","manifest.webmanifest","sw.js")) {
-            $f = "$src/$asset"
-            if (Test-Path $f) {
-              Copy-Item $f "public/"
-              Write-Host "[OK] $asset"
-            } else {
-              Write-Warning "$asset khong co trong build output -- PWA co the bi anh huong"
-            }
-          }
-          New-Item -ItemType File -Force -Path "public/.nojekyll" | Out-Null
-          Write-Host "--- Kiem tra noi dung public/ ---"
-          Get-ChildItem public/
+          mkdir -p public
+          src="app/build/wasm/${{ env.BUILD_OS }}"
+          cp "$src/cTetris.html" public/index.html
+          cp "$src/cTetris.js"   public/
+          cp "$src/cTetris.wasm" public/
+          for asset in favicon.svg favicon.ico manifest.webmanifest sw.js; do
+            if [ -f "$src/$asset" ]; then
+              cp "$src/$asset" "public/$asset"
+              echo "[OK] $asset"
+            else
+              echo "[WARN] $asset not in build output -- PWA may be affected"
+            fi
+          done
+          touch public/.nojekyll
+          echo "--- public/ contents ---"
+          ls -la public/
 
       # Upload Pages artifact
       - name: Upload Pages artifact
@@ -94,19 +129,21 @@ jobs:
           path: public
 
   # ---------------------------------------------------------------------------
-  # Job 2: DEPLOY GITHUB PAGE
+  # Job 2: DEPLOY GITHUB PAGES
+  # deploy-pages action only runs on ubuntu -- runner is always ubuntu-latest
+  # regardless of which OS was used to build.
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    runs-on: ubuntu-latest   # deploy-pages action chi chay tren ubuntu
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       pages: write
       id-token: write
-      actions: write
+      actions: write        # required to list + delete artifacts
     steps:
       - name: Deploy
         id: deployment
