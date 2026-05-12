@@ -109,6 +109,8 @@ static void coreCloseBgm() {
     }
 }
 
+static bool checkCollision(const GameState& state, const Tetromino& t);
+
 // gamecore-table-matrix-21
 // Format: semicolon-separated rows (bottom-aligned), comma-separated colorID values.
 // e.g. "1,0,2,0,3,0,4,0,5,0;6,1,2,3,4,5,6,1,2,3" = 2 pre-filled bottom rows.
