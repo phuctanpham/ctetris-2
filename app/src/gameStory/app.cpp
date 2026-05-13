@@ -474,6 +474,496 @@ static int findDialNodeIdx(const std::vector<DialogueNode>& nodes, int nodeId) {
     return -1;
 }
 
+// =============================================================================
+// gamestory-dong-bo-sqlite-05a  Phase C — Gist manifest sync (Issues 2.3, 2.4)
+// =============================================================================
+// MANIFEST_GIST_URL is the stable raw URL of the manifest Gist.
+// Set to your actual Gist URL before building.
+// Format: https://gist.githubusercontent.com/{owner}/{GIST_MANIFEST_ID}/raw/manifest.json
+// This URL never changes regardless of how many times the Gist content is updated.
+#ifndef MANIFEST_GIST_URL
+#define MANIFEST_GIST_URL ""
+#endif
+
+// Sync states for the intro screen state machine
+enum SyncState {
+    SYNC_IDLE,          // not started yet
+    SYNC_FETCHING,      // HTTP request in flight (WASM async) or running (native)
+    SYNC_UPDATING_DB,   // applying chapter updates to SQLite
+    SYNC_DONE,          // all chapters up to date
+    SYNC_OFFLINE        // fetch failed — using local data
+};
+
+// Per-chapter sync progress tracked across frames
+struct SyncProgress {
+    int  total     = 0;   // chapters that need updating
+    int  done      = 0;   // chapters processed
+    std::string currentId;   // chapter being processed ("c001", ...)
+    SyncState state = SYNC_IDLE;
+};
+
+// ---------------------------------------------------------------------------
+// Minimal HTTP GET — returns body string or empty on failure.
+// Native:  libcurl synchronous (blocking, acceptable for startup sync).
+// WASM:    emscripten_fetch synchronous mode (uses Asyncify to avoid blocking
+//          the browser event loop; requires -sASYNCIFY in link flags).
+// Offline: returns "" — all callers treat empty response as offline.
+// ---------------------------------------------------------------------------
+static std::string httpGetSync(const char* url) {
+    if (!url || url[0] == '\0') return "";
+
+#ifdef __EMSCRIPTEN__
+    // Emscripten synchronous fetch via Asyncify
+    emscripten_fetch_attr_t attr;
+    emscripten_fetch_attr_init(&attr);
+    SDL_strlcpy(attr.requestMethod, "GET", sizeof(attr.requestMethod));
+    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY | EMSCRIPTEN_FETCH_SYNCHRONOUS;
+    emscripten_fetch_t* fetch = emscripten_fetch(&attr, url);
+    std::string body;
+    if (fetch && fetch->status == 200 && fetch->numBytes > 0) {
+        body.assign(fetch->data, (size_t)fetch->numBytes);
+    } else if (fetch) {
+        SDL_Log("[gameStory] httpGetSync WASM: HTTP %d for %s", (int)fetch->status, url);
+    }
+    if (fetch) emscripten_fetch_close(fetch);
+    return body;
+
+#else
+    // Native: libcurl (build.sh / build.ps1 must link -lcurl)
+    // Declared extern so this TU compiles without curl.h in the include path.
+    // The linker resolves the symbol from the curl shared library.
+    // If curl is unavailable the build will fail at link time — intentional.
+    #ifdef HAVE_LIBCURL
+    #include <curl/curl.h>
+    struct CurlBuf { std::string data; };
+    auto writeCallback = [](char* ptr, size_t sz, size_t nmemb, void* ud) -> size_t {
+        ((CurlBuf*)ud)->data.append(ptr, sz * nmemb);
+        return sz * nmemb;
+    };
+    CurlBuf buf;
+    CURL* c = curl_easy_init();
+    if (!c) return "";
+    curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, (curl_write_callback)(writeCallback));
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &buf);
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 10L);
+    CURLcode res = curl_easy_perform(c);
+    curl_easy_cleanup(c);
+    if (res != CURLE_OK) {
+        SDL_Log("[gameStory] httpGetSync curl fail: %s", curl_easy_strerror(res));
+        return "";
+    }
+    return buf.data;
+    #else
+    // libcurl not available — treat as offline
+    SDL_Log("[gameStory] httpGetSync: built without libcurl, offline fallback");
+    return "";
+    #endif  // HAVE_LIBCURL
+#endif  // __EMSCRIPTEN__
+}
+
+// ---------------------------------------------------------------------------
+// Read SHA from meta table for a chapter. Returns "" if not found.
+// ---------------------------------------------------------------------------
+static std::string metaGetSha(sqlite3* db, const char* chapterId) {
+    if (!db || !chapterId) return "";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db,
+        "SELECT sha FROM meta WHERE chapter_id = ?;",
+        -1, &st, nullptr) != SQLITE_OK) return "";
+    sqlite3_bind_text(st, 1, chapterId, -1, SQLITE_TRANSIENT);
+    std::string sha;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        const unsigned char* p = sqlite3_column_text(st, 0);
+        if (p) sha = (const char*)p;
+    }
+    sqlite3_finalize(st);
+    return sha;
+}
+
+// ---------------------------------------------------------------------------
+// Update meta table after a chapter is synced.
+// ---------------------------------------------------------------------------
+static void metaSetSha(sqlite3* db, const char* chapterId, const char* sha) {
+    if (!db || !chapterId || !sha) return;
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db,
+        "INSERT OR REPLACE INTO meta (chapter_id, sha, updated_at) VALUES (?, ?, ?);",
+        -1, &st, nullptr) != SQLITE_OK) return;
+    sqlite3_bind_text (st, 1, chapterId, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (st, 2, sha,       -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(st, 3, (sqlite3_int64)SDL_GetTicks());
+    sqlite3_step(st);
+    sqlite3_finalize(st);
+}
+
+// ---------------------------------------------------------------------------
+// Apply one chapter's JSON into shared_data + story_dialogues + story_choices.
+// This is the C++ equivalent of parse.py — diff per idStory, no full replace.
+// ---------------------------------------------------------------------------
+static bool applyChapterJson(sqlite3* db, const std::string& jsonBody,
+                             const char* chapterId) {
+    if (!db || jsonBody.empty()) return false;
+
+    nlohmann::json jroot;
+    try {
+        jroot = nlohmann::json::parse(jsonBody);
+    } catch (const std::exception& ex) {
+        SDL_Log("[gameStory] applyChapterJson parse fail %s: %s",
+                chapterId, ex.what());
+        return false;
+    }
+    if (!jroot.contains("shared_data") || !jroot["shared_data"].is_array()) {
+        SDL_Log("[gameStory] %s: missing shared_data array", chapterId);
+        return false;
+    }
+
+    // Collect incoming idStory values
+    std::vector<int> incomingIds;
+    for (const auto& row : jroot["shared_data"]) {
+        incomingIds.push_back(row.value("idStory", 0));
+    }
+
+    // Determine idChapter from first row
+    int idChapter = 0;
+    if (!jroot["shared_data"].empty())
+        idChapter = jroot["shared_data"][0].value("idChapter", 0);
+    if (idChapter == 0) return false;
+
+    // --- DELETE stories no longer in JSON ---
+    {
+        // Build "(?,?,?,...) " placeholder list
+        std::string placeholders;
+        for (size_t i = 0; i < incomingIds.size(); i++) {
+            if (i) placeholders += ",";
+            placeholders += "?";
+        }
+        std::string delSQL =
+            "DELETE FROM shared_data WHERE idChapter = ? AND idStory NOT IN ("
+            + placeholders + ");";
+        sqlite3_stmt* st = nullptr;
+        if (sqlite3_prepare_v2(db, delSQL.c_str(), -1, &st, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int(st, 1, idChapter);
+            for (int i = 0; i < (int)incomingIds.size(); i++)
+                sqlite3_bind_int(st, 2 + i, incomingIds[i]);
+            sqlite3_step(st);
+            sqlite3_finalize(st);
+        }
+        // Same for story_dialogues / story_choices
+        std::string delDlg =
+            "DELETE FROM story_dialogues WHERE idChapter = ? AND idStory NOT IN ("
+            + placeholders + ");";
+        std::string delCho =
+            "DELETE FROM story_choices WHERE idChapter = ? AND idStory NOT IN ("
+            + placeholders + ");";
+        for (const auto& dsql : {delDlg, delCho}) {
+            sqlite3_stmt* ds = nullptr;
+            if (sqlite3_prepare_v2(db, dsql.c_str(), -1, &ds, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int(ds, 1, idChapter);
+                for (int i = 0; i < (int)incomingIds.size(); i++)
+                    sqlite3_bind_int(ds, 2 + i, incomingIds[i]);
+                sqlite3_step(ds);
+                sqlite3_finalize(ds);
+            }
+        }
+    }
+
+    // --- UPSERT each story row ---
+    auto bStr = [](sqlite3_stmt* s, int i, const std::string& v) {
+        sqlite3_bind_text(s, i, v.c_str(), -1, SQLITE_TRANSIENT);
+    };
+
+    sqlite3_stmt* stSD = nullptr, *stDlg = nullptr, *stCho = nullptr;
+    sqlite3_prepare_v2(db,
+        "INSERT OR REPLACE INTO shared_data "
+        "(idStory,storyName,idChapter,chapterName,minScore,minSpeed,minRetries,"
+        " requiredStories,nextBlockScore,nextBlockSpeed,tableMatrix,xmlDialogue,"
+        " thumbnailPath) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);",
+        -1, &stSD, nullptr);
+    sqlite3_prepare_v2(db,
+        "INSERT OR REPLACE INTO story_dialogues "
+        "(idStory,idChapter,nodeId,speaker,text,imageUrl,bgmUrl,sfxUrl,"
+        " nextNodeId,hasChoices) VALUES (?,?,?,?,?,?,?,?,?,?);",
+        -1, &stDlg, nullptr);
+    sqlite3_prepare_v2(db,
+        "INSERT OR REPLACE INTO story_choices "
+        "(idStory,idChapter,nodeId,choiceIdx,label,nextNodeId) VALUES (?,?,?,?,?,?);",
+        -1, &stCho, nullptr);
+
+    char* errMsg = nullptr;
+    sqlite3_exec(db, "BEGIN;", nullptr, nullptr, &errMsg);
+    sqlite3_free(errMsg);
+
+    for (const auto& row : jroot["shared_data"]) {
+        if (!stSD) break;
+        int idStory = row.value("idStory", 0);
+        sqlite3_reset(stSD);
+        sqlite3_bind_int   (stSD,  1, idStory);
+        bStr               (stSD,  2, row.value("storyName",       std::string()));
+        sqlite3_bind_int   (stSD,  3, idChapter);
+        bStr               (stSD,  4, row.value("chapterName",     std::string()));
+        sqlite3_bind_int   (stSD,  5, row.value("minScore",        0));
+        sqlite3_bind_double(stSD,  6, row.value("minSpeed",        0.0));
+        sqlite3_bind_int   (stSD,  7, row.value("minRetries",      0));
+        bStr               (stSD,  8, row.value("requiredStories", std::string()));
+        sqlite3_bind_int   (stSD,  9, row.value("nextBlockScore",  0));
+        sqlite3_bind_double(stSD, 10, row.value("nextBlockSpeed",  0.0));
+        bStr               (stSD, 11, row.value("tableMatrix",     std::string()));
+        bStr               (stSD, 12, row.value("xmlDialogue",     std::string()));
+        bStr               (stSD, 13, row.value("thumbnailPath",   std::string()));
+        sqlite3_step(stSD);
+
+        // Delete old dialogues/choices for this story then re-insert
+        if (stDlg) {
+            sqlite3_stmt* del = nullptr;
+            sqlite3_prepare_v2(db,
+                "DELETE FROM story_dialogues WHERE idStory=? AND idChapter=?;",
+                -1, &del, nullptr);
+            if (del) {
+                sqlite3_bind_int(del, 1, idStory);
+                sqlite3_bind_int(del, 2, idChapter);
+                sqlite3_step(del); sqlite3_finalize(del);
+            }
+            if (stCho) {
+                sqlite3_stmt* delc = nullptr;
+                sqlite3_prepare_v2(db,
+                    "DELETE FROM story_choices WHERE idStory=? AND idChapter=?;",
+                    -1, &delc, nullptr);
+                if (delc) {
+                    sqlite3_bind_int(delc, 1, idStory);
+                    sqlite3_bind_int(delc, 2, idChapter);
+                    sqlite3_step(delc); sqlite3_finalize(delc);
+                }
+            }
+            if (row.contains("dialogues") && row["dialogues"].is_array()) {
+                for (const auto& nd : row["dialogues"]) {
+                    int nodeId = nd.value("nodeId", 0);
+                    sqlite3_reset(stDlg);
+                    sqlite3_bind_int(stDlg, 1, idStory);
+                    sqlite3_bind_int(stDlg, 2, idChapter);
+                    sqlite3_bind_int(stDlg, 3, nodeId);
+                    bStr(stDlg, 4, nd.value("speaker", std::string()));
+                    bStr(stDlg, 5, nd.value("text", std::string()));
+                    bStr(stDlg, 6, nd.value("imageUrl", std::string()));
+                    bStr(stDlg, 7, nd.value("bgmUrl", std::string()));
+                    bStr(stDlg, 8, nd.value("sfxUrl", std::string()));
+                    sqlite3_bind_int(stDlg, 9, nd.value("nextNodeId", 0));
+                    int hasChoices = (nd.contains("choices") &&
+                                     nd["choices"].is_array() &&
+                                     !nd["choices"].empty()) ? 1 : 0;
+                    sqlite3_bind_int(stDlg, 10, hasChoices);
+                    sqlite3_step(stDlg);
+                    // Choices
+                    if (stCho && nd.contains("choices") && nd["choices"].is_array()) {
+                        int choiceIdx = 0;
+                        for (const auto& ch : nd["choices"]) {
+                            sqlite3_reset(stCho);
+                            sqlite3_bind_int(stCho, 1, idStory);
+                            sqlite3_bind_int(stCho, 2, idChapter);
+                            sqlite3_bind_int(stCho, 3, nodeId);
+                            sqlite3_bind_int(stCho, 4, choiceIdx);
+                            bStr(stCho, 5, ch.value("label", std::string()));
+                            sqlite3_bind_int(stCho, 6, ch.value("nextNodeId", 0));
+                            sqlite3_step(stCho);
+                            choiceIdx++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    errMsg = nullptr;
+    sqlite3_exec(db, "COMMIT;", nullptr, nullptr, &errMsg);
+    sqlite3_free(errMsg);
+    sqlite3_finalize(stSD);
+    sqlite3_finalize(stDlg);
+    sqlite3_finalize(stCho);
+    SDL_Log("[gameStory] applyChapterJson %s: %d stories", chapterId,
+            (int)jroot["shared_data"].size());
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// syncFromGist(): compare manifest SHA vs local meta, update changed chapters.
+// Returns immediately (offline) if MANIFEST_GIST_URL is empty or fetch fails.
+// ---------------------------------------------------------------------------
+static SyncProgress g_syncProgress;
+
+static void syncFromGist(sqlite3* db) {
+    g_syncProgress = SyncProgress{};
+    g_syncProgress.state = SYNC_FETCHING;
+
+    const char* manifestUrl = MANIFEST_GIST_URL;
+    if (!manifestUrl || manifestUrl[0] == '\0') {
+        SDL_Log("[gameStory] MANIFEST_GIST_URL not set — offline");
+        g_syncProgress.state = SYNC_OFFLINE;
+        return;
+    }
+
+    std::string manifestBody = httpGetSync(manifestUrl);
+    if (manifestBody.empty()) {
+        SDL_Log("[gameStory] manifest fetch failed — offline");
+        g_syncProgress.state = SYNC_OFFLINE;
+        return;
+    }
+
+    nlohmann::json manifest;
+    try {
+        manifest = nlohmann::json::parse(manifestBody);
+    } catch (...) {
+        SDL_Log("[gameStory] manifest JSON parse fail — offline");
+        g_syncProgress.state = SYNC_OFFLINE;
+        return;
+    }
+    if (!manifest.contains("chapters") || !manifest["chapters"].is_array()) {
+        SDL_Log("[gameStory] manifest: no chapters array");
+        g_syncProgress.state = SYNC_OFFLINE;
+        return;
+    }
+
+    // Count chapters that need updating
+    struct ChapterEntry { std::string id, sha, gistUrl; };
+    std::vector<ChapterEntry> toUpdate;
+    for (const auto& ch : manifest["chapters"]) {
+        std::string cid     = ch.value("id",      std::string());
+        std::string newSha  = ch.value("sha",     std::string());
+        std::string gistUrl = ch.value("gistUrl", std::string());
+        if (cid.empty() || newSha.empty() || gistUrl.empty()) continue;
+        std::string localSha = metaGetSha(db, cid.c_str());
+        if (localSha == newSha) {
+            SDL_Log("[gameStory] %s SHA match — skip", cid.c_str());
+        } else {
+            SDL_Log("[gameStory] %s SHA diff (%s → %s) — queue update",
+                    cid.c_str(), localSha.c_str(), newSha.c_str());
+            toUpdate.push_back({cid, newSha, gistUrl});
+        }
+    }
+
+    g_syncProgress.total = (int)toUpdate.size();
+    g_syncProgress.done  = 0;
+
+    if (toUpdate.empty()) {
+        SDL_Log("[gameStory] all chapters up to date");
+        g_syncProgress.state = SYNC_DONE;
+        return;
+    }
+
+    g_syncProgress.state = SYNC_UPDATING_DB;
+    for (const auto& entry : toUpdate) {
+        g_syncProgress.currentId = entry.id;
+        std::string body = httpGetSync(entry.gistUrl.c_str());
+        if (body.empty()) {
+            SDL_Log("[gameStory] %s gistUrl fetch fail — skip",
+                    entry.id.c_str());
+        } else if (applyChapterJson(db, body, entry.id.c_str())) {
+            metaSetSha(db, entry.id.c_str(), entry.sha.c_str());
+#ifdef __EMSCRIPTEN__
+            // Persist to IndexedDB after each chapter write
+            EM_ASM({ Module.FS.syncfs(false, function(){}); });
+#endif
+        }
+        g_syncProgress.done++;
+    }
+
+    g_syncProgress.state = SYNC_DONE;
+    SDL_Log("[gameStory] sync complete: %d/%d chapters updated",
+            g_syncProgress.done, g_syncProgress.total);
+}
+
+// ---------------------------------------------------------------------------
+// Post-sync: check current story conditions → replay or prompt next story.
+// Called once after sync completes (storyId==0 intro path only).
+// Returns the storyId to run next (0 = no dialogue, just proceed to Console).
+// ---------------------------------------------------------------------------
+static int postSyncConditionCheck(sqlite3* db, const char* idUser) {
+    if (!db || !idUser) return 0;
+
+    // Get selected story
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db,
+        "SELECT us.idStory, us.idChapter, us.lastMaxScore, us.lastMaxSpeed, "
+        "       sd.minScore, sd.minSpeed "
+        "FROM idUser_Stories us "
+        "JOIN shared_data sd ON us.idStory = sd.idStory AND us.idChapter = sd.idChapter "
+        "WHERE us.idUser = ? AND us.isSelected = 1 LIMIT 1;",
+        -1, &st, nullptr) != SQLITE_OK) return 0;
+    sqlite3_bind_text(st, 1, idUser, -1, SQLITE_TRANSIENT);
+
+    struct SelStory { int id=0, ch=0, maxScore=0; float maxSpeed=0;
+                      int minScore=0; float minSpeed=0; } sel;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        sel.id       = sqlite3_column_int   (st, 0);
+        sel.ch       = sqlite3_column_int   (st, 1);
+        sel.maxScore = sqlite3_column_int   (st, 2);
+        sel.maxSpeed = (float)sqlite3_column_double(st, 3);
+        sel.minScore = sqlite3_column_int   (st, 4);
+        sel.minSpeed = (float)sqlite3_column_double(st, 5);
+    }
+    sqlite3_finalize(st);
+
+    if (sel.id == 0) {
+        // No story selected → use first story of chapter 1
+        sqlite3_stmt* fs = nullptr;
+        if (sqlite3_prepare_v2(db,
+            "SELECT idStory, idChapter FROM shared_data "
+            "WHERE idChapter = 1 ORDER BY idStory ASC LIMIT 1;",
+            -1, &fs, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(fs) == SQLITE_ROW) {
+                sel.id = sqlite3_column_int(fs, 0);
+                sel.ch = sqlite3_column_int(fs, 1);
+            }
+            sqlite3_finalize(fs);
+        }
+        if (sel.id == 0) return 0;
+        // Mark as selected
+        sqlite3_exec(db,
+            ("INSERT OR REPLACE INTO idUser_Stories "
+             "(idUser,idStory,idChapter,isActivated,isSelected) VALUES ('" +
+             std::string(idUser) + "'," + std::to_string(sel.id) + "," +
+             std::to_string(sel.ch) + ",1,1);").c_str(),
+            nullptr, nullptr, nullptr);
+        return sel.id;   // run first story unconditionally
+    }
+
+    // Find next story in chapter flow (same chapter, next idStory, requiredStories satisfied)
+    sqlite3_stmt* nx = nullptr;
+    int nextStoryId = 0;
+    std::string nextStoryName;
+    if (sqlite3_prepare_v2(db,
+        "SELECT sd.idStory, sd.storyName, sd.minScore, sd.minSpeed "
+        "FROM shared_data sd "
+        "WHERE sd.idChapter = ? AND sd.idStory > ? "
+        "ORDER BY sd.idStory ASC LIMIT 1;",
+        -1, &nx, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(nx, 1, sel.ch);
+        sqlite3_bind_int(nx, 2, sel.id);
+        if (sqlite3_step(nx) == SQLITE_ROW) {
+            int nxtId      = sqlite3_column_int(nx, 0);
+            const unsigned char* nxtName = sqlite3_column_text(nx, 1);
+            int nxtMinScore = sqlite3_column_int(nx, 2);
+            float nxtMinSpd = (float)sqlite3_column_double(nx, 3);
+            // Check if current story meets next story's unlock conditions
+            if (sel.maxScore >= nxtMinScore && sel.maxSpeed >= nxtMinSpd) {
+                nextStoryId   = nxtId;
+                nextStoryName = nxtName ? (const char*)nxtName : "";
+            }
+        }
+        sqlite3_finalize(nx);
+    }
+
+    if (nextStoryId > 0) {
+        SDL_Log("[gameStory] postSync: next story %d ('%s') unlocked",
+                nextStoryId, nextStoryName.c_str());
+        return -nextStoryId;   // negative = "prompt user first" (caller checks sign)
+    }
+
+    // No unlock — replay current story
+    SDL_Log("[gameStory] postSync: replay story %d", sel.id);
+    return sel.id;
+}
+
 // [D.6] BGM stub: log URL change, no playback until V3 provides media files.
 static std::string s_currentBgmUrl;
 static void diagUpdateBgm(const std::string& bgmUrl) {
@@ -632,46 +1122,135 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
         return 0;
     }
 
-    // -------------------------------------------------------------------------
     // gamestory-logo-intro-01  +  gamestory-loading-bar-02
-    // gamestory-corp-credit-03: Original intro (storyId == 0)
-    // gamestory-nut-bo-qua-cot-truyen-06 [E.1+E.2]: SKIP button on intro screen
-    // -------------------------------------------------------------------------
-    bool running    = true;
+    // gamestory-corp-credit-03: Intro (storyId == 0)
+    // gamestory-dong-bo-sqlite-05a: Gist sync → real progress bar
+    // gamestory-nut-bo-qua-cot-truyen-06 [E.1+E.2]: Skip (dialogue phase only)
+    //
+    // Two-phase state machine:
+    //   Phase 1 — STATE_SYNCING:  fetch manifest, update DB, show progress bar.
+    //             Skip button HIDDEN (Issue 2.6).
+    //             Bar fills proportionally to chapters synced (Issue 2.8).
+    //   Phase 2 — STATE_LOGO:    full 8-second logo animation, Skip visible.
+    //             If user skips, jump straight to post-sync check.
+    //   Post-sync: compare story conditions (Issue 2.9).
+
+    // Open (or reuse) the DB for sync and post-sync check
+    bool dbOpenedHere = false;
+    if (!g_storyDb) {
+        dbOpenedHere = storyDbOpen();
+    } else {
+        dbOpenedHere = true;
+    }
+
+    // --- Ensure meta table exists (sync tracking) ---
+    if (g_storyDb) {
+        sqlite3_exec(g_storyDb,
+            "CREATE TABLE IF NOT EXISTS meta ("
+            "  chapter_id TEXT PRIMARY KEY,"
+            "  sha        TEXT NOT NULL,"
+            "  updated_at INTEGER"
+            ");",
+            nullptr, nullptr, nullptr);
+    }
+
+    // --- Phase 1: Sync (non-blocking render loop) ---
+    // syncFromGist() is synchronous — it blocks for the duration of HTTP.
+    // We run it BEFORE entering the render loop to keep logic simple.
+    // The render loop below shows the result immediately after.
+    // For WASM: Asyncify handles the blocking; browser stays responsive.
+    if (g_storyDb) {
+        syncFromGist(g_storyDb);
+    } else {
+        g_syncProgress.state = SYNC_OFFLINE;
+        SDL_Log("[gameStory] DB not available — skip sync");
+    }
+
+    // --- Phase 2: Logo animation with real progress bar ---
+    enum IntroPhase { PHASE_LOGO, PHASE_DONE };
+    IntroPhase phase = PHASE_LOGO;
     bool skipHoverI = false;
     SDL_Event event;
     Uint32 startTime = SDL_GetTicks();
 
-    while (running) {
+    while (phase != PHASE_DONE) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) std::exit(0);
-            // ESC = skip intro [E.2]
-            if (event.type == SDL_EVENT_KEY_DOWN &&
-                event.key.key == SDLK_ESCAPE) {
-                running = false;
-            }
-            // SKIP button hover + click [E.2]
-            if (event.type == SDL_EVENT_MOUSE_MOTION)
-                skipHoverI = diagHit(DIAG_SKIP_BTN,
-                                     event.motion.x, event.motion.y);
-            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
-                event.button.button == SDL_BUTTON_LEFT &&
-                diagHit(DIAG_SKIP_BTN, event.button.x, event.button.y)) {
-                running = false;
+
+            // Issue 2.6: Skip only active in PHASE_LOGO (sync is already done)
+            if (phase == PHASE_LOGO) {
+                if (event.type == SDL_EVENT_KEY_DOWN &&
+                    event.key.key == SDLK_ESCAPE) {
+                    phase = PHASE_DONE;
+                }
+                if (event.type == SDL_EVENT_MOUSE_MOTION)
+                    skipHoverI = diagHit(DIAG_SKIP_BTN,
+                                         event.motion.x, event.motion.y);
+                if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                    event.button.button == SDL_BUTTON_LEFT &&
+                    diagHit(DIAG_SKIP_BTN, event.button.x, event.button.y)) {
+                    phase = PHASE_DONE;
+                }
             }
         }
+
         Uint32 elapsedTime = SDL_GetTicks() - startTime;
-        if (elapsedTime > (Uint32)INTRO_DURATION) running = false;
+        if (elapsedTime > (Uint32)INTRO_DURATION) phase = PHASE_DONE;
 
         SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
         SDL_RenderClear(renderer);
 
         drawLogo(renderer, elapsedTime);
-        float barBottomY = drawLoadingBar(renderer, elapsedTime);
-        drawCorpCredit(renderer, elapsedTime, barBottomY);
 
-        // SKIP button [E.1] — same rect as dialogue mode for visual consistency
+        // Issue 2.8: Real progress bar
+        // If sync updated chapters: bar = done/total (0..100%).
+        // If all SHAs matched (total==0) or offline: bar fills instantly to 100%.
+        float syncProgress = 1.0f;
+        if (g_syncProgress.total > 0) {
+            syncProgress = (float)g_syncProgress.done / (float)g_syncProgress.total;
+        }
+        // Blend sync progress with time progress — whichever is further ahead.
+        float timeProgress = (float)elapsedTime / (float)INTRO_DURATION;
+        float barProgress = (syncProgress > timeProgress) ? syncProgress : timeProgress;
+
+        // Draw bar using syncProgress as fill, same layout as drawLoadingBar()
         {
+            const float barW = 180.0f, barH = 12.0f;
+            const float barX = (STORY_SCREEN_WIDTH  - barW) / 2.0f;
+            const float barY = STORY_SCREEN_HEIGHT - 110.0f;
+            SDL_FRect bgBar = { barX, barY, barW, barH };
+            SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+            SDL_RenderFillRect(renderer, &bgBar);
+            float fill = barProgress;
+            if (fill > 1.0f) fill = 1.0f;
+            SDL_FRect fgBar = { barX, barY, barW * fill, barH };
+            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+            SDL_RenderFillRect(renderer, &fgBar);
+            // Status line
+            char statusBuf[48] = "";
+            if (g_syncProgress.state == SYNC_UPDATING_DB &&
+                !g_syncProgress.currentId.empty()) {
+                SDL_snprintf(statusBuf, sizeof(statusBuf), "Syncing %s...",
+                            g_syncProgress.currentId.c_str());
+            } else if (g_syncProgress.state == SYNC_OFFLINE) {
+                SDL_strlcpy(statusBuf, "Offline - using local data", sizeof(statusBuf));
+            } else if (g_syncProgress.state == SYNC_DONE) {
+                SDL_strlcpy(statusBuf, "Up to date", sizeof(statusBuf));
+            }
+            if (statusBuf[0] != '\0') {
+                int sl2 = (int)SDL_strlen(statusBuf);
+                SDL_SetRenderDrawColor(renderer, 180, 180, 180, 200);
+                SDL_RenderDebugText(renderer,
+                    (STORY_SCREEN_WIDTH - sl2 * 8.0f) / 2.0f,
+                    barY - 18.0f, statusBuf);
+            }
+            // Corp credit below bar
+            float barBottomY = barY + barH;
+            drawCorpCredit(renderer, elapsedTime, barBottomY);
+        }
+
+        // Skip button — PHASE_LOGO only (Issue 2.6)
+        if (phase == PHASE_LOGO) {
             SDL_Color skipBg = skipHoverI ? DIAG_SKIP_HOV : DIAG_SKIP_IDLE;
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer,
@@ -684,13 +1263,172 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
             SDL_SetRenderDrawColor(renderer, 180, 180, 180, 200);
             SDL_RenderDebugText(renderer,
                 DIAG_SKIP_BTN.x + (DIAG_SKIP_BTN.w - sll * 8.0f) / 2.0f,
-                DIAG_SKIP_BTN.y + (DIAG_SKIP_BTN.h - 8.0f) / 2.0f,
-                sl);
+                DIAG_SKIP_BTN.y + (DIAG_SKIP_BTN.h - 8.0f) / 2.0f, sl);
         }
 
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
+
+    // --- Issue 2.9: Post-sync condition check ---
+    // Determine next story to run based on DB state.
+    // postSyncConditionCheck() returns:
+    //   0          → no story (proceed to Console)
+    //   positive N → run story N immediately (first time or replay)
+    //  negative N  → story N is newly unlocked; show prompt then run
+    int nextStory = 0;
+    if (g_storyDb) {
+        nextStory = postSyncConditionCheck(g_storyDb, "default");
+    }
+
+    // Show "Chapter Completion" banner if all stories in chapter are done
+    // (postSyncConditionCheck returns 0 only when no more stories)
+    if (nextStory == 0 && g_storyDb) {
+        // Check if any activated story exists — if so, show completion
+        sqlite3_stmt* chk = nullptr;
+        if (sqlite3_prepare_v2(g_storyDb,
+            "SELECT COUNT(*) FROM idUser_Stories "
+            "WHERE idUser='default' AND isActivated=1;",
+            -1, &chk, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(chk) == SQLITE_ROW &&
+                sqlite3_column_int(chk, 0) > 0) {
+                // TODO: show banner "Chapter Complete!"
+                SDL_Log("[gameStory] Chapter complete — ready to exit to Console");
+            }
+            sqlite3_finalize(chk);
+        }
+    }
+
+    // Show "unlock" prompt when a new story is available (negative return)
+    bool runNextStory = false;
+    if (nextStory < 0) {
+        int unlockId = -nextStory;
+        std::string unlockName;
+        if (g_storyDb) {
+            sqlite3_stmt* ns = nullptr;
+            if (sqlite3_prepare_v2(g_storyDb,
+                "SELECT storyName FROM shared_data WHERE idStory=? LIMIT 1;",
+                -1, &ns, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int(ns, 1, unlockId);
+                if (sqlite3_step(ns) == SQLITE_ROW) {
+                    const unsigned char* p = sqlite3_column_text(ns, 0);
+                    if (p) unlockName = (const char*)p;
+                }
+                sqlite3_finalize(ns);
+            }
+        }
+        // Show yes/no prompt
+        char promptLine[64];
+        SDL_snprintf(promptLine, sizeof(promptLine),
+                     "Unlocked: %s!", unlockName.c_str());
+        enum PromptChoice { PROMPT_NONE, PROMPT_YES, PROMPT_NO };
+        PromptChoice choice = PROMPT_NONE;
+        bool promptHoverYes = false, promptHoverNo = false;
+        SDL_FRect yesBtn = { 55.0f, 280.0f, 60.0f, 24.0f };
+        SDL_FRect noBtn  = { 155.0f, 280.0f, 60.0f, 24.0f };
+
+        while (choice == PROMPT_NONE) {
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_EVENT_QUIT) std::exit(0);
+                if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                    promptHoverYes = diagHit(yesBtn, event.motion.x, event.motion.y);
+                    promptHoverNo  = diagHit(noBtn,  event.motion.x, event.motion.y);
+                }
+                if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                    event.button.button == SDL_BUTTON_LEFT) {
+                    if (diagHit(yesBtn, event.button.x, event.button.y))
+                        choice = PROMPT_YES;
+                    else if (diagHit(noBtn, event.button.x, event.button.y))
+                        choice = PROMPT_NO;
+                }
+            }
+            SDL_SetRenderDrawColor(renderer, 20, 20, 30, 255);
+            SDL_RenderClear(renderer);
+            int pl = (int)SDL_strlen(promptLine);
+            SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
+            SDL_RenderDebugText(renderer,
+                (STORY_SCREEN_WIDTH - pl * 8.0f) / 2.0f, 200.0f, promptLine);
+            // YES button
+            SDL_SetRenderDrawColor(renderer,
+                promptHoverYes ? 100 : 55, promptHoverYes ? 155 : 80,
+                promptHoverYes ? 200 : 120, 255);
+            SDL_RenderFillRect(renderer, &yesBtn);
+            SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
+            SDL_RenderRect(renderer, &yesBtn);
+            SDL_RenderDebugText(renderer, yesBtn.x + 22.0f, yesBtn.y + 8.0f, "YES");
+            // NO button
+            SDL_SetRenderDrawColor(renderer,
+                promptHoverNo ? 200 : 120, promptHoverNo ? 80 : 80,
+                promptHoverNo ? 100 : 120, 255);
+            SDL_RenderFillRect(renderer, &noBtn);
+            SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
+            SDL_RenderRect(renderer, &noBtn);
+            SDL_RenderDebugText(renderer, noBtn.x + 24.0f, noBtn.y + 8.0f, "NO");
+            SDL_RenderPresent(renderer);
+            SDL_Delay(16);
+        }
+
+        if (choice == PROMPT_YES) {
+            // Update DB: set new story as selected, deselect old
+            if (g_storyDb) {
+                sqlite3_exec(g_storyDb,
+                    ("UPDATE idUser_Stories SET isSelected=0 WHERE idUser='default';").c_str(),
+                    nullptr, nullptr, nullptr);
+                sqlite3_exec(g_storyDb,
+                    ("INSERT OR REPLACE INTO idUser_Stories "
+                     "(idUser,idStory,idChapter,isActivated,isSelected) "
+                     "SELECT 'default', idStory, idChapter, 1, 1 FROM shared_data "
+                     "WHERE idStory=" + std::to_string(unlockId) + " LIMIT 1;").c_str(),
+                    nullptr, nullptr, nullptr);
+#ifdef __EMSCRIPTEN__
+                EM_ASM({ Module.FS.syncfs(false, function(){}); });
+#endif
+            }
+            nextStory = unlockId;
+            runNextStory = true;
+        } else {
+            // No: replay current story
+            nextStory = (nextStory < 0) ? -nextStory : nextStory;
+            // find and replay the currently selected story instead
+            if (g_storyDb) {
+                sqlite3_stmt* cs = nullptr;
+                if (sqlite3_prepare_v2(g_storyDb,
+                    "SELECT idStory, idChapter FROM idUser_Stories "
+                    "WHERE idUser='default' AND isSelected=1 LIMIT 1;",
+                    -1, &cs, nullptr) == SQLITE_OK) {
+                    if (sqlite3_step(cs) == SQLITE_ROW) {
+                        nextStory = sqlite3_column_int(cs, 0);
+                    }
+                    sqlite3_finalize(cs);
+                }
+            }
+            runNextStory = (nextStory > 0);
+        }
+    } else if (nextStory > 0) {
+        runNextStory = true;
+    }
+
+    // Run story dialogue if determined above
+    if (runNextStory && nextStory > 0) {
+        // Find chapter for this story
+        int storyCh = 1;
+        if (g_storyDb) {
+            sqlite3_stmt* cs = nullptr;
+            if (sqlite3_prepare_v2(g_storyDb,
+                "SELECT idChapter FROM shared_data WHERE idStory=? LIMIT 1;",
+                -1, &cs, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int(cs, 1, nextStory);
+                if (sqlite3_step(cs) == SQLITE_ROW) {
+                    storyCh = sqlite3_column_int(cs, 0);
+                }
+                sqlite3_finalize(cs);
+            }
+        }
+        std::vector<DialogueNode> nodes = storyDbLoadDialogue(nextStory, storyCh);
+        dialRunLoop(renderer, nodes, nextStory, storyCh);
+    }
+
+    if (dbOpenedHere) storyDbClose();
 
     // Cleanup intro textures (lazy-init will recreate on re-entry)
     if (g_logo.texture) {

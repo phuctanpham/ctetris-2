@@ -735,7 +735,47 @@ bool dbInitSchema() {
         ");",
         "CREATE shared_data")) return false;
 
-    SDL_Log("[gameConsole_db] schema initialized (3 tables)");
+    // story_dialogues: per-node dialogue consumed by gameStory V2
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS story_dialogues ("
+        "  rowId      INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  idStory    INTEGER NOT NULL,"
+        "  idChapter  INTEGER NOT NULL,"
+        "  nodeId     INTEGER NOT NULL,"
+        "  speaker    TEXT    DEFAULT '',"
+        "  text       TEXT    DEFAULT '',"
+        "  imageUrl   TEXT    DEFAULT '',"
+        "  bgmUrl     TEXT    DEFAULT '',"
+        "  sfxUrl     TEXT    DEFAULT '',"
+        "  nextNodeId INTEGER DEFAULT 0,"
+        "  hasChoices INTEGER DEFAULT 0,"
+        "  UNIQUE(idStory, idChapter, nodeId)"
+        ");",
+        "CREATE story_dialogues")) return false;
+
+    // story_choices: branching choices consumed by gameStory V2
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS story_choices ("
+        "  rowId      INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  idStory    INTEGER NOT NULL,"
+        "  idChapter  INTEGER NOT NULL,"
+        "  nodeId     INTEGER NOT NULL,"
+        "  choiceIdx  INTEGER NOT NULL,"
+        "  label      TEXT    DEFAULT '',"
+        "  nextNodeId INTEGER DEFAULT 0,"
+        "  UNIQUE(idStory, idChapter, nodeId, choiceIdx)"
+        ");",
+        "CREATE story_choices")) return false;
+
+    // user_settings: key-value store for SettingsConfig persistence
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS user_settings ("
+        "  key   TEXT PRIMARY KEY,"
+        "  value TEXT NOT NULL DEFAULT ''"
+        ");",
+        "CREATE user_settings")) return false;
+
+    SDL_Log("[gameConsole_db] schema initialized (6 tables)");
     return true;
 }
 
@@ -763,59 +803,160 @@ bool dbSeedSharedData() {
         return true;
     }
 
-    // V2: hardcoded chapter list bundled with binary.
-    // V3 (Task 3.1): GET https://<pages>/chapters/index.json to discover
-    // new chapter IDs, curl each <id>/<id>.sql, then re-run this exec loop.
+    // V2: chapters bundled as JSON (no .sql needed).
+    // WASM: --preload-file chapters/  |  Native: next to executable.
+    // V3 (Task 3.1): fetch chapter list from Gist manifest, then update rows.
     const char* chapterDirs[] = { "c001" };
-    const int   nChapters     = (int)(sizeof(chapterDirs) / sizeof(chapterDirs[0]));
-
+    const int   nChapters = (int)(sizeof(chapterDirs) / sizeof(chapterDirs[0]));
     const char* basePath = SDL_GetBasePath();
     int totalLoaded = 0;
 
     for (int ci = 0; ci < nChapters; ci++) {
-        std::string sqlPath = (basePath && basePath[0] != '\0')
-            ? std::string(basePath) + "chapters/" + chapterDirs[ci] + "/" + chapterDirs[ci] + ".sql"
-            : std::string("chapters/") + chapterDirs[ci] + "/" + chapterDirs[ci] + ".sql";
+        // Read c{id}.json (not .sql)
+        std::string jsonPath = (basePath && basePath[0] != '\0')
+            ? std::string(basePath) + "chapters/" + chapterDirs[ci]
+              + "/" + chapterDirs[ci] + ".json"
+            : std::string("chapters/") + chapterDirs[ci]
+              + "/" + chapterDirs[ci] + ".json";
 
-        SDL_IOStream* io = SDL_IOFromFile(sqlPath.c_str(), "rb");
+        SDL_IOStream* io = SDL_IOFromFile(jsonPath.c_str(), "rb");
         if (!io) {
-            SDL_Log("[gameConsole_db] khong mo duoc %s -- skip chapter %s",
-                    sqlPath.c_str(), chapterDirs[ci]);
+            SDL_Log("[gameConsole_db] cannot open %s -- skip", jsonPath.c_str());
             continue;
         }
         Sint64 sz = SDL_GetIOSize(io);
         if (sz <= 0) { SDL_CloseIO(io); continue; }
-
-        std::string sqlText((size_t)sz, '\0');
-        size_t got = SDL_ReadIO(io, &sqlText[0], (size_t)sz);
+        std::string raw((size_t)sz, '\0');
+        size_t got = SDL_ReadIO(io, &raw[0], (size_t)sz);
         SDL_CloseIO(io);
         if (got != (size_t)sz) {
-            SDL_Log("[gameConsole_db] %s: read sai size (%zu/%lld)",
-                    sqlPath.c_str(), got, (long long)sz);
+            SDL_Log("[gameConsole_db] %s: read size mismatch (%zu/%lld)",
+                    jsonPath.c_str(), got, (long long)sz);
             continue;
         }
 
-        // sqlite3_exec handles multi-statement scripts (BEGIN/INSERT/COMMIT)
-        char* errMsg = nullptr;
-        int rc = sqlite3_exec(g_db, sqlText.c_str(), nullptr, nullptr, &errMsg);
-        if (rc != SQLITE_OK) {
-            SDL_Log("[gameConsole_db] %s exec fail: %s",
-                    chapterDirs[ci], errMsg ? errMsg : "(no msg)");
-            sqlite3_free(errMsg);
-            // Try next chapter; partial failure is non-fatal
+        // Parse JSON
+        nlohmann::json jroot;
+        try {
+            jroot = nlohmann::json::parse(raw);
+        } catch (const std::exception& ex) {
+            SDL_Log("[gameConsole_db] JSON parse fail %s: %s",
+                    chapterDirs[ci], ex.what());
             continue;
         }
-        SDL_Log("[gameConsole_db] chapter %s seeded tu %s",
-                chapterDirs[ci], sqlPath.c_str());
+        if (!jroot.contains("shared_data") || !jroot["shared_data"].is_array()) {
+            SDL_Log("[gameConsole_db] %s: missing shared_data array", chapterDirs[ci]);
+            continue;
+        }
+
+        // Prepare INSERT statements (reused per story/node/choice)
+        sqlite3_stmt* stSD  = nullptr;
+        sqlite3_stmt* stDlg = nullptr;
+        sqlite3_stmt* stCho = nullptr;
+        sqlite3_prepare_v2(g_db,
+            "INSERT OR REPLACE INTO shared_data "
+            "(idStory,storyName,idChapter,chapterName,minScore,minSpeed,minRetries,"
+            " requiredStories,nextBlockScore,nextBlockSpeed,tableMatrix,xmlDialogue,"
+            " thumbnailPath) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            -1, &stSD, nullptr);
+        sqlite3_prepare_v2(g_db,
+            "INSERT OR REPLACE INTO story_dialogues "
+            "(idStory,idChapter,nodeId,speaker,text,imageUrl,bgmUrl,sfxUrl,"
+            " nextNodeId,hasChoices) VALUES (?,?,?,?,?,?,?,?,?,?);",
+            -1, &stDlg, nullptr);
+        sqlite3_prepare_v2(g_db,
+            "INSERT OR REPLACE INTO story_choices "
+            "(idStory,idChapter,nodeId,choiceIdx,label,nextNodeId) VALUES (?,?,?,?,?,?);",
+            -1, &stCho, nullptr);
+        if (!stSD) {
+            SDL_Log("[gameConsole_db] prepare INSERT fail: %s", sqlite3_errmsg(g_db));
+            sqlite3_finalize(stDlg); sqlite3_finalize(stCho);
+            continue;
+        }
+
+        // Helper: bind std::string as TEXT
+        auto bStr = [](sqlite3_stmt* s, int i, const std::string& v) {
+            sqlite3_bind_text(s, i, v.c_str(), -1, SQLITE_TRANSIENT);
+        };
+
+        dbExec("BEGIN;", "seed BEGIN");
+        int storyCount = 0, nodeCount = 0, choiceCount = 0;
+
+        for (const auto& row : jroot["shared_data"]) {
+            // ---- shared_data row ----
+            sqlite3_reset(stSD);
+            sqlite3_bind_int   (stSD,  1, row.value("idStory",        0));
+            bStr               (stSD,  2, row.value("storyName",      std::string()));
+            sqlite3_bind_int   (stSD,  3, row.value("idChapter",      0));
+            bStr               (stSD,  4, row.value("chapterName",    std::string()));
+            sqlite3_bind_int   (stSD,  5, row.value("minScore",       0));
+            sqlite3_bind_double(stSD,  6, row.value("minSpeed",       0.0));
+            sqlite3_bind_int   (stSD,  7, row.value("minRetries",     0));
+            bStr               (stSD,  8, row.value("requiredStories",std::string()));
+            sqlite3_bind_int   (stSD,  9, row.value("nextBlockScore", 0));
+            sqlite3_bind_double(stSD, 10, row.value("nextBlockSpeed", 0.0));
+            bStr               (stSD, 11, row.value("tableMatrix",    std::string()));
+            bStr               (stSD, 12, row.value("xmlDialogue",    std::string()));
+            bStr               (stSD, 13, row.value("thumbnailPath",  std::string()));
+            sqlite3_step(stSD);
+            storyCount++;
+
+            // ---- story_dialogues + story_choices ----
+            if (stDlg && row.contains("dialogues") && row["dialogues"].is_array()) {
+                int idStory   = row.value("idStory",   0);
+                int idChapter = row.value("idChapter", 0);
+                for (const auto& nd : row["dialogues"]) {
+                    int nodeId = nd.value("nodeId", 0);
+                    int hasCh  = (nd.contains("choices") &&
+                                  nd["choices"].is_array() &&
+                                  !nd["choices"].empty()) ? 1 : 0;
+                    sqlite3_reset(stDlg);
+                    sqlite3_bind_int(stDlg, 1, idStory);
+                    sqlite3_bind_int(stDlg, 2, idChapter);
+                    sqlite3_bind_int(stDlg, 3, nodeId);
+                    bStr           (stDlg, 4, nd.value("speaker",    std::string()));
+                    bStr           (stDlg, 5, nd.value("text",       std::string()));
+                    bStr           (stDlg, 6, nd.value("imageUrl",   std::string()));
+                    bStr           (stDlg, 7, nd.value("bgmUrl",     std::string()));
+                    bStr           (stDlg, 8, nd.value("sfxUrl",     std::string()));
+                    sqlite3_bind_int(stDlg, 9, nd.value("nextNodeId", 0));
+                    sqlite3_bind_int(stDlg,10, hasCh);
+                    sqlite3_step(stDlg);
+                    nodeCount++;
+
+                    if (stCho && hasCh) {
+                        int ci2 = 0;
+                        for (const auto& ch : nd["choices"]) {
+                            sqlite3_reset(stCho);
+                            sqlite3_bind_int(stCho, 1, idStory);
+                            sqlite3_bind_int(stCho, 2, idChapter);
+                            sqlite3_bind_int(stCho, 3, nodeId);
+                            sqlite3_bind_int(stCho, 4, ci2++);
+                            bStr           (stCho, 5, ch.value("label",      std::string()));
+                            sqlite3_bind_int(stCho, 6, ch.value("nextNodeId", 0));
+                            sqlite3_step(stCho);
+                            choiceCount++;
+                        }
+                    }
+                }
+            }
+        }
+
+        dbExec("COMMIT;", "seed COMMIT");
+        sqlite3_finalize(stSD);
+        sqlite3_finalize(stDlg);
+        sqlite3_finalize(stCho);
+        SDL_Log("[gameConsole_db] %s: %d stories, %d nodes, %d choices",
+                chapterDirs[ci], storyCount, nodeCount, choiceCount);
         totalLoaded++;
     }
 
     if (totalLoaded == 0) {
-        SDL_Log("[gameConsole_db] khong load duoc chapter nao -- shared_data trong");
+        SDL_Log("[gameConsole_db] no chapters loaded -- shared_data empty");
         return false;
     }
-    SDL_Log("[gameConsole_db] %d chapter(s) seeded vao shared_data", totalLoaded);
-    dbSyncToPersistent();   // [F.7]
+    SDL_Log("[gameConsole_db] %d chapter(s) seeded", totalLoaded);
+    dbSyncToPersistent();
     return true;
 }
 
@@ -1101,6 +1242,107 @@ bool dbUpsertStoryProgress(const char* idUser, int idStory, int idChapter,
     sqlite3_finalize(st);
     if (ok) dbSyncToPersistent();
     return ok;
+}
+
+// gameconsole-nut-setting-10 / Issue 2.2-2.3
+// Persist SettingsConfig to user_settings table (INSERT OR REPLACE per key).
+bool dbSaveSettings(const SettingsConfig& cfg) {
+    if (!g_db) return false;
+    const char* sql =
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?);";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbSaveSettings prepare fail: %s",
+                sqlite3_errmsg(g_db));
+        return false;
+    }
+    auto kv = [&](const char* k, const char* v) {
+        sqlite3_reset(st);
+        sqlite3_bind_text(st, 1, k, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(st, 2, v, -1, SQLITE_TRANSIENT);
+        sqlite3_step(st);
+    };
+    char buf[32];
+    SDL_snprintf(buf, sizeof(buf), "%.4f", (double)cfg.volume);
+    kv("volume", buf);
+    for (int i = 0; i < 7; i++) {
+        char key[12];
+        SDL_snprintf(key, sizeof(key), "color%d", i);
+        kv(key, cfg.colorEnabled[i] ? "1" : "0");
+    }
+    SDL_snprintf(buf, sizeof(buf), "%d", cfg.storyId);   kv("storyId",   buf);
+    SDL_snprintf(buf, sizeof(buf), "%d", cfg.chapterId); kv("chapterId", buf);
+    sqlite3_finalize(st);
+    dbSyncToPersistent();
+    SDL_Log("[gameConsole_db] settings saved");
+    return true;
+}
+
+// Load SettingsConfig from user_settings table.
+// Returns false when table has no rows (caller keeps struct defaults).
+bool dbLoadSettings(SettingsConfig& cfg) {
+    if (!g_db) return false;
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db,
+        "SELECT key, value FROM user_settings;",
+        -1, &st, nullptr) != SQLITE_OK) return false;
+    bool found = false;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        found = true;
+        const char* k = (const char*)sqlite3_column_text(st, 0);
+        const char* v = (const char*)sqlite3_column_text(st, 1);
+        if (!k || !v) continue;
+        if (SDL_strcmp(k, "volume") == 0) {
+            float vol = (float)SDL_atof(v);
+            if (vol < 0.0f) vol = 0.0f;
+            if (vol > 1.0f) vol = 1.0f;
+            cfg.volume = vol;
+        } else if (SDL_strcmp(k, "storyId")   == 0) { cfg.storyId   = SDL_atoi(v); }
+        else if (SDL_strcmp(k, "chapterId") == 0) { cfg.chapterId = SDL_atoi(v); }
+        else {
+            for (int i = 0; i < 7; i++) {
+                char expect[12];
+                SDL_snprintf(expect, sizeof(expect), "color%d", i);
+                if (SDL_strcmp(k, expect) == 0) {
+                    cfg.colorEnabled[i] = (SDL_atoi(v) != 0);
+                    break;
+                }
+            }
+        }
+    }
+    sqlite3_finalize(st);
+    if (found) SDL_Log("[gameConsole_db] settings loaded");
+    return found;
+}
+
+// Issue 2.7: Load leaderboard from idUser_Records (replaces board.json).
+std::vector<BoardRecord> dbLoadRecords(const char* idUser, int limit) {
+    std::vector<BoardRecord> out;
+    if (!g_db) return out;
+    (void)idUser;   // V2: global leaderboard; V3 will filter by idUser
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db,
+        "SELECT idUser, totalScore, totalSeconds, avgSpeed, endTS "
+        "FROM idUser_Records ORDER BY totalScore DESC LIMIT ?;",
+        -1, &st, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbLoadRecords prepare fail: %s",
+                sqlite3_errmsg(g_db));
+        return out;
+    }
+    sqlite3_bind_int(st, 1, limit);
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        BoardRecord r;
+        const unsigned char* u = sqlite3_column_text(st, 0);
+        r.idUser       = u ? (const char*)u : "";
+        r.totalScore   = sqlite3_column_int   (st, 1);
+        r.totalSeconds = sqlite3_column_int   (st, 2);
+        r.avgSpeed     = (float)sqlite3_column_double(st, 3);
+        r.endTS        = (int64_t)sqlite3_column_int64(st, 4);
+        out.push_back(std::move(r));
+    }
+    sqlite3_finalize(st);
+    SDL_Log("[gameConsole_db] dbLoadRecords: %d rows", (int)out.size());
+    return out;
 }
 
 static bool dbSelectStory(const char* idUser, int idStory, int idChapter) {
@@ -1971,6 +2213,28 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     AppState state;
     state.cfg = &cfgInOut;   // borrow, do NOT delete
     SDL_Event event;
+
+    // Issue 2.1: Guard -- if DB file does not exist, redirect to gameStory
+    // so it can create and init the DB before Console renders any UI.
+    // Return code 3 = SCREEN_GAMESTORY_INIT (handled in main.cpp).
+    {
+        char* pref = SDL_GetPrefPath("uit", "cTetris");
+        bool dbExists = false;
+        if (pref) {
+            std::string probe = std::string(pref) + "default.sqlite";
+            SDL_free(pref);
+            SDL_IOStream* f = SDL_IOFromFile(probe.c_str(), "rb");
+            if (f) {
+                dbExists = (SDL_GetIOSize(f) > 100); // >100 bytes = not empty stub
+                SDL_CloseIO(f);
+            }
+        }
+        if (!dbExists) {
+            SDL_Log("[gameConsole] DB not found -> redirect to gameStory (init)");
+            return 3;   // SCREEN_GAMESTORY_INIT
+        }
+    }
+
     playBackgroundMusic();
     applyVolumeToStream(cfgInOut.volume);   // [D.5] sync gain to current vol
 
@@ -1980,6 +2244,8 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     if (dbOpen("default")) {
         dbInitSchema();
         dbSeedSharedData();
+        dbLoadSettings(cfgInOut);   // Issue 2.2: restore volume, colors, storyId
+        applyVolumeToStream(cfgInOut.volume);   // re-apply after load
         dbCheckAndUnlockStories("default");   // [F.5] cascade-unlock on entry
         state.storiesMaxChapter = dbMaxActivatedChapter("default");
 
@@ -2081,7 +2347,11 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                     // none are open does it jump focus to QUIT button.
                     if (state.showGuide)         { state.showGuide = false;    sbResetInteraction(state.sb); }
                     else if (state.showBoard)    { state.showBoard = false;    sbResetInteraction(state.sb); }
-                    else if (state.showSettings) { state.showSettings = false; sbResetInteraction(state.sb); }
+                    else if (state.showSettings) {
+                        state.showSettings = false;
+                        sbResetInteraction(state.sb);
+                        if (state.cfg) dbSaveSettings(*state.cfg);   // Issue 2.3
+                    }
                     else if (state.showStories)  { state.showStories = false;  sbResetInteraction(state.sb); }
                     else                          state.focusIndex = BTN_IDX_QUIT;
                 }
@@ -2165,6 +2435,7 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                         state.showSettings = false;
                         state.draggingVolume = false;
                         sbResetInteraction(state.sb);
+                        if (state.cfg) dbSaveSettings(*state.cfg);   // Issue 2.3
                     }
                     // [D.3] Volume slider drag-start: hit thumb OR click on track
                     else if (state.cfg) {

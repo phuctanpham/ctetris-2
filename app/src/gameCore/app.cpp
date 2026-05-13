@@ -541,6 +541,26 @@ static void drawSidebar(SDL_Renderer* renderer, const GameState& state,
     drawScoreInSlot(renderer, RECT_SCORE, state.score);
     drawTimerInSlot(renderer, RECT_TIMER, elapsedMs);
     drawNextPreview(renderer, RECT_NEXT1, state.nextBlock);
+    // Issue 2.7: show story label "S{storyId}-C{chapterId}" in RECT_SCORE slot
+    // (the score slot already draws score via drawScoreInSlot above;
+    //  use a small label above it, inside RECT_TIMER which is the 4th component).
+    // Sidebar slot 1 (RECT_SCORE, y=80) already shows score.
+    // Sidebar slot 0 (RECT_QUIT)  is power icon.
+    // We render the story label as a tiny overlay inside RECT_NEXT1 header area.
+    if (s_cfg && s_cfg->storyId > 0) {
+        char storyLbl[12];
+        SDL_snprintf(storyLbl, sizeof(storyLbl), "S%d-C%d",
+                     s_cfg->storyId, s_cfg->chapterId);
+        int sll = (int)SDL_strlen(storyLbl);
+        SDL_SetRenderDrawColor(renderer, 160, 160, 100, 255);
+        drawSmallText(renderer,
+                      RECT_NEXT1.x + (RECT_NEXT1.w - sll * 8.0f * 0.55f) / 2.0f,
+                      RECT_NEXT1.y + 1.0f,
+                      0.55f, storyLbl);
+    }
+
+    // TODO(V3): replace nextBlockScore*2 fallback with cfg.nextBlockScore3
+    // when SettingsConfig and shared_data extend schema. (Issue 2.8)
     bool showNext2 = s_cfg && s_cfg->nextBlockScore > 0
                      && state.score >= s_cfg->nextBlockScore;
     bool showNext3 = showNext2 && state.score >= s_cfg->nextBlockScore * 2;
@@ -739,6 +759,10 @@ static void onAction(GameState& state, SDL_Keycode keyEquiv) {
     applyMoveOrRotate(state, keyEquiv);
 }
 
+// Issue 2.5: record save before quit is handled at the call-site in the
+// event loop (gameOverRecorded guard), so handleQuitAction itself only
+// sets the shutdown/exit flags. This keeps the function state-mutation-only
+// and avoids needing the elapsed-time calculation here.
 static void handleQuitAction(GameState& state) {
 #ifdef __EMSCRIPTEN__
     state.wasmShutdown = true;
@@ -865,15 +889,42 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
                     if (hitTest(POPUP_CLOSE, mx, my) || hitTest(POPUP_CANCEL, mx, my)) {
                         state.showQuitPopup = false;
                     } else if (hitTest(POPUP_RESTART, mx, my)) {
+                        // Issue 2.5: save record for this session before resetting.
+                        // Record is written even when score==0 (valid retry entry).
+                        if (!gameOverRecorded) {
+                            Uint32 _now = SDL_GetTicks();
+                            Uint32 _elapsed = state.pauseStartTime > 0
+                                ? state.pauseStartTime - state.gameStartTime - state.totalPausedMs
+                                : _now - state.gameStartTime - state.totalPausedMs;
+                            onGameOver(state, _elapsed);
+                        }
                         state.retryCount++;           // [C8]
                         resetGame(state);
-                        gameOverRecorded = false;     // [C8] allow re-recording next game-over
+                        gameOverRecorded = false;     // allow re-recording next game-over
                         lastFallTime = SDL_GetTicks();
                     } else if (hitTest(POPUP_CONSOLE, mx, my)) {
+                        // Issue 2.5: save record before leaving to Console.
+                        if (!gameOverRecorded) {
+                            Uint32 _now = SDL_GetTicks();
+                            Uint32 _elapsed = state.pauseStartTime > 0
+                                ? state.pauseStartTime - state.gameStartTime - state.totalPausedMs
+                                : _now - state.gameStartTime - state.totalPausedMs;
+                            onGameOver(state, _elapsed);
+                            gameOverRecorded = true;
+                        }
                         state.exitCode = 2;
                         quitRequested = true;
                         break;
                     } else if (hitTest(POPUP_QUIT, mx, my)) {
+                        // Issue 2.5: save record before quit.
+                        if (!gameOverRecorded) {
+                            Uint32 _now = SDL_GetTicks();
+                            Uint32 _elapsed = state.pauseStartTime > 0
+                                ? state.pauseStartTime - state.gameStartTime - state.totalPausedMs
+                                : _now - state.gameStartTime - state.totalPausedMs;
+                            onGameOver(state, _elapsed);
+                            gameOverRecorded = true;
+                        }
                         handleQuitAction(state);
                         if (!state.wasmShutdown) {
                             quitRequested = true;

@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include "gameConsole_layout.h"   // SettingsConfig (for dbSaveSettings/dbLoadSettings)
 
 // ---------------------------------------------------------------------------
 // Story row -- one record from shared_data joined with idUser_Stories overlay.
@@ -57,6 +58,18 @@ struct GameRecord {
 };
 
 // ---------------------------------------------------------------------------
+// Board record -- one leaderboard row loaded from idUser_Records.
+// Used by Board popup (V2: reads from DB instead of gameConsole_board.json).
+// ---------------------------------------------------------------------------
+struct BoardRecord {
+    std::string idUser;
+    int         totalScore   = 0;
+    int         totalSeconds = 0;
+    float       avgSpeed     = 0.0f;
+    int64_t     endTS        = 0;   // Unix epoch ms; used for time-based sort
+};
+
+// ---------------------------------------------------------------------------
 // API -- prototypes only; implementation in src/gameConsole/app.cpp.
 // All functions return bool for success/failure where applicable.
 // ---------------------------------------------------------------------------
@@ -97,3 +110,27 @@ int dbMaxActivatedChapter(const char* idUser);
 // idStory values are completed in idUser_Stories, set isActivated=1.
 // Returns number of rows newly unlocked.
 int dbCheckAndUnlockStories(const char* idUser);
+
+// ---------------------------------------------------------------------------
+// Settings persistence (Issue 2.2 / 2.3 gameConsole V2)
+// Table: user_settings (key TEXT PRIMARY KEY, value TEXT)
+// Created by dbInitSchema() alongside the other three tables.
+// ---------------------------------------------------------------------------
+
+// Persist current SettingsConfig to user_settings table (INSERT OR REPLACE).
+// Called when Settings popup is closed. WASM: caller must syncfs after this.
+bool dbSaveSettings(const SettingsConfig& cfg);
+
+// Load SettingsConfig from user_settings table into cfg.
+// Returns false if no settings row exists yet — caller keeps struct defaults.
+bool dbLoadSettings(SettingsConfig& cfg);
+
+// ---------------------------------------------------------------------------
+// Leaderboard from DB (Issue 2.7 gameConsole V2)
+// Replaces gameConsole_board.json as the Board popup data source.
+// Falls back to gameConsole_board.json if idUser_Records is empty.
+// ---------------------------------------------------------------------------
+
+// Load up to `limit` game records ordered by totalScore DESC.
+// Returns empty vector on error or when table has no rows.
+std::vector<BoardRecord> dbLoadRecords(const char* idUser, int limit = 50);
