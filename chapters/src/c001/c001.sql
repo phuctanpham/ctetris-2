@@ -6,6 +6,7 @@
 
 BEGIN TRANSACTION;
 
+-- shared_data (story catalogue, consumed by gameConsole)
 INSERT OR REPLACE INTO shared_data (idStory, storyName, idChapter, chapterName, minScore, minSpeed, minRetries, requiredStories, nextBlockScore, nextBlockSpeed, tableMatrix, xmlDialogue, thumbnailPath) VALUES (1, 'Falling Sky', 1, 'The Tetris Matrix', 0, 0.0, 0, '', 50, 1.0, '', '', 'THUMB_001_FALLING_SKY.png');
 INSERT OR REPLACE INTO shared_data (idStory, storyName, idChapter, chapterName, minScore, minSpeed, minRetries, requiredStories, nextBlockScore, nextBlockSpeed, tableMatrix, xmlDialogue, thumbnailPath) VALUES (2, 'Holy Sanctum', 1, 'The Tetris Matrix', 2, 0.1, 1, '1', 100, 1.2, '', '', 'THUMB_002_ORDERCORP_TEMPLE.png');
 INSERT OR REPLACE INTO shared_data (idStory, storyName, idChapter, chapterName, minScore, minSpeed, minRetries, requiredStories, nextBlockScore, nextBlockSpeed, tableMatrix, xmlDialogue, thumbnailPath) VALUES (3, 'Blood Tower', 1, 'The Tetris Matrix', 1, 0.1, 2, '1', 100, 1.2, '', '', 'THUMB_003_UNDERCITY_SLUM.png');
