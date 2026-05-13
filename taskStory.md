@@ -201,7 +201,68 @@
     - Tuy nhiên, mã nguồn thiết lập `LOGO_SVG_DATA` (logo game cTetris - 3x3 ô vuông) làm logo chính cho hiệu ứng intro, trong khi `CORP_SVG_DATA` (logo trường đại học UIT) bị đẩy xuống làm logo phụ đính kèm ở phần credit "Powered up by".
 
 ### V2
-[ ] bổ sung sau
+[ ] Issue 2.1: Khởi tạo DB client khi chưa tồn tại — Prefix theo Device ID.
+    - Nếu không tìm thấy file SQLite (`SDL_GetPrefPath("uit","cTetris")` + device-id prefix), tạo mới `{deviceId}.sqlite`.
+    - Device ID = hash ổn định từ `SDL_GetPlatform()` + `SDL_GetBasePath()`.
+    - Sau khi init, fetch `manifest.json` qua hằng số `MANIFEST_GIST_URL` → lấy danh sách gist link từng chapter → import tuần tự vào DB.
+    - Story mặc định sau init: story có `idStory` nhỏ nhất của chapter có `idChapter` nhỏ nhất trong manifest.
+    - I/O validation: xoá DB → chạy lại → DB mới tên chứa device-id, bảng `meta` có ít nhất 1 row sau sync.
+
+[ ] Issue 2.2: So sánh phiên bản manifest và cập nhật có chọn lọc — Flow A (DB đã tồn tại).
+    - Fetch `manifest.json` gist → so sánh từng `{ "id", "sha" }` với bảng `meta` local.
+    - SHA khớp → bỏ qua chapter. SHA khác → fetch `c{id}.json` từ gist tương ứng → parse JSON trong C++ (không qua `parse.py`) → diff từng object `idStory`:
+        + `idStory` mới → INSERT vào `stories`, `dialogues`, `choices`.
+        + `idStory` thay đổi → UPDATE các row tương ứng.
+        + `idStory` bị xoá → DELETE các row tương ứng.
+    - Sau mỗi chapter xử lý xong, UPDATE `meta.sha` và `meta.updated_at`.
+    - I/O validation: sửa 1 dialogue trong `c001.json` → push gist → chạy lại → row `dialogues` đã update, chapter khác không bị chạm.
+
+[ ] Issue 2.3: GitHub Action chỉ cập nhật Gist — KHÔNG commit vào git repo.
+    - Workflow trigger: thay đổi `chapters/src/**/*.json`.
+    - Với mỗi file thay đổi: publish JSON lên Gist tương ứng qua GitHub Gist API (dùng secret `GIST_TOKEN`).
+    - Sau khi cập nhật tất cả chapter Gist, rebuild manifest Gist với `{ id, sha, gistUrl }` mới.
+    - Không có bước `git add` / `git commit` nào trong workflow.
+    - Điều kiện guard: `if: github.actor != 'github-actions[bot]'`.
+    - I/O validation: push `c001.json` → workflow chạy → Gist có nội dung mới → manifest Gist có SHA mới → `git log` không có commit mới.
+
+[ ] Issue 2.4: Stream ảnh trực tiếp từ URL — Không tải về disk.
+    - Tất cả `image_url`, `sfx_url`, `bgm_url` trong DB là raw URL. Fetch in-memory → decode → `SDL_CreateTexture`.
+    - Không ghi bất kỳ file media nào xuống FS (không có cache disk layer ở V2; V3 Task 3.1 sẽ thêm).
+    - Offline fallback: fetch thất bại → thumbnail hiển thị hình chữ nhật xám `{80,80,80,255}`, không crash.
+    - I/O validation: tắt mạng → chạy → thumbnail xám hiện, log "image offline fallback", không exception.
+
+[ ] Issue 2.5: Progressive Bar hiển thị tiến trình sync thực tế.
+    - Bar CHỈ hiển thị trong phase sync DB (state `STATE_SYNCING`), KHÔNG hiển thị trên màn hình dialogue.
+    - Tính `percent = chaptersProcessed / totalChaptersToSync * 100`.
+    - Nếu không có chapter nào cần sync (tất cả SHA khớp): bar điền 100% ngay, không delay.
+    - Dòng trạng thái bên dưới bar: `"Syncing c{id}... ({done}/{total})"`.
+    - I/O validation: 3 chapter cần update → bar tăng qua 3 bước → chuyển tiếp sau 100%.
+
+[ ] Issue 2.6: Button "Skip" CHỈ hiện trong Dialogue Screen — Không hiện khi đang sync/load.
+    - `SKIP_BTN` không render và không nhận event trong state `STATE_SYNCING` / `STATE_LOADING`.
+    - Skip story hiện tại → chỉ kết thúc dialogue của story đó; nếu chapter flow còn story kế tiếp đã activated → mở dialogue story đó (Skip button hiện lại).
+    - Hết story trong flow → chuyển sang gameConsole.
+    - I/O validation: đang sync → Skip button ẩn; vào dialogue story 1 → Skip hiện; click → story 2 bắt đầu với Skip; skip story 2 → gameConsole.
+
+[ ] Issue 2.7: Chapter Flow — Story đầu tiên không có điều kiện, các story sau unlock tuần tự.
+    - Story đầu tiên của mỗi chapter (`idStory` nhỏ nhất) luôn có `requiredStories = NULL`.
+    - Story kế tiếp chỉ chạy khi story trước trong cùng chapter đã có `isActivated=1`.
+    - Story có `requiredStories` tham chiếu cross-chapter: chỉ kiểm tra khi đang ở đúng chapter đó; không chạy cross-chapter story nếu chapter hiện tại không phải chapter của story đó.
+    - Tất cả story trong chapter hoàn thành → hiển thị `"Chapter Completion: {chapterName}"` → chuyển gameConsole.
+    - I/O validation: story 1 xong → story 2 tự chạy; story 2 có cross-chapter requirement chưa đủ → bị bỏ qua → chapter completion hiện.
+
+[ ] Issue 2.8: Kiểm tra điều kiện sau Progressive Bar — Chạy lại hoặc mở story mới.
+    - Sau sync 100%: đọc `idUser_Stories` + `idUser_Records` để lấy `lastMaxScore`, `lastMaxSpeed` của story `isSelected=1`.
+    - So sánh với `minScore`, `minSpeed` của story kế tiếp trong chapter flow:
+        + Chưa đủ điều kiện → chạy lại dialogue của story hiện tại.
+        + Đủ điều kiện → hiển thị prompt `"Bạn đã mở ra {nextStoryName}! Tiếp tục?"` → Yes: chạy dialogue mới; No: chạy lại story cũ.
+    - Tất cả story chapter completed → `"Chapter Completion: {chapterName}"`.
+    - I/O validation: `lastMaxScore=60`, `minScore` story kế tiếp=50 → prompt mở story mới hiện; chọn No → dialogue story cũ chạy.
+
+[ ] Issue 2.9: Cập nhật DB khi user xác nhận mở story mới.
+    - Sau khi user chọn "Yes" trên prompt: `UPDATE idUser_Stories SET isSelected=0` story cũ, `isSelected=1` và `isActivated=1` story mới.
+    - WASM: `EM_ASM({ Module.FS.syncfs(false, function(){}); })` ngay sau UPDATE.
+    - I/O validation: confirm Yes → query `idUser_Stories` → story mới `isSelected=1`, story cũ `isSelected=0`.
 
 ### V3
 [ ] bổ sung sau

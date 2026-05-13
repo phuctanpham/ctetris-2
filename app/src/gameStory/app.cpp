@@ -2,7 +2,7 @@
 // gamestory-dong-bo-sqlite-05a  [Phase C] storyDb read layer
 // gamestory-phan-cot-game-05b   [Phase D] Dialogue engine + state machine
 #include "gameStory_layout.h"
-#include "gameStory_db.h"   // Phase C: DialogueNode, DialogueChoice, storyDb*
+#include "gameStory_db.h"
 #include "sqlite3.h"
 
 // nanosvg single-header library: parser + rasterizer.

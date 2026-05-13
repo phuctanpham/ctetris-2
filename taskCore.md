@@ -263,9 +263,42 @@
 [x] Issue 1.6: Thêm cử chỉ vuốt cảm ứng (Swipe Gesture) trên vùng bảng game
 ### V2
 [ ] Issue 2.1: `spawnBlock()` hiện dùng `std::rand() % 6 + 1` hardcode — sau Task 2.6 phải dùng enabled palette.
+    - Build `enabledIndices[]` từ `cfg.colorEnabled[7]`, chọn ngẫu nhiên trong danh sách đó.
+    - Guard: nếu tất cả `colorEnabled[i]=false` (không thể xảy ra từ Console guard nhưng cần phòng) → fallback toàn bộ palette.
+
 [ ] Issue 2.2: `FALL_INTERVAL_FAST = 500 / 5` hardcode — sau Task 2.2 phải = `getFallInterval(score) / 5`.
-[ ] Issue 2.3: `dbOpen/dbClose` trong gameCore cần tránh double-open nếu Console đã mở DB (kiểm tra `g_db != nullptr` trước khi open lại).
-[ ] Issue 2.4: tableMatrix format cần được chuẩn hoá trong `c001.sql` — hiện tại cột `tableMatrix` là empty string cho tất cả stories.
+    - Xoá hằng số `FALL_INTERVAL_FAST`, thay bằng `softDropInterval = getFallInterval(state.score) / 5` tính lại mỗi frame.
+
+[ ] Issue 2.3: `dbOpen/dbClose` trong gameCore phải tránh double-open nếu Console đã giữ connection.
+    - Kiểm tra `g_db != nullptr` trước `dbOpen()`. Nếu đã mở, dùng luôn.
+    - Dùng flag `bool g_dbOwnedByCore` để chỉ `dbClose()` khi Core là người đã open.
+
+[ ] Issue 2.4: tableMatrix format cần chuẩn hoá trong seed data — hiện là empty string cho tất cả stories.
+    - Format chuẩn: `"r0c0,...,r0c9;r1c0,..."` (semicolon rows, comma cols, value = colorID 0-6).
+    - Cập nhật `dbSeedSharedData()` trong `gameConsole/app.cpp` có ít nhất 1 story với tableMatrix mẫu hợp lệ.
+
+[ ] Issue 2.5: Cập nhật DB khi Quit, Restart và Game Over — không mất dữ liệu.
+    - **Game Over:** `dbInsertRecord()` → `dbUpsertStoryProgress()` → `dbCheckAndUnlockStories()` theo thứ tự Task 2.8→2.9.
+    - **Restart:** `dbInsertRecord()` với score tại thời điểm restart (kể cả score=0) → `resetGame()`.
+    - **Quit:** `dbInsertRecord()` → `dbClose()` → return `SCREEN_GAMECONSOLE`.
+    - WASM: `EM_ASM({ Module.FS.syncfs(false, function(){}); })` sau mỗi write.
+    - I/O validation: chơi 30 giây → quit → `SELECT COUNT(*) FROM idUser_Records` = 1, `endTS - startTS >= 30`.
+
+[ ] Issue 2.6: Parse và hiển thị `tableMatrix` từ cfg — đồng bộ trạng thái bàn cờ.
+    - `resetGame()` parse `cfg.tableMatrix` và điền `board[][]` TRƯỚC khi spawn khối đầu tiên.
+    - Parse lỗi → log warning, blank board, không crash.
+    - I/O validation: story có tableMatrix 2 dòng đáy → board hiện 2 dòng màu ngay khi bắt đầu.
+
+[ ] Issue 2.7: Hiển thị thông tin story hiện tại trên Sidebar từ cfg.
+    - Đọc `cfg.storyId` và `cfg.chapterId` → hiển thị `"S{storyId}-C{chapterId}"` trên 1 ô sidebar (ô 1, dưới score).
+    - `cfg.storyId == 0` → ô đó để trống.
+    - I/O validation: chọn story 2 chapter 1 ở Console → vào Core → sidebar hiện "S2-C1".
+
+[ ] Issue 2.8: `nextBlockScore * 2` cho NEXT-3 là fallback — thêm TODO cho V3 extension.
+    - Task 2.3 dùng `cfg.nextBlockScore * 2` làm ngưỡng NEXT-3 khi không có field riêng.
+    - Thêm comment `// TODO(V3): add nextBlockScore3 to SettingsConfig when shared_data extends schema`.
+    - Không thay đổi logic V2, chỉ ghi nhận để tránh magic number bị bỏ sót khi nâng cấp.
+
 ### V3
 [ ] bổ sung sau
 
