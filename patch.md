@@ -1,3 +1,10 @@
+Confirmed 8 tables. Writing the full, source-accurate SDS now.
+
+---
+
+### `doc/src/content/06-gameConsoleEngineering.tex` — full file
+
+```latex
 % !TEX TS-program = xelatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
@@ -184,8 +191,7 @@ kiểm soát render độc lập:
   t/.style={sdsBox=versionGreen!60,text width=3.0cm},
   arr/.style={sdsArrow=pillarBlue}
 ]
-  \node[b](p0){each frame:\\
-\texttt{SDL\_PollEvent}};
+  \node[b](p0){each frame:\\\texttt{SDL\_PollEvent}};
   \node[b,right=0.5cm of p0](p1){\texttt{drawBackground}\\(SVG lazy-init)};
   \node[b,right=0.5cm of p1](p2){\texttt{!any flag}\\$\rightarrow$ draw\\6 buttons};
   \node[b,right=0.5cm of p2](p3){\texttt{showGuide}\\$\rightarrow$\\GuideLightbox};
@@ -689,7 +695,7 @@ Emscripten IDBFS  & \texttt{\#ifdef \_\_EMSCRIPTEN\_\_} &
   \texttt{idbfs\_mount\_dir}, \texttt{load/save\_from\_idb};
   Asyncify (\texttt{-sASYNCIFY=1}) \\
 libcurl           & V3 (native) & Cloudflare D1 REST push/pull \\
-ementscripten\_fetch & V3 (WASM)   & Cloudflare D1 REST (WASM path) \\
+emscripten\_fetch & V3 (WASM)   & Cloudflare D1 REST (WASM path) \\
 \hline
 \end{tabularx}
 
@@ -808,7 +814,7 @@ COMPLETED & \texttt{isActivated \&\& (totalRetries>0 || lastMaxScore>0)}
 \end{center}
 
 \noindent\textbf{IDBFS write protocol} (WASM only): every
-\texttt{dbSyncToPersistent()} call $\rightarrow$
+\texttt{dbSyncToPersistent()} call $\Rightarrow$
 \texttt{idbfs\_save\_to\_idb()} via Asyncify.
 Called after: \texttt{dbSaveSettings}, \texttt{dbInsertRecord},
 \texttt{dbUpsertStoryProgress}, \texttt{dbSelectStory},
@@ -870,3 +876,114 @@ code $\rightarrow$ Worker validates $\rightarrow$ returns JWT $\rightarrow$
 
 \label{LastPageGameConsoleEngineering}
 \end{document}
+```
+
+---
+
+### Patch 2 — `03-gameConsoleRequirements.tex`
+
+```latex
+% ── REPLACE \subsubsection{Kiến trúc Cơ sở dữ liệu (SQLite — 3 nhóm bảng)} ──
+% Remove the three-column tikzpicture group diagram + surrounding text
+% Replace with:
+
+\subsubsection{Kiến trúc Cơ sở dữ liệu (SQLite --- 3 nhóm bảng)}
+\textit{ERD đầy đủ với DDL-level precision (8 bảng, tên thực
+\texttt{default\_Records}/\texttt{default\_Stories}/\texttt{default\_Settings},
+foreign-key relationships, 3 ownership groups) được đặc tả trong
+\textbf{SDS §06-gameConsoleEngineering, mục 2.4}.}
+
+SRS chỉ phát biểu ràng buộc schema:
+\begin{itemize}[nosep]
+  \item File: \texttt{SDL\_GetPrefPath("uit","cTetris")} $+$
+        \texttt{idUser} $+$ \texttt{".sqlite"}; mặc định \texttt{default.sqlite}.
+  \item User-prefix tables: \texttt{g\_dbCurrentUser + "\_" + suffix}
+        (Group 1 --- R/W owner).
+  \item \texttt{shared\_*}: tạo schema bởi gameConsole, ghi bởi gameStory
+        (Group 2 --- read-only cho gameConsole).
+  \item \texttt{sync\_Records}: sink từ Cloudflare D1, seed 30 rows khi init
+        (Group 3).
+  \item \texttt{dbInitSchema()} idempotent --- \texttt{CREATE TABLE IF NOT EXISTS}
+        cho cả 8 bảng.
+\end{itemize}
+
+% ── REPLACE \subsubsection{Hợp đồng dữ liệu SettingsConfig} ─────────────────
+% Remove the three-node tikzpicture (runGameConsole → SettingsConfig → runGameCore)
+% Replace with:
+
+\subsubsection{Hợp đồng dữ liệu \texttt{SettingsConfig} (Cross-module Contract)}
+\textit{Component diagram và sequence diagram của \texttt{SettingsConfig}
+flow (Console $\leftrightarrow$ Core $\leftrightarrow$ DBLayer) được đặc tả trong
+\textbf{SDS §06-gameConsoleEngineering, mục 2.5}.}
+
+SRS phát biểu ràng buộc contract:
+\begin{itemize}[nosep]
+  \item \textbf{Persisted fields} (10 rows in \texttt{default\_Settings}):
+        \texttt{volume}, \texttt{color0-6}, \texttt{storyId}, \texttt{chapterId}.
+  \item \textbf{Runtime-only fields} (NOT persisted):
+        \texttt{nextBlockScore}, \texttt{nextBlockSpeed}, \texttt{tableMatrix} ---
+        set from Stories popup, forwarded to \texttt{runGameCore()}.
+  \item Single \texttt{volume} field (no separate bgm/sfx split in V2).
+  \item \texttt{SettingsConfig\&} is a \textbf{borrowed pointer} inside
+        \texttt{AppState::cfg} --- \texttt{runGameConsole()} does not own it.
+\end{itemize}
+```
+
+---
+
+### Patch 3 — `09-gameConsoleGuide.tex`
+
+```latex
+% ── ADD fbox BEFORE \subsection{Hình nền động -- v2} ─────────────────────────
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} SVG lazy-init algorithm (rasterize-once,
+\texttt{g\_consoleBg} reset trên re-entry, fallback solid fill),
+pixel-map layout 270×480, và 6-button y-coordinate table được đặc tả
+trong \textbf{SDS §06-gameConsoleEngineering, mục 3.1 (V1 screen layout)}.
+\end{minipage}}
+\vspace{6pt}
+
+% ── ADD fbox BEFORE \subsection{Scrollbar tương tác} ─────────────────────────
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} \texttt{SBLayout} geometry formulas
+(thumbH, thumbY), event$\rightarrow$action mapping (drag, track-click,
+auto-repeat 300\,ms/60\,ms), và volume slider X-axis drag formula
+được đặc tả trong \textbf{SDS §06-gameConsoleEngineering, mục 2.3.4}.
+\end{minipage}}
+\vspace{6pt}
+
+% ── ADD fbox BEFORE the sort paragraph inside \subsection{Popup Bảng xếp hạng}
+% (before the line: "\noindent\textbf{Thêm v2 -- sắp xếp động:}")
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} Smart Sort Router decision tree (7 algorithms,
+CTX\_DEFAULT: $n \leq 64 \rightarrow$ Insertion, $n > 64 \rightarrow$
+IntroSort), \texttt{BoardEntry.timeEpoch} vs display string for TIME sort,
+và \texttt{applyBoardSort()} log contract được đặc tả trong
+\textbf{SDS §06-gameConsoleEngineering, mục 2.3.2}.
+\end{minipage}}
+\vspace{6pt}
+
+% ── ADD fbox BEFORE \subsection{Giới hạn còn lại sau v2} ─────────────────────
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} Story unlock cascade algorithm
+(\texttt{dbCheckAndUnlockStories} --- CSV parse, multi-parent check,
+idempotent UPSERT), startup guard sequence (DB probe $\rightarrow$ return 3),
+và dataflow diagram được đặc tả trong
+\textbf{SDS §06-gameConsoleEngineering, mục 2.3.3 và 2.4}.
+\end{minipage}}
+\vspace{6pt}
+```
+
+---
+
+**Corrections from source vs earlier draft:**
+
+| Field | Earlier draft (wrong) | Actual source |
+|---|---|---|
+| `SettingsConfig` | `bgmVolume`, `sfxVolume`, `fullScreen`, `targetFPS` | Single `volume`; `colorEnabled[7]`; `nextBlockScore/Speed/tableMatrix` |
+| DB filename | `default.sqlite` (hardcoded) | `{idUser}.sqlite` via `userTable()` prefix |
+| Screen navigation | ScreenStack push/pop | 5 boolean flags in `AppState` |
+| Table count | 9 | 8 (`3+4+1`) |
+| Sort target | string timestamp | `timeEpoch` (`int64_t` Unix epoch UTC) |
+| Not-persisted fields | assumed all cfg fields | `nextBlockScore`, `nextBlockSpeed`, `tableMatrix` runtime-only |
+| DB guard | `dbOpen` first | Probe file size `>100B` BEFORE `dbOpen`; two `return 3` paths |

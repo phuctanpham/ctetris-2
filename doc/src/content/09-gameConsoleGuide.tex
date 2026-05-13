@@ -75,6 +75,13 @@ Màn hình chính được chia thành ba vùng theo chiều dọc:
 \noindent Nền màn hình dùng màu xám đậm \texttt{\#282C34} -- vừa đủ tối để các nút màu nổi bật, vừa dễ chịu cho mắt khi nhìn lâu.
 
 \subsection{Hình nền động -- v2}
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} SVG lazy-init algorithm (rasterize-once,
+\texttt{g\_consoleBg} reset trên re-entry, fallback solid fill),
+pixel-map layout 270×480, và 6-button y-coordinate table được đặc tả
+trong \textbf{SDS §06-gameConsoleEngineering, mục 3.1 (V1 screen layout)}.
+\end{minipage}}
+\vspace{6pt}
 Thay thế nền trơn \texttt{#282C34} của v1, màn hình console v2 render file
 \texttt{gameConsole\_bg.svg} được nhúng trực tiếp vào binary lúc compile-time
 header \texttt{gameConsole\_bg\_svg.h} -- cùng chiến lược với logo gameStory).
@@ -156,6 +163,13 @@ Hệ thống chấp nhận nhiều bộ phím tương đương để bạn dùng
 \end{itemize}
 
 \subsection{Scrollbar tương tác}
+\noindentbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} \texttt{SBLayout} geometry formulas
+(thumbH, thumbY), event$\rightarrow$action mapping (drag, track-click,
+auto-repeat 300\,ms/60\,ms), và volume slider X-axis drag formula
+được đặc tả trong \textbf{SDS §06-gameConsoleEngineering, mục 2.3.4}.
+\end{minipage}}
+\vspace{6pt}
 Hai popup \textbf{GUIDE} và \textbf{BOARD} đều dùng chung một \textit{scrollbar} (thanh cuộn) đặt bên phải. Scrollbar hỗ trợ bốn kiểu tương tác để bạn cuộn dài hay ngắn đều thuận tiện:
 
 \vspace{4pt}
@@ -207,6 +221,15 @@ Nhấn nút \textbf{GUIDE} (hoặc dùng phím tắt khi nút đang được foc
 
 \subsection{Popup Bảng xếp hạng (Board)}
 Nhấn nút \textbf{BOARD} để mở popup xem bảng xếp hạng người chơi. Popup tái sử dụng kỹ thuật lightbox và scrollbar giống popup Guide, nhưng tập trung trình bày dữ liệu dạng bảng.
+
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} Smart Sort Router decision tree (7 algorithms,
+CTX\_DEFAULT: $n \leq 64 \rightarrow$ Insertion, $n > 64 \rightarrow$
+IntroSort), \texttt{BoardEntry.timeEpoch} vs display string for TIME sort,
+và \texttt{applyBoardSort()} log contract được đặc tả trong
+\textbf{SDS §06-gameConsoleEngineering, mục 2.3.2}.
+\end{minipage}}
+\vspace{6pt}
 
 \vspace{4pt}
 \noindent\textbf{Thay đổi v2 -- nguồn dữ liệu:}
@@ -351,6 +374,14 @@ Bảng tổng hợp dưới đây gom toàn bộ phím tắt của gameConsole v
 \end{tabularx}
 
 \subsection{Giới hạn còn lại sau v2}
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} Story unlock cascade algorithm
+(\texttt{dbCheckAndUnlockStories} --- CSV parse, multi-parent check,
+idempotent UPSERT), startup guard sequence (DB probe $\rightarrow$ return 3),
+và dataflow diagram được đặc tả trong
+\textbf{SDS §06-gameConsoleEngineering, mục 2.3.3 và 2.4}.
+\end{minipage}}
+\vspace{6pt}
 Các điểm \textbf{đã hoàn thành} trong v2 (bỏ khỏi danh sách giới hạn cũ):
 nhạc nền có volume slider, màu khối tuỳ chỉnh, bảng xếp hạng lưu thật.
 

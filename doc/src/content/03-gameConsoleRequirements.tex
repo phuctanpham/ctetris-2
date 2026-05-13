@@ -25,114 +25,42 @@ Phân hệ \textbf{gameConsole} đóng vai trò là Trung tâm điều phối (H
 
 \subsection{Mô hình hóa Hệ thống (System Modeling)}
 
-\subsubsection{Sơ đồ Ngữ cảnh (System Context Diagram)}
-\begin{center}
-\begin{tikzpicture}[
-    entity/.style={rectangle, draw=black, fill=blue!10, thick, minimum width=2.8cm, minimum height=1.2cm, align=center, font=\small},
-    system/.style={circle, draw=orange, fill=orange!10, thick, minimum size=2.8cm, align=center, font=\small},
-    arrow/.style={-{Stealth[scale=1.2]}, thick}
-]
-\node[system] (gameconsole) {\textbf{gameConsole}};
-\node[entity, left=3.5cm of gameconsole] (player) {Người chơi};
-\node[entity, right=3cm of gameconsole] (storage) {Local JSON /\\ API MongoDB};
-\node[entity, above=1.5cm of gameconsole] (gamestory) {Module\\ gameStory};
-\node[entity, below=1.5cm of gameconsole] (gamecore) {Module\\ gameCore};
+\subsubsection{Kiến trúc Cơ sở dữ liệu (SQLite --- 3 nhóm bảng)}
+	extit{ERD đầy đủ với DDL-level precision (8 bảng, tên thực
+	exttt{default\_Records}/\texttt{default\_Stories}/\texttt{default\_Settings},
+foreign-key relationships, 3 ownership groups) được đặc tả trong
+	extbf{SDS §06-gameConsoleEngineering, mục 2.4}.}
 
-\draw[arrow] ($(player.east)+(0,0.25)$) -- node[above, font=\scriptsize, align=center] {Thao tác Menu} ($(gameconsole.west)+(0,0.25)$);
-\draw[arrow] ($(gameconsole.west)-(0,0.25)$) -- node[below, font=\scriptsize] {Hiển thị UI} ($(player.east)-(0,0.25)$);
+SRS chỉ phát biểu ràng buộc schema:
+\begin{itemize}[nosep]
+  \item File: \texttt{SDL\_GetPrefPath("uit","cTetris")} $+$
+        	exttt{idUser} $+$ \texttt{".sqlite"}; mặc định \texttt{default.sqlite}.
+  \item User-prefix tables: \texttt{g\_dbCurrentUser + "\_" + suffix}
+        (Group 1 --- R/W owner).
+  \item \texttt{shared\_*}: tạo schema bởi gameConsole, ghi bởi gameStory
+        (Group 2 --- read-only cho gameConsole).
+  \item \texttt{sync\_Records}: sink từ Cloudflare D1, seed 30 rows khi init
+        (Group 3).
+  \item \texttt{dbInitSchema()} idempotent --- \texttt{CREATE TABLE IF NOT EXISTS}
+        cho cả 8 bảng.
+\end{itemize}
 
-\draw[arrow] ($(gameconsole.east)+(0,0.25)$) -- node[above, font=\scriptsize] {Ghi/Đọc Cấu hình} ($(storage.west)+(0,0.25)$);
-\draw[arrow] ($(storage.west)-(0,0.25)$) -- node[below, font=\scriptsize] {Trả Data (Board)} ($(gameconsole.east)-(0,0.25)$);
+\subsubsection{Hợp đồng dữ liệu \texttt{SettingsConfig} (Cross-module Contract)}
+	extit{Component diagram và sequence diagram của \texttt{SettingsConfig}
+flow (Console $\leftrightarrow$ Core $\leftrightarrow$ DBLayer) được đặc tả trong
+	extbf{SDS §06-gameConsoleEngineering, mục 2.5}.}
 
-\draw[arrow] (gamestory) -- node[right, font=\scriptsize] {Tín hiệu bắt đầu} (gameconsole);
-\draw[arrow] ($(gameconsole.south)+(-0.3,0)$) -- node[left, font=\scriptsize] {Khởi tạo Game} ($(gamecore.north)+(-0.3,0)$);
-\draw[arrow] ($(gamecore.north)+(0.3,0)$) -- node[right, font=\scriptsize] {Return (Thoát/Menu)} ($(gameconsole.south)+(0.3,0)$);
-\end{tikzpicture}
-\end{center}
-
-\subsubsection{Sơ đồ Ca sử dụng (Use Case Diagram)}
-\begin{center}
-\begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10, minimum size=0.5cm}, usecase/.style={ellipse, draw, fill=white, minimum width=2cm}]
-    \draw (0,0) rectangle (5,-4); \node at (2.5,-0.3) {\textbf{Hệ thống gameConsole}};
-    \node (p) [actor] at (-1.5, -2) {Player};
-    \node (u1) [usecase] at (2.5,-1) {Xem Guide};
-    \node (u2) [usecase] at (2.5,-1.8) {Xem Bảng xếp hạng};
-    \node (u3) [usecase] at (2.5,-2.6) {Bắt đầu chơi (Play)};
-    \node (u4) [usecase] at (2.5,-3.4) {Thiết lập (V2/V3)};
-    \draw [->] (p) -- (u1); \draw [->] (p) -- (u2); 
-    \draw [->] (p) -- (u3); \draw [->] (p) -- (u4);
-\end{tikzpicture}
-\end{center}
-
-\subsubsection{Sơ đồ Hoạt động (Activity Diagram)}
-Mô tả luồng xử lý lựa chọn từ màn hình chính.
-\begin{center}
-\begin{tikzpicture}[
-    node distance=1cm, 
-    every node/.style={font=\scriptsize},
-    startstop/.style={rectangle, rounded corners, draw=black, fill=red!10, thick, minimum width=2cm, minimum height=0.6cm, align=center},
-    process/.style={rectangle, draw=black, fill=orange!10, thick, minimum width=2.5cm, minimum height=0.6cm, align=center},
-    decision/.style={diamond, draw=black, fill=green!10, thick, aspect=2, align=center},
-    arrow/.style={-{Stealth[scale=1.2]}, thick}
-]
-    \node (start) [startstop] {Mở Console};
-    \node (init) [process, below=0.6cm of start] {Hiển thị Menu chính};
-    \node (wait) [process, below=0.6cm of init] {Đợi sự kiện Input};
-    \node (dec) [decision, below=0.8cm of wait] {Lựa chọn?};
-    
-    \node (guide) [process, left=1cm of dec] {Mở Popup Guide};
-    \node (board) [process, below=0.6cm of guide] {Mở Popup Board};
-    \node (play) [process, right=1cm of dec] {Kích hoạt gameCore};
-    \node (quit) [decision, below=0.8cm of dec] {Nền tảng?};
-    \node (reload) [process, left=1cm of quit] {Màn hình Reload};
-    \node (exit) [startstop, right=1cm of quit] {Thoát App};
-
-    \draw [arrow] (start) -- (init);
-    \draw [arrow] (init) -- (wait);
-    \draw [arrow] (wait) -- (dec);
-    \draw [arrow] (dec) -- node[above] {Guide} (guide);
-    \draw [arrow] (dec) -- node[left] {Board} (board);
-    \draw [arrow] (dec) -- node[above] {Play} (play);
-    \draw [arrow] (dec) -- node[left] {Quit} (quit);
-    \draw [arrow] (guide) -- ++(-1.5,0) |- (wait);
-    \draw [arrow] (board) -- ++(-1.5,0) |- (wait);
-    \draw [arrow] (quit) -- node[above] {WASM} (reload);
-    \draw [arrow] (quit) -- node[above] {Native} (exit);
-\end{tikzpicture}
-\end{center}
-
-\subsubsection{Sơ đồ Trạng thái (State Machine Diagram)}
-Mô tả các trạng thái giao diện của module \texttt{gameConsole}.
-\begin{center}
-\begin{tikzpicture}[
-    node distance=3.5cm,
-    state/.style={circle, draw=blue, fill=blue!5, thick, minimum size=2.2cm, align=center, font=\scriptsize},
-    arrow/.style={-{Stealth[scale=1.2]}, thick}
-]
-    \node[state] (main) {MAIN\_MENU};
-    \node[state, left=of main] (guide) {GUIDE\_POPUP};
-    \node[state, below=2cm of main] (board) {BOARD\_POPUP};
-    \node[state, right=of main] (reload) {RELOAD\_SCREEN};
-
-    \draw[arrow] (main.160) -- node[above, font=\scriptsize] {Click GUIDE} (guide.20);
-    \draw[arrow] (guide.340) -- node[below, font=\scriptsize] {ESC / Close} (main.200);
-    \draw[arrow] (main.250) -- node[left, font=\scriptsize] {Click BOARD} (board.110);
-    \draw[arrow] (board.70) -- node[right, font=\scriptsize] {ESC / Close} (main.290);
-    \draw[arrow] (main) -- node[above, font=\scriptsize] {Quit (WASM)} (reload);
-    \draw[arrow] (reload.north) to[bend right=35] node[above, font=\scriptsize] {F5 / Button} (main.north);
-\end{tikzpicture}
-\end{center}
-
-\subsubsection{Cây tính năng (Feature Tree)}
-Phân rã cấu trúc các nhóm tính năng của \texttt{gameConsole}.
-\begin{center}
-\begin{tikzpicture}[
-    grow=right,
-    level 1/.style={sibling distance=2.5cm, level distance=4.5cm},
-    level 2/.style={sibling distance=1.1cm, level distance=4.5cm},
-    edge from parent fork right,
-    every node/.style={rectangle, draw=black, rounded corners, fill=gray!10, thick, align=center, font=\scriptsize},
-    root/.style={fill=orange!20, font=\small\bfseries, minimum height=0.8cm}
+SRS phát biểu ràng buộc contract:
+\begin{itemize}[nosep]
+  \item \textbf{Persisted fields} (10 rows in \texttt{default\_Settings}):
+        	exttt{volume}, \texttt{color0-6}, \texttt{storyId}, \texttt{chapterId}.
+  \item \textbf{Runtime-only fields} (NOT persisted):
+        	exttt{nextBlockScore}, \texttt{nextBlockSpeed}, \texttt{tableMatrix} ---
+        set from Stories popup, forwarded to \texttt{runGameCore()}.
+  \item Single \texttt{volume} field (no separate bgm/sfx split in V2).
+  \item \texttt{SettingsConfig\&} is a \textbf{borrowed pointer} inside
+        	exttt{AppState::cfg} --- \texttt{runGameConsole()} does not own it.
+\end{itemize}
 ]
 \node[root] {Module \\ gameConsole}
     child { node[fill=red!10] {Cấu hình (V2/V3)}
