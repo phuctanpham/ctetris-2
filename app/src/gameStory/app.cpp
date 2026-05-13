@@ -64,7 +64,7 @@ std::vector<DialogueNode> storyDbLoadDialogue(int idStory, int idChapter) {
     const char* sql =
         "SELECT nodeId, speaker, text, imageUrl, bgmUrl, sfxUrl, "
         "       nextNodeId, hasChoices "
-        "FROM story_dialogues "
+        "FROM shared_dialogues "
         "WHERE idStory=?1 AND idChapter=?2 "
         "ORDER BY nodeId;";
 
@@ -107,7 +107,7 @@ std::vector<DialogueChoice> storyDbLoadChoices(int idStory, int idChapter,
 
     const char* sql =
         "SELECT choiceIdx, label, nextNodeId "
-        "FROM story_choices "
+    "FROM shared_choices "
         "WHERE idStory=?1 AND idChapter=?2 AND nodeId=?3 "
         "ORDER BY choiceIdx;";
 
@@ -564,13 +564,13 @@ static std::string httpGetSync(const char* url) {
 }
 
 // ---------------------------------------------------------------------------
-// Read SHA from meta table for a chapter. Returns "" if not found.
+// Read SHA from shared_meta table for a chapter. Returns "" if not found.
 // ---------------------------------------------------------------------------
 static std::string metaGetSha(sqlite3* db, const char* chapterId) {
     if (!db || !chapterId) return "";
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db,
-        "SELECT sha FROM meta WHERE chapter_id = ?;",
+        "SELECT sha FROM shared_meta WHERE chapter_id = ?;",
         -1, &st, nullptr) != SQLITE_OK) return "";
     sqlite3_bind_text(st, 1, chapterId, -1, SQLITE_TRANSIENT);
     std::string sha;
@@ -583,27 +583,51 @@ static std::string metaGetSha(sqlite3* db, const char* chapterId) {
 }
 
 // ---------------------------------------------------------------------------
-// Update meta table after a chapter is synced.
+// Update shared_meta table after a chapter is synced.
 // ---------------------------------------------------------------------------
-static void metaSetSha(sqlite3* db, const char* chapterId, const char* sha) {
+static void metaSetSha(sqlite3* db, const char* chapterId,
+                        const char* sha, const char* mediaBaseUrl = "") {
     if (!db || !chapterId || !sha) return;
+    // Add column if missing (idempotent upgrade from old schema)
+    sqlite3_exec(db,
+        "ALTER TABLE shared_meta ADD COLUMN media_base_url TEXT DEFAULT '';",
+        nullptr, nullptr, nullptr);   // error ignored (column may exist)
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db,
-        "INSERT OR REPLACE INTO meta (chapter_id, sha, updated_at) VALUES (?, ?, ?);",
+        "INSERT OR REPLACE INTO shared_meta "
+        "(chapter_id, sha, updated_at, media_base_url) VALUES (?,?,?,?);",
         -1, &st, nullptr) != SQLITE_OK) return;
-    sqlite3_bind_text (st, 1, chapterId, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text (st, 2, sha,       -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (st, 1, chapterId,    -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text (st, 2, sha,          -1, SQLITE_TRANSIENT);
     sqlite3_bind_int64(st, 3, (sqlite3_int64)SDL_GetTicks());
+    sqlite3_bind_text (st, 4, mediaBaseUrl ? mediaBaseUrl : "", -1, SQLITE_TRANSIENT);
     sqlite3_step(st);
     sqlite3_finalize(st);
 }
 
+static std::string metaGetMediaBaseUrl(sqlite3* db, const char* chapterId) {
+    if (!db || !chapterId) return "";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db,
+        "SELECT media_base_url FROM shared_meta WHERE chapter_id = ?;",
+        -1, &st, nullptr) != SQLITE_OK) return "";
+    sqlite3_bind_text(st, 1, chapterId, -1, SQLITE_TRANSIENT);
+    std::string url;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        const unsigned char* p = sqlite3_column_text(st, 0);
+        if (p) url = (const char*)p;
+    }
+    sqlite3_finalize(st);
+    return url;
+}
+
 // ---------------------------------------------------------------------------
-// Apply one chapter's JSON into shared_data + story_dialogues + story_choices.
+// Apply one chapter's JSON into shared_data + shared_dialogues + shared_choices.
 // This is the C++ equivalent of parse.py — diff per idStory, no full replace.
 // ---------------------------------------------------------------------------
 static bool applyChapterJson(sqlite3* db, const std::string& jsonBody,
-                             const char* chapterId) {
+                             const char* chapterId,
+                             const char* mediaBaseUrl = "") {
     if (!db || jsonBody.empty()) return false;
 
     nlohmann::json jroot;
@@ -650,12 +674,12 @@ static bool applyChapterJson(sqlite3* db, const std::string& jsonBody,
             sqlite3_step(st);
             sqlite3_finalize(st);
         }
-        // Same for story_dialogues / story_choices
+        // Same for shared_dialogues / shared_choices
         std::string delDlg =
-            "DELETE FROM story_dialogues WHERE idChapter = ? AND idStory NOT IN ("
+            "DELETE FROM shared_dialogues WHERE idChapter = ? AND idStory NOT IN ("
             + placeholders + ");";
         std::string delCho =
-            "DELETE FROM story_choices WHERE idChapter = ? AND idStory NOT IN ("
+            "DELETE FROM shared_choices WHERE idChapter = ? AND idStory NOT IN ("
             + placeholders + ");";
         for (const auto& dsql : {delDlg, delCho}) {
             sqlite3_stmt* ds = nullptr;
@@ -682,12 +706,12 @@ static bool applyChapterJson(sqlite3* db, const std::string& jsonBody,
         " thumbnailPath) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);",
         -1, &stSD, nullptr);
     sqlite3_prepare_v2(db,
-        "INSERT OR REPLACE INTO story_dialogues "
+        "INSERT OR REPLACE INTO shared_dialogues "
         "(idStory,idChapter,nodeId,speaker,text,imageUrl,bgmUrl,sfxUrl,"
         " nextNodeId,hasChoices) VALUES (?,?,?,?,?,?,?,?,?,?);",
         -1, &stDlg, nullptr);
     sqlite3_prepare_v2(db,
-        "INSERT OR REPLACE INTO story_choices "
+        "INSERT OR REPLACE INTO shared_choices "
         "(idStory,idChapter,nodeId,choiceIdx,label,nextNodeId) VALUES (?,?,?,?,?,?);",
         -1, &stCho, nullptr);
 
@@ -718,7 +742,7 @@ static bool applyChapterJson(sqlite3* db, const std::string& jsonBody,
         if (stDlg) {
             sqlite3_stmt* del = nullptr;
             sqlite3_prepare_v2(db,
-                "DELETE FROM story_dialogues WHERE idStory=? AND idChapter=?;",
+                "DELETE FROM shared_dialogues WHERE idStory=? AND idChapter=?;",
                 -1, &del, nullptr);
             if (del) {
                 sqlite3_bind_int(del, 1, idStory);
@@ -728,7 +752,7 @@ static bool applyChapterJson(sqlite3* db, const std::string& jsonBody,
             if (stCho) {
                 sqlite3_stmt* delc = nullptr;
                 sqlite3_prepare_v2(db,
-                    "DELETE FROM story_choices WHERE idStory=? AND idChapter=?;",
+                    "DELETE FROM shared_choices WHERE idStory=? AND idChapter=?;",
                     -1, &delc, nullptr);
                 if (delc) {
                     sqlite3_bind_int(delc, 1, idStory);
@@ -823,21 +847,30 @@ static void syncFromGist(sqlite3* db) {
         return;
     }
 
-    // Count chapters that need updating
-    struct ChapterEntry { std::string id, sha, gistUrl; };
+    // Read versions[latest] — format: { "c001": { latestCommitId, gistUrl, mediaBaseUrl, updatedDate } }
+    std::string latest = manifest.value("latest", std::string());
+    if (latest.empty() || !manifest.contains(latest) || !manifest[latest].is_object()) {
+        SDL_Log("[gameStory] manifest: no valid latest version ('%s')", latest.c_str());
+        g_syncProgress.state = SYNC_OFFLINE;
+        return;
+    }
+    const auto& latestVer = manifest[latest];
+    SDL_Log("[gameStory] manifest latest: %s", latest.c_str());
+
+    struct ChapterEntry { std::string id, sha, gistUrl, mediaBaseUrl; };
     std::vector<ChapterEntry> toUpdate;
-    for (const auto& ch : manifest["chapters"]) {
-        std::string cid     = ch.value("id",      std::string());
-        std::string newSha  = ch.value("sha",     std::string());
-        std::string gistUrl = ch.value("gistUrl", std::string());
+    for (auto it = latestVer.begin(); it != latestVer.end(); ++it) {
+        std::string cid      = it.key();
+        std::string newSha   = it.value().value("latestCommitId", std::string());
+        std::string gistUrl  = it.value().value("gistUrl",        std::string());
+        std::string mediaBU  = it.value().value("mediaBaseUrl",   std::string());
         if (cid.empty() || newSha.empty() || gistUrl.empty()) continue;
         std::string localSha = metaGetSha(db, cid.c_str());
         if (localSha == newSha) {
             SDL_Log("[gameStory] %s SHA match — skip", cid.c_str());
         } else {
-            SDL_Log("[gameStory] %s SHA diff (%s → %s) — queue update",
-                    cid.c_str(), localSha.c_str(), newSha.c_str());
-            toUpdate.push_back({cid, newSha, gistUrl});
+            SDL_Log("[gameStory] %s SHA diff — queue update", cid.c_str());
+            toUpdate.push_back({cid, newSha, gistUrl, mediaBU});
         }
     }
 
@@ -857,8 +890,10 @@ static void syncFromGist(sqlite3* db) {
         if (body.empty()) {
             SDL_Log("[gameStory] %s gistUrl fetch fail — skip",
                     entry.id.c_str());
-        } else if (applyChapterJson(db, body, entry.id.c_str())) {
-            metaSetSha(db, entry.id.c_str(), entry.sha.c_str());
+        } else if (applyChapterJson(db, body, entry.id.c_str(),
+                                    entry.mediaBaseUrl.c_str())) {
+            metaSetSha(db, entry.id.c_str(), entry.sha.c_str(),
+                       entry.mediaBaseUrl.c_str());
 #ifdef __EMSCRIPTEN__
             // Persist to IndexedDB after each chapter write
             EM_ASM({ Module.FS.syncfs(false, function(){}); });
@@ -1143,13 +1178,14 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
         dbOpenedHere = true;
     }
 
-    // --- Ensure meta table exists (sync tracking) ---
+    // --- Ensure shared_meta table exists (sync tracking) ---
     if (g_storyDb) {
         sqlite3_exec(g_storyDb,
-            "CREATE TABLE IF NOT EXISTS meta ("
-            "  chapter_id TEXT PRIMARY KEY,"
-            "  sha        TEXT NOT NULL,"
-            "  updated_at INTEGER"
+            "CREATE TABLE IF NOT EXISTS shared_meta ("
+            "  chapter_id    TEXT PRIMARY KEY,"
+            "  sha           TEXT NOT NULL,"
+            "  updated_at    INTEGER,"
+            "  media_base_url TEXT DEFAULT ''"
             ");",
             nullptr, nullptr, nullptr);
     }

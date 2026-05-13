@@ -235,23 +235,15 @@
     - CMakeLists.txt: đảm bảo `sqlite3.c` + `gameConsole_db.h` include path accessible từ gameCore/app.cpp.
 
 ### V3
-[ ] Task 3.1: viết v3 gameCore/app.cpp - cho phép nhập tên khi game over
-    - Comment codeblock này trong gameCore/app.cpp là: gamecore-game-over-screen-20
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 19 và trên 21.
-    - Bổ sung ô nhập ký tự (text input) vào lightbox Game Over để lưu lại tên người chơi với điểm số tương ứng. Thoát game là mất data nếu không ghi.
-    - Dùng `SDL_StartTextInput()` + `SDL_EVENT_TEXT_INPUT` để bắt ký tự.
-    - Lưu tên vào `GameRecord.idUser` trước khi gọi `dbInsertRecord()`.
-    - I/O validation: nhập "PLAYER1" → dbInsertRecord với idUser="PLAYER1".
-[ ] Task 3.2: viết v3 gameCore/app.cpp - gọi API và gửi tên và điểm lên Mongo atlas
-    - Comment codeblock này trong gameCore/app.cpp là: gamecore-tich-hop-backend-21
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 20 và trên 22.
-    - Chỉ cần quan tâm bài toán ghi dữ liệu. Thêm nút retry hoặc resync ở màn hình game over nếu ghi không thành công.
-    - Native: libcurl POST to MongoDB Atlas Data API.
-    - WASM: `emscripten_fetch` async call.
-    - I/O validation: network available → record appears in Atlas `board` collection; network fail → retry button shown.
-[ ] Task 3.3: tích hợp v3 với các modules còn lại trong app/src qua file app/main.cpp
-    - Comment codeblock này trong gameCore/app.cpp là: integration/v3
-    - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v2
+[ ] Task 3.1: Tự động lưu thành tích Game Over (hoặc restart / quit)
+    - Comment: `gamecore-game-over-screen-24`
+    - Vị trí: sau `gamecore-update-story-progress-23`.
+    - Tự động lưu thành tích với các cột cột cần thiết như userID, chapterID,... riêng recordID bắt đầu từ {userID}-{YYMMDD}-{HHMMSS}, với YYMMDD là ngày kết thúc, HHMMSS là thời điểm kết thúc game.
+
+[ ] Task 3.2: Tích hợp V3
+    - Comment: `integration/v3` trong `gameCore/app.cpp`.
+    - Sau `integration/v2`.
+    - Kiểm tra flow: Game Over → tự động submit SQLlite
 
 ## Issues (Changes, Bugs and Usabilities)
 ### V1

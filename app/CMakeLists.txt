@@ -27,6 +27,23 @@
 cmake_minimum_required(VERSION 3.16)
 project(cTetris LANGUAGES C CXX)
 
+# Read MANIFEST_GIST_URL from .env (fallback if not passed via -D)
+if(NOT DEFINED MANIFEST_GIST_URL OR MANIFEST_GIST_URL STREQUAL "")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.env")
+        file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/.env" _env_lines)
+        foreach(_line ${_env_lines})
+            if(_line MATCHES "^MANIFEST_GIST_URL=(.+)$")
+                set(MANIFEST_GIST_URL "${CMAKE_MATCH_1}")
+            endif()
+        endforeach()
+    endif()
+endif()
+if(MANIFEST_GIST_URL)
+    message(STATUS "MANIFEST_GIST_URL: ${MANIFEST_GIST_URL}")
+else()
+    message(WARNING "MANIFEST_GIST_URL not set — gameStory sync will be offline-only")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -59,6 +76,36 @@ set(GAME_INCLUDE_DIRS
 # -----------------------------------------------------------------------------
 add_executable(cTetris WIN32 ${GAME_SOURCES})
 target_include_directories(cTetris PRIVATE ${GAME_INCLUDE_DIRS})
+
+# Inject MANIFEST_GIST_URL define
+if(MANIFEST_GIST_URL AND
+   NOT MANIFEST_GIST_URL STREQUAL "https://gist.githubusercontent.com/OWNER/GIST_ID/raw/manifest.json")
+    target_compile_definitions(cTetris PRIVATE
+        "MANIFEST_GIST_URL=\"${MANIFEST_GIST_URL}\""
+    )
+endif()
+
+# nlohmann already in GAME_INCLUDE_DIRS; guard in case it was added conditionally
+if(DEFINED NLOHMANN_INCLUDE_DIR AND NOT NLOHMANN_INCLUDE_DIR STREQUAL "")
+    target_include_directories(cTetris PRIVATE ${NLOHMANN_INCLUDE_DIR})
+endif()
+
+# libcurl for native gameStory HTTP sync (optional — offline graceful if absent)
+if(NOT BUILD_WASM)
+    find_package(CURL QUIET)
+    if(CURL_FOUND)
+        target_link_libraries(cTetris PRIVATE CURL::libcurl)
+        target_compile_definitions(cTetris PRIVATE HAVE_LIBCURL)
+        message(STATUS "libcurl found — native HTTP sync enabled")
+    else()
+        message(WARNING "libcurl not found — native sync will be offline-only")
+    endif()
+endif()
+
+# WASM: Asyncify needed for emscripten_fetch synchronous mode in gameStory
+if(BUILD_WASM)
+    target_link_options(cTetris PRIVATE -sASYNCIFY=1 -sFETCH=1)
+endif()
 
 # Add Windows SDK paths for linking on Windows
 if(WIN32)

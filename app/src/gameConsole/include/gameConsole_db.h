@@ -131,6 +131,6 @@ bool dbLoadSettings(SettingsConfig& cfg);
 // Falls back to gameConsole_board.json if idUser_Records is empty.
 // ---------------------------------------------------------------------------
 
-// Load up to `limit` game records ordered by totalScore DESC.
-// Returns empty vector on error or when table has no rows.
-std::vector<BoardRecord> dbLoadRecords(const char* idUser, int limit = 50);
+// Load up to `limit` leaderboard rows from sync_Records (Group 3 — Cloudflare D1 sync).
+// Falls back to FALLBACK_BOARD_ROWS constants if table is empty.
+std::vector<BoardRecord> dbLoadRecords(int limit = 50);

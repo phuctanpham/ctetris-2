@@ -127,48 +127,58 @@
     - Mã nguồn định nghĩa hằng số `HIGHLIGHT_Y = {255, 215, 0, 255}`.
     - Màu vàng này được dùng thống nhất để tạo viền cho nút bấm khi đang được focus bằng bàn phím, đồng thời làm màu cho thanh trượt (thumb) của scrollbar khi người chơi đang kéo thả (dragging).
 ### V2
-[ ] Issue 2.1: Phát hiện DB client — Tự động chuyển sang gameStory nếu không tồn tại.
-    - Đầu `runGameConsole()`: kiểm tra `{deviceId}.sqlite` qua `SDL_GetPrefPath("uit","cTetris")`.
-    - File không tồn tại hoặc bảng `idUser_Stories` rỗng → return `SCREEN_GAMESTORY` ngay, không render UI.
-    - I/O validation: xoá DB → từ gameConsole → chuyển về gameStory trong 1 frame, không flash UI Console.
+[x] Issue 2.1: `runGameConsole()` entry kiểm tra DB tồn tại — return 3 nếu thiếu.
+    - Kiểm tra `{devicePrefPath}/default.sqlite` qua `SDL_IOFromFile`.
+    - File không tồn tại hoặc size < 100 bytes → return 3 (SCREEN_GAMESTORY_INIT).
+    - `main.cpp` bắt `next == 3` → gọi `runGameStory(0,0)` để init DB + sync, rồi loop lại Console.
+    - Không render bất kỳ UI Console nào trước khi kiểm tra xong.
 
-[ ] Issue 2.2: Popup "Stories" — Thumbnail thay đổi theo story đang highlight, Play chỉ hiện khi activated.
-    - Hover/focus vào story row → fetch `thumbnailPath` URL in-memory → cập nhật ô Thumbnail.
-    - Hiệu ứng chuyển thumbnail: fade-out 150ms → fade-in texture mới.
-    - Story `isSelected=1`: highlight viền `HIGHLIGHT_Y` khi popup mở.
-    - Story `isActivated=0`: hiển thị icon lock, ẩn nút Play.
-    - I/O validation: hover story 1 → thumbnail 1; hover story 2 (activated) → fade thumbnail 2, Play hiện; hover story 3 (locked) → lock icon.
+[x] Issue 2.2: Load `{idUser}_Settings` từ DB khi khởi động — không dùng default hardcode.
+    - `dbLoadSettings(cfgInOut)` gọi ngay sau `dbInitSchema()` + `dbSeedSharedData()`.
+    - Đọc bảng `{idUser}_Settings` (key-value); không có row → giữ default struct values.
+    - `applyVolumeToStream()` gọi lại sau load để sync gain với volume từ DB.
 
-[ ] Issue 2.3: Nút "Play" — Replay dialogue và cập nhật isSelected trong DB.
-    - Click Play: `dbUpsertStoryProgress()` SET `isSelected=0` story cũ, `isSelected=1` story mới → return `SCREEN_GAMESTORY`.
-    - `main.cpp` gọi `runGameStory()` với story ID mới; sau khi trả về, gọi lại `runGameConsole()`.
-    - I/O validation: click Play story 2 → DB `isSelected=1` story 2 → gameStory khởi động đúng story 2's dialogue.
+[x] Issue 2.3: Save `{idUser}_Settings` khi đóng Settings popup.
+    - `dbSaveSettings(*state.cfg)` gọi khi X button click và ESC trong Settings popup.
+    - WASM: `EM_ASM({ Module.FS.syncfs(false, function(){}); })` sau mỗi save.
+    - I/O: set volume=0.3 → kill app → mở lại → slider tại 30%.
 
-[ ] Issue 2.4: Tự động đồng bộ isSelected từ gameStory khi re-enter gameConsole.
-    - Đầu `runGameConsole()` (mỗi lần gọi): query `idUser_Stories WHERE isSelected=1` để set `g_selectedStoryId`.
-    - Popup Stories mở luôn phản chiếu DB, không dùng in-memory cache từ lần trước.
-    - I/O validation: gameStory unlock story 2 (Issue 2.8 gameStory) → vào Console → mở Stories → story 2 highlighted.
+[x] Issue 2.4: Stories popup — thumbnail fade theo story hover; 3 trạng thái row rõ ràng.
+    - Hover/focus row → fetch `thumbnailPath` URL → fade-out 150ms → fade-in texture mới.
+    - `isActivated=0`: row xám `{80,80,80}`, icon lock, không Play.
+    - `isActivated=1, isSelected=0`: row bình thường, Play hiện, radio outline.
+    - `isActivated=1, isSelected=1`: row viền `HIGHLIGHT_Y`, Play hiện, radio filled.
+    - `lastMaxScore > 0`: hiển thị `"Best: {score}"` cạnh tên story.
 
-[ ] Issue 2.5: Cập nhật DB khi thay đổi Settings, Stories và Board.
-    - **Settings:** đóng popup Settings (X hoặc ESC) → `dbSaveSettings()` ghi `SettingsConfig` vào bảng `user_settings`.
-    - **Stories:** Story selection thay đổi qua `dbUpsertStoryProgress()` (Issue 2.3/2.4).
-    - **Board:** Board là read-only từ Console; không cần write action thêm.
-    - WASM: `EM_ASM({ Module.FS.syncfs(false, function(){}); })` sau mỗi write.
-    - I/O validation: đổi volume → đóng Settings → kill app → mở lại → slider đúng vị trí.
+[x] Issue 2.5: Nút Play trong Stories popup — update `isSelected` DB rồi chuyển sang gameStory.
+    - Click Play: `dbUpsertStoryProgress` SET `isSelected=1` story mới, `isSelected=0` story cũ.
+    - Return `SCREEN_GAMESTORY` (=1) từ `runGameConsole()`.
+    - `main.cpp`: `next==1` → `runGameStory(cfg.storyId, cfg.chapterId)` → loop về Console.
 
-[ ] Issue 2.6: Load SettingsConfig từ DB khi khởi động gameConsole.
-    - Khi `runGameConsole()` mở, đọc bảng `user_settings` để init `SettingsConfig`.
-    - Không có data (lần đầu): dùng default (`volume=1.0`, `colorEnabled[all]=true`).
-    - I/O validation: set volume=0.3 → kill app → mở lại → slider tại 30%.
+[x] Issue 2.6: Tự động đồng bộ `isSelected` từ gameStory khi re-enter Console.
+    - Mỗi lần vào `runGameConsole()`: query `{idUser}_Stories WHERE isSelected=1` → cập nhật `cfg.storyId/chapterId`.
+    - Popup Stories luôn phản chiếu DB, không cache in-memory từ lần mở trước.
 
-[ ] Issue 2.7: Hiển thị 3 trạng thái story trong popup Stories từ DB.
-    - Mỗi lần mở popup: query `idUser_Stories JOIN shared_data` để lấy `isActivated`, `isSelected`, `lastMaxScore`.
-    - Render:
-        + `isActivated=0`: row xám, tên mờ, không Play, không radio filled.
-        + `isActivated=1, isSelected=0`: row bình thường, Play hiện, radio outline.
-        + `isActivated=1, isSelected=1`: row viền `HIGHLIGHT_Y`, Play hiện, radio filled.
-    - Nếu `lastMaxScore > 0`: hiển thị `"Best: {score}"` bên cạnh tên story.
-    - I/O validation: game-over score=75 → mở Stories → story đó hiển thị "Best: 75".
+[x] Issue 2.7: Board popup đọc từ `sync_Records` (Group 3) thay vì `gameConsole_board.json`.
+    - `dbLoadRecords()` (không tham số) query `sync_Records ORDER BY totalScore DESC LIMIT 50`.
+    - Fallback: nếu `sync_Records` rỗng dùng `FALLBACK_BOARD_ROWS[]` constants.
+    - `sync_Records` được seed 30 fake rows từ `FALLBACK_BOARD_ROWS` lúc `dbInitSchema()` nếu table rỗng.
+
+[x] Issue 2.8: Chuẩn hoá tên bảng DB thành 3 nhóm.
+    - `userTable(suffix)` helper: `g_dbCurrentUser + "_" + suffix`.
+    - Group 1 `{idUser}_*`: `default_Records`, `default_Stories`, `default_Settings`.
+    - Group 2 `shared_*`: `shared_data`, `shared_dialogues`, `shared_choices`, `shared_meta`.
+    - Group 3 `sync_*`: `sync_Records`.
+
+[x] Issue 2.9: `dbInitSchema()` tạo 9 bảng; `sync_Records` seed fake data.
+    - Tất cả `CREATE TABLE IF NOT EXISTS` — idempotent, an toàn khi gọi lại.
+    - `sync_Records` seeded 30 rows từ `FALLBACK_BOARD_ROWS` nếu `COUNT(*) == 0`.
+    - Log: `"schema initialized (9 tables: 3 user + 4 shared + 1 sync + meta)"`.
+
+[x] Issue 2.10: `dbSeedSharedData()` trở thành no-op skeleton.
+    - Không còn đọc file `.json` hay `.sql` từ `SDL_GetBasePath()`.
+    - Nếu `shared_data` có rows → return true (sync đã chạy từ gameStory).
+    - Nếu rỗng → log warning + return false → `runGameConsole()` return 3 → gameStory sync.
 
 ### V3
 [ ] bổ sung sau

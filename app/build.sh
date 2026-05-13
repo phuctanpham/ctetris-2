@@ -314,14 +314,6 @@ build_native() {
           "${icon_arg[@]}" # [cite: 8, 9]
 
     cmake --build "$BUILD_NATIVE_DIR" -j
-
-    # [C.3] Copy gameConsole_board.json 
-    if [ -f "$APP_DIR/src/gameConsole/gameConsole_board.json" ]; then
-        cp "$APP_DIR/src/gameConsole/gameConsole_board.json" "$BUILD_NATIVE_DIR/"
-        log_ok "Copy gameConsole_board.json -> $BUILD_NATIVE_DIR/"
-    else
-        log_warn "Khong co gameConsole_board.json -- runtime se fall back hardcoded array"
-    fi
 }
 
 build_wasm() {

@@ -79,6 +79,13 @@ int main(int argc, char* argv[]) {
             continue;   // back to Console
         }
 
+        if (next == 3) {
+            // DB not found in Console -> go to gameStory to init + sync
+            logger.logEvent("STORY", "DB missing -> gameStory init");
+            runGameStory(window, renderer, 0, 0);
+            continue;
+        }
+
         // nextScene=1: PLAY button -> show story dialogue then enter gameCore
         if (cfg.storyId > 0) {
             logger.logEvent("STORY", "Playing dialogue story=%d chapter=%d",
