@@ -196,6 +196,13 @@ DB. Skip chỉ xuất hiện sau khi sync hoàn tất hoặc offline fallback đ
 Hover trên nút: nền đổi sang đỏ tối \texttt{\{140,55,55\}} để xác nhận trạng thái.
 
 \subsection{Hệ thống hội thoại (Dialogue Engine) -- v2}
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} sequence diagram giữa các thành phần,
+word-wrap algorithm, state machine \texttt{dialRunLoop()} và
+\texttt{diagChoiceRect()} formula được đặc tả trong
+\textbf{SDS §05-gameStoryEngineering, mục 2.3 và 3.2}.
+\end{minipage}}
+\vspace{6pt}
 
 \subsubsection{Bố cục màn hình hội thoại}
 Màn hình hội thoại thay thế hoàn toàn màn hình intro (nền tối \texttt{\{18,18,28\}}):
@@ -287,6 +294,13 @@ Nếu không tìm thấy \texttt{isSelected=1} trong DB, hàm tự chọn story 
 WASM: \texttt{FS.syncfs(false)} sau mỗi UPDATE.
 
 \subsection{Cơ sở dữ liệu trong gameStory -- v2}
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} DDL đầy đủ, ERD và dataflow diagram của tất cả
+bảng SQLite trong \texttt{default.sqlite} được trình bày trong
+\textbf{SDS §05-gameStoryEngineering, mục 2.4}.
+Phần này chỉ mô tả vai trò của từng bảng từ góc độ người dùng module.
+\end{minipage}}
+\vspace{6pt}
 gameStory V2 \textbf{đọc} (không ghi) bốn bảng trong \texttt{default.sqlite}:
 
 \vspace{4pt}

@@ -244,79 +244,26 @@ Phân hệ \textbf{gameStory} đóng vai trò là màn hình khởi động và 
 
 % ---- Dialogue Engine ----
 \subsubsection{Dialogue Engine Architecture (Phase D)}
+\textit{Kiến trúc nội tại của Dialogue Engine (component diagram, dataflow,
+sequence diagram giữa \texttt{storyDb*()}, \texttt{dialRunLoop()},
+\texttt{drawDialoguePage()}) được đặc tả đầy đủ trong
+\textbf{SDS §05-gameStoryEngineering, mục 2.3--2.4}.}
 
-\begin{center}
-\begin{tikzpicture}[
-    every node/.style={font=\scriptsize},
-    layer/.style={rectangle, draw=black, thick, fill=white,
-                  rounded corners, inner sep=5pt, align=center},
-    arrow/.style={-{Stealth[scale=1.1]}, thick}
-]
-    % DB layer
-    \node[layer, fill=blue!10, minimum width=5.0cm] (db) at (0, 3.5)
-        {\texttt{storyDbLoadDialogue(id, ch)} \textbar\ \texttt{storyDbLoadChoices(id, ch, nodeId)}};
-
-    % Node structs
-    \node[layer, fill=yellow!10] (dn) at (-2.5, 2.0)
-        {\textbf{DialogueNode}\\nodeId, speaker, text\\imageUrl, bgmUrl, sfxUrl\\nextNodeId, hasChoices};
-    \node[layer, fill=yellow!10] (dc) at (2.5, 2.0)
-        {\textbf{DialogueChoice}\\choiceIdx, label\\nextNodeId};
-
-    % State machine
-    \node[layer, fill=orange!10, minimum width=5.0cm] (sm) at (0, 0.5)
-        {\textbf{dialRunLoop()} State Machine\\curIdx → curChoices → selCh → next nodeId};
-
-    % Render
-    \node[layer, fill=green!10, minimum width=5.0cm] (rend) at (0, -0.8)
-        {\textbf{drawDialoguePage()}\\IMG\_AREA (260×196) \textbar\ TB (260×244) \textbar\ Skip btn};
-
-    \draw[arrow] (db.south west) -- (dn.north);
-    \draw[arrow] (db.south east) -- (dc.north);
-    \draw[arrow] (dn.south) -- (sm.north west);
-    \draw[arrow] (dc.south) -- (sm.north east);
-    \draw[arrow] (sm.south) -- (rend.north);
-\end{tikzpicture}
-\end{center}
+Yêu cầu chức năng của Phase D (input routing, choice branching, terminal
+condition) được phát biểu trong §\ref{subsec:v2-func} dưới đây.
 
 % ---- Dialogue Layout Diagram ----
 \subsubsection{Bố cục màn hình Dialogue Engine (270×480)}
-
-\begin{center}
-\begin{tikzpicture}[every node/.style={font=\tiny}, x=0.054cm, y=0.054cm]
-    % screen border
-    \draw[thick] (0,0) rectangle (270,480);
-
-    % Skip button (top right)
-    \fill[gray!30] (200,462) rectangle (265,480);
-    \draw (200,462) rectangle (265,480);
-    \node at (232,471) {[ SKIP ] y=5..23};
-
-    % Image area
-    \fill[blue!15] (5,284) rectangle (265,453);
-    \draw (5,284) rectangle (265,453);
-    \node at (135,368) {IMG\_AREA 260×196};
-    \node at (135,355) {y=27..223 (placeholder V2)};
-
-    % Text box
-    \fill[purple!10, opacity=0.7] (5,8) rectangle (265,252);
-    \draw[thick] (5,8) rectangle (265,252);
-    \node at (135,240) {TEXT BOX 260×244 y=228..472};
-    \node[align=center] at (135,210) {SPEAKER  y=236 (yellow)};
-    \node[align=center] at (135,195) {separator y=249};
-    \node[align=center] at (135,170) {dialogue text};
-    \node[align=center] at (135,155) {30 chars × 12 lines};
-    \node[align=center] at (135,100) {CHOICE buttons (if hasChoices)};
-    \node[align=center] at (135,30)  {HINT: [ NEXT ] / [ END ] y=466};
-
-    % Choice button examples
-    \fill[blue!25] (13,60) rectangle (257,82);
-    \draw (13,60) rectangle (257,82);
-    \node at (135,71) {Choice 0 (selected)};
-    \fill[blue!10] (13,34) rectangle (257,56);
-    \draw (13,34) rectangle (257,56);
-    \node at (135,45) {Choice 1};
-\end{tikzpicture}
-\end{center}
+\textit{Pixel-map layout (IMG\_AREA, text-box, choice rects, SKIP\_BTN toạ độ
+chính xác) được vẽ trong \textbf{SDS §05-gameStoryEngineering, mục 3.1 (V1
+screen layout)}.
+SRS chỉ phát biểu ràng buộc giao diện:}
+\begin{itemize}[nosep]
+  \item Ảnh scene chiếm $260\times196\,\text{px}$ vùng trên (y=27..223).
+  \item Text-box $260\times244\,\text{px}$ vùng dưới, nền bán trong suốt
+        (\texttt{alpha=235}).
+  \item Nút Skip luôn hiển thị ở góc trên phải; ẩn hoàn toàn trong phase sync.
+\end{itemize}
 
 % ---- Post-sync Condition Flow ----
 \subsubsection{Luồng Kiểm tra Điều kiện Sau Đồng bộ (\texttt{postSyncConditionCheck})}
