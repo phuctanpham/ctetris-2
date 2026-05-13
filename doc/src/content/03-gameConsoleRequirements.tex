@@ -193,21 +193,349 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \end{itemize}
 \end{itemize}
 
-\subsection{Yêu cầu Phiên bản V2: Cấu hình cá nhân hóa \& JSON Data}
+% ============================================================
+% PATCH V2 — insert after V1 subsection, before V3 subsection
+% ============================================================
+
+\subsection{Yêu cầu Phiên bản V2: Cấu hình cá nhân hóa \& Cơ sở dữ liệu cục bộ}
+
+\subsubsection{Tổng quan nâng cấp so với V1}
+
+\begin{tabularx}{\linewidth}{|l|X|X|}
+    \hline
+    \textbf{Khía cạnh} & \textbf{V1 (baseline)} & \textbf{V2 (delta)} \\
+    \hline
+    Dữ liệu bảng xếp hạng & Mảng C++ cứng \texttt{BOARD\_DATA[]} & \texttt{sync\_Records} (SQLite Group 3) + fallback constant \\
+    \hline
+    Nền màn hình & Solid fill \texttt{\#282C34} & SVG rasterised qua nanosvg, lazy-init 1 lần/session \\
+    \hline
+    Cấu hình người dùng & Không lưu trữ & \texttt{default\_Settings} (key–value), persist qua restart \\
+    \hline
+    Số nút chính & 4 & 6 (thêm \textsc{Stories} + \textsc{Settings}) \\
+    \hline
+    Tích hợp âm thanh & Stub log & \texttt{SDL\_AudioStream} + \texttt{SDL\_SetAudioStreamGain} \\
+    \hline
+    Persistence WASM & Không & Emscripten IDBFS, \texttt{FS.syncfs} sau mỗi write \\
+    \hline
+    Giao tiếp module & Không có struct chung & \texttt{SettingsConfig} làm contract Console $\leftrightarrow$ Core \\
+    \hline
+    Leaderboard sort & Không & 4 chế độ: score↑↓ / time↑↓ via Smart Sort Engine \\
+    \hline
+\end{tabularx}
+
+% ---- Sơ đồ Trạng thái mở rộng V2 ----
+\subsubsection{Sơ đồ Trạng thái V2 (State Machine — mở rộng)}
+
+\noindent V2 bổ sung hai trạng thái popup mới (\textsc{Settings\_Popup}, \textsc{Stories\_Popup}) và luồng khởi động có kiểm tra DB (\textsc{DB\_Guard}).
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=2.8cm,
+    state/.style={circle, draw=blue!60, fill=blue!5, thick,
+                  minimum size=1.9cm, align=center, font=\scriptsize},
+    guard/.style={diamond, draw=red!70, fill=red!5, thick,
+                  minimum width=2.2cm, minimum height=1.1cm,
+                  align=center, font=\scriptsize, aspect=2},
+    arrow/.style={-{Stealth[scale=1.1]}, thick},
+    dashed arrow/.style={-{Stealth[scale=1.1]}, thick, dashed}
+]
+    \node[guard]  (dbg)     {DB\\Guard};
+    \node[state,  right=1.8cm of dbg]  (main)    {MAIN\\MENU};
+    \node[state,  above left=1.4cm and 1.6cm of main] (guide)  {GUIDE\\POPUP};
+    \node[state,  above right=1.4cm and 1.6cm of main] (board) {BOARD\\POPUP};
+    \node[state,  below left=1.4cm and 1.6cm of main] (set)   {SETTINGS\\POPUP};
+    \node[state,  below right=1.4cm and 1.6cm of main] (stor) {STORIES\\POPUP};
+    \node[state,  right=2.4cm of main] (reload) {RELOAD\\(WASM)};
+
+    % guard transitions
+    \draw[dashed arrow] (dbg) -- node[above,font=\scriptsize]{DB ok} (main);
+    \draw[dashed arrow] (dbg.north) to[bend left=50]
+        node[above,font=\scriptsize]{missing→ret 3} ++(0,1.6)
+        node[font=\scriptsize,draw=orange!60,fill=orange!5,rounded corners]{gameStory\\init};
+
+    % main ↔ popups
+    \draw[arrow] (main.150) to[bend left=15]
+        node[above left,font=\scriptsize]{GUIDE} (guide.330);
+    \draw[arrow] (guide.290) to[bend left=15]
+        node[below right,font=\scriptsize]{ESC/X} (main.130);
+
+    \draw[arrow] (main.30) to[bend left=15]
+        node[above right,font=\scriptsize]{BOARD} (board.210);
+    \draw[arrow] (board.250) to[bend left=15]
+        node[below left,font=\scriptsize]{ESC/X} (main.50);
+
+    \draw[arrow] (main.210) to[bend right=15]
+        node[below left,font=\scriptsize]{SETTINGS} (set.30);
+    \draw[arrow] (set.70) to[bend right=15]
+        node[above right,font=\scriptsize]{ESC/X\\+save} (main.230);
+
+    \draw[arrow] (main.330) to[bend right=15]
+        node[below right,font=\scriptsize]{STORIES} (stor.150);
+    \draw[arrow] (stor.110) to[bend right=15]
+        node[above left,font=\scriptsize]{ESC/X} (main.310);
+
+    % QUIT
+    \draw[arrow] (main) -- node[above,font=\scriptsize]{QUIT\\(WASM)} (reload);
+\end{tikzpicture}
+\end{center}
+
+% ---- DB Schema ----
+\subsubsection{Kiến trúc Cơ sở dữ liệu (SQLite — 3 nhóm bảng)}
+
+\noindent File DB: \texttt{SDL\_GetPrefPath("uit","cTetris") + "<idUser>.sqlite"} (mặc định \texttt{default.sqlite}).
+
+\begin{center}
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    tbl/.style={rectangle, draw=black, fill=white, thick,
+                text width=4.8cm, align=left, inner sep=4pt},
+    grp/.style={rectangle, draw=gray, dashed, rounded corners,
+                fill=gray!5, inner sep=6pt},
+    arrow/.style={-{Stealth[scale=1.0]}, thick}
+]
+% Group 1
+\node[tbl] (rec) at (0,0) {
+    \textbf{default\_Records} (Group 1)\\
+    \rule{\linewidth}{0.4pt}\\
+    \texttt{id} PK AUTOINCREMENT\\
+    \texttt{idUser} TEXT\\
+    \texttt{startTS / endTS} INT\\
+    \texttt{idStory / idChapter} INT\\
+    \texttt{totalScore / totalSeconds}\\
+    \texttt{avgSpeed} REAL \quad \texttt{retryNo}
+};
+\node[tbl, below=0.3cm of rec] (stor) {
+    \textbf{default\_Stories} (Group 1)\\
+    \rule{\linewidth}{0.4pt}\\
+    PK(\texttt{idUser, idStory, idChapter})\\
+    \texttt{isActivated / isSelected} INT\\
+    \texttt{totalRetries / lastMaxScore}\\
+    \texttt{lastMaxSpeed} REAL
+};
+\node[tbl, below=0.3cm of stor] (sett) {
+    \textbf{default\_Settings} (Group 1)\\
+    \rule{\linewidth}{0.4pt}\\
+    \texttt{key} TEXT PRIMARY KEY\\
+    \texttt{value} TEXT
+};
+
+% Group 2
+\node[tbl, right=1.6cm of rec] (sd) {
+    \textbf{shared\_data} (Group 2)\\
+    \rule{\linewidth}{0.4pt}\\
+    PK(\texttt{idStory, idChapter})\\
+    \texttt{storyName / chapterName}\\
+    \texttt{minScore / minSpeed / minRetries}\\
+    \texttt{requiredStories} TEXT (CSV)\\
+    \texttt{nextBlockScore / nextBlockSpeed}\\
+    \texttt{tableMatrix / xmlDialogue}\\
+    \texttt{thumbnailPath}
+};
+\node[tbl, below=0.3cm of sd] (sdlg) {
+    \textbf{shared\_dialogues} (Group 2)\\
+    \rule{\linewidth}{0.4pt}\\
+    UNIQUE(\texttt{idStory, idChapter, nodeId})\\
+    \texttt{speaker / text / imageUrl}\\
+    \texttt{nextNodeId / hasChoices}
+};
+\node[tbl, below=0.3cm of sdlg] (smet) {
+    \textbf{shared\_meta} (Group 2)\\
+    \rule{\linewidth}{0.4pt}\\
+    \texttt{chapter\_id} PK\\
+    \texttt{sha / updated\_at}\\
+    \texttt{media\_base\_url}
+};
+
+% Group 3
+\node[tbl, right=1.6cm of sd] (sync) {
+    \textbf{sync\_Records} (Group 3)\\
+    \rule{\linewidth}{0.4pt}\\
+    \textit{Cloudflare D1 1-way sync}\\
+    \texttt{nameUser / totalScore}\\
+    \texttt{totalSeconds / avgSpeed}\\
+    \texttt{endTS / idStory / idChapter}\\
+    \textit{seed: 30 rows từ FALLBACK\_BOARD\_ROWS}
+};
+
+% Group boxes
+\begin{scope}[on background layer]
+    \node[grp, fit=(rec)(stor)(sett), label=above:{\small\bfseries Group 1 — Per-user R/W}] {};
+    \node[grp, fit=(sd)(sdlg)(smet), label=above:{\small\bfseries Group 2 — Shared Catalogue (read-only)}] {};
+    \node[grp, fit=(sync), label=above:{\small\bfseries Group 3 — Cloudflare D1 Sync}] {};
+\end{scope}
+
+% FK arrows
+\draw[arrow, blue!60] (stor.east) -- ++(0.3,0) |-
+    node[pos=0.25, right, font=\tiny]{LEFT JOIN} (sd.west);
+\draw[arrow, green!50!black] (rec.north east) -- ++(0.5,0.3) --
+    node[above, font=\tiny]{leaderboard seed} (sync.south west);
+\end{tikzpicture}
+\end{center}
+
+\vspace{4pt}
+\noindent\textbf{Persistence WASM:} Emscripten IDBFS mount tại \texttt{SDL\_GetPrefPath} → \texttt{FS.syncfs(true)} trước \texttt{sqlite3\_open} → \texttt{FS.syncfs(false)} sau mỗi write transaction. Không call \texttt{syncfs} trên native (no-op guard).
+
+% ---- SettingsConfig contract ----
+\subsubsection{Hợp đồng dữ liệu \texttt{SettingsConfig} (Cross-module Contract)}
+
+\noindent Struct được khai báo trong \texttt{gameConsole\_layout.h} và truyền qua tham chiếu giữa \texttt{runGameConsole()} và \texttt{runGameCore()}.
+
+\begin{center}
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    mod/.style={rectangle, draw=black, fill=orange!10, thick,
+                minimum width=2.6cm, minimum height=1.0cm, align=center},
+    cfg/.style={rectangle, draw=blue!60, fill=blue!5, thick,
+                minimum width=3.2cm, align=left, inner sep=5pt},
+    arrow/.style={-{Stealth[scale=1.1]}, thick}
+]
+    \node[mod] (cons) at (0,0) {\textbf{runGameConsole}\\{\tiny SettingsConfig\& cfgInOut}};
+    \node[cfg]  (cfg)  at (4.6,0) {
+        \textbf{SettingsConfig}\\
+        \rule{\linewidth}{0.4pt}\\
+        \texttt{float  volume}\\
+        \texttt{bool   colorEnabled[7]}\\
+        \texttt{int    storyId / chapterId}\\
+        \texttt{int    nextBlockScore}\\
+        \texttt{float  nextBlockSpeed}\\
+        \texttt{string tableMatrix}
+    };
+    \node[mod]  (core) at (9.2,0) {\textbf{runGameCore}\\{\tiny const SettingsConfig\& cfg}};
+
+    \draw[arrow] (cons.east) -- node[above,font=\scriptsize]{mutate} (cfg.west);
+    \draw[arrow] (cfg.east)  -- node[above,font=\scriptsize]{read-only} (core.west);
+
+    % DB persist arrow
+    \draw[arrow, dashed, blue!60] (cfg.south) -- ++(0,-0.8)
+        node[below,font=\tiny,draw=blue!30,fill=blue!5,rounded corners,inner sep=2pt]
+        {dbSaveSettings() / dbLoadSettings()};
+\end{tikzpicture}
+\end{center}
+
+% ---- Luồng WASM Persistence ----
+\subsubsection{Luồng khởi động V2 (Activity Diagram — mở rộng)}
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=0.7cm,
+    every node/.style={font=\scriptsize},
+    proc/.style={rectangle, draw=black, fill=orange!10, thick,
+                 minimum width=3.6cm, minimum height=0.55cm, align=center},
+    dec/.style={diamond, draw=black, fill=green!10, thick,
+                aspect=2.2, align=center},
+    term/.style={rectangle, rounded corners, draw=black, fill=red!10, thick,
+                 minimum width=3.0cm, minimum height=0.55cm, align=center},
+    arrow/.style={-{Stealth[scale=1.1]}, thick}
+]
+    \node[term]  (s)   {runGameConsole entry};
+    \node[dec,   below=0.5cm of s]   (chk)  {DB\\exists?};
+    \node[proc,  below=0.5cm of chk] (idbfs){WASM: IDBFS mount\\+ syncfs(true)};
+    \node[proc,  below=0.5cm of idbfs](open) {sqlite3\_open\\dbInitSchema()};
+    \node[proc,  below=0.5cm of open] (seed) {dbSeedSharedData()\\→ verify shared\_data rows};
+    \node[dec,   below=0.5cm of seed] (hasD) {shared\_data\\has rows?};
+    \node[proc,  below=0.5cm of hasD] (load) {dbLoadSettings()\\applyVolumeToStream()};
+    \node[proc,  below=0.5cm of load] (unl)  {dbCheckAndUnlockStories()};
+    \node[proc,  below=0.5cm of unl]  (brd)  {loadBoardWithFallback()\\applyBoardSort(SCORE\_DESC)};
+    \node[term,  below=0.5cm of brd]  (loop) {main event loop};
+
+    \node[term,  right=3.2cm of chk]  (ret3) {return 3\\(gameStory init)};
+    \node[term,  right=3.2cm of hasD] (ret3b){return 3\\(shared\_data missing)};
+
+    \draw[arrow] (s) -- (chk);
+    \draw[arrow] (chk) -- node[left]{yes} (idbfs);
+    \draw[arrow] (chk) -- node[above]{no} (ret3);
+    \draw[arrow] (idbfs) -- (open);
+    \draw[arrow] (open) -- (seed);
+    \draw[arrow] (seed) -- (hasD);
+    \draw[arrow] (hasD) -- node[left]{yes} (load);
+    \draw[arrow] (hasD) -- node[above]{no} (ret3b);
+    \draw[arrow] (load) -- (unl);
+    \draw[arrow] (unl) -- (brd);
+    \draw[arrow] (brd) -- (loop);
+\end{tikzpicture}
+\end{center}
+
+% ---- Yêu cầu chức năng V2 ----
+\subsubsection{Yêu cầu Chức năng V2}
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Mục tiêu cốt lõi:} Tăng cường trải nghiệm bằng hình nền động (Dynamic Background), thay thế dữ liệu cứng bằng File JSON nội bộ và bổ sung tính năng cá nhân hóa Settings.
-    \item \textbf{Yêu cầu Chức năng:}
-    \begin{itemize}[noitemsep]
-        \item Hình nền động: Hỗ trợ tải ảnh nền từ file vật lý với thuật toán co dãn bảo toàn tỷ lệ 9:16.
-        \item Màn hình Settings: Cho phép điều chỉnh âm lượng (Slider) và lựa chọn màu sắc khối Tetromino chủ đạo.
-        \item Dữ liệu cục bộ: Đọc/Ghi thông tin Bảng xếp hạng và thiết lập người dùng xuống tệp JSON.
-    \end{itemize}
-    \item \textbf{Yêu cầu Kỹ thuật \& Tiêu chí thành công:}
-    \begin{itemize}[noitemsep]
-        \item Kỹ thuật: Tích hợp thư viện parse JSON. Cơ chế đồng bộ thiết lập (Settings) sang module \texttt{gameCore}.
-        \item \textbf{Tiêu chí thành công:} Thiết lập của người dùng được lưu lại và áp dụng chính xác cho ván đấu tiếp theo.
-    \end{itemize}
+    \item \textbf{Background SVG (2.1):} Lazy-rasterize 1 lần/session qua nanosvg → \texttt{SDL\_Texture}. Reset pointer khi exit để tránh leak khi re-entry. WASM: embed SVG dạng header C string, không cần \texttt{--preload-file}.
+    \item \textbf{Popup Settings (2.3):} Volume slider drag (\texttt{SDL\_AudioStream} + \texttt{SDL\_SetAudioStreamGain}); phím LEFT/RIGHT ±5\%; 7 color swatches toggle multi-select với guard tối thiểu 1 màu. Đóng popup tự gọi \texttt{dbSaveSettings()}.
+    \item \textbf{Popup Stories (2.6):} 3 trạng thái hàng — \textsc{Locked} / \textsc{Active} / \textsc{Completed}; navigator chapter trái/phải; nút Play chuyển scene về gameStory preview (return 2). Click radio chọn story → \texttt{dbSelectStory()} + cập nhật \texttt{SettingsConfig}.
+    \item \textbf{Leaderboard từ DB (2.7):} \texttt{sync\_Records} ORDER BY totalScore DESC; fallback \texttt{FALLBACK\_BOARD\_ROWS[]} khi rỗng; sort 4 chế độ qua \textit{Smart Sort Engine} (Insertion cho $n \leq 64$, Intro cho $n > 64$).
+    \item \textbf{Unlock cascade (2.6):} \texttt{dbCheckAndUnlockStories()} mỗi lần vào Console: parse CSV \texttt{requiredStories}, so sánh với \texttt{lastMaxScore/Speed/Retries}, UPSERT \texttt{isActivated=1} nếu đủ điều kiện.
 \end{itemize}
+
+\subsubsection{Yêu cầu Phi Chức năng V2}
+\begin{itemize}[noitemsep, leftmargin=*]
+    \item SQLite compile flag: \texttt{-DSQLITE\_THREADSAFE=0} (WASM single-thread).
+    \item \texttt{dbInitSchema()} idempotent — \texttt{CREATE TABLE IF NOT EXISTS} toàn bộ 9 bảng.
+    \item Mọi write có \texttt{dbSyncToPersistent()} ngay sau để đảm bảo IDBFS flush trên WASM.
+    \item \texttt{SettingsConfig} thay đổi struct bắt buộc cập nhật cả \texttt{runGameCore()} signature.
+\end{itemize}
+
+\subsubsection{Cây tính năng V2 (Feature Tree — delta)}
+\begin{center}
+\begin{tikzpicture}[
+    grow=right,
+    level 1/.style={sibling distance=2.8cm, level distance=4.8cm},
+    level 2/.style={sibling distance=1.0cm, level distance=4.6cm},
+    edge from parent fork right,
+    every node/.style={rectangle, draw=black, rounded corners,
+                       fill=gray!10, thick, align=center, font=\scriptsize},
+    root/.style={fill=orange!20, font=\small\bfseries}
+]
+\node[root] {V2 Delta}
+    child { node[fill=blue!10] {Persistence}
+        child { node {SQLite\\3 nhóm} }
+        child { node {IDBFS\\WASM} }
+        child { node {Cloudflare D1\\sync\_Records} }
+    }
+    child { node[fill=yellow!15] {Settings Popup}
+        child { node {Volume\\Slider} }
+        child { node {Color\\Picker ×7} }
+        child { node {Save/Load\\Settings} }
+    }
+    child { node[fill=green!10] {Stories Popup}
+        child { node {3 trạng\\thái row} }
+        child { node {Chapter\\Navigator} }
+        child { node {Unlock\\Cascade} }
+    }
+    child { node[fill=red!10] {Cross-module}
+        child { node {SettingsConfig\\contract} }
+        child { node {Smart Sort\\Engine} }
+    };
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Tiêu chí Thành công V2}
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Kịch bản kiểm thử} & \textbf{Kết quả mong đợi} \\
+    \hline
+    Set volume=0.3 → kill app → restart & Slider hiển thị đúng 30\%; \texttt{SDL\_AudioStream} gain = 0.3 \\
+    \hline
+    Tắt 6 màu, giữ 1 màu → click tắt màu cuối & Swatch không tắt; log \texttt{"need >=1 color enabled"} \\
+    \hline
+    Click Play trong Stories popup & \texttt{cfg.storyId/chapterId} cập nhật; return 2; gameStory chạy preview \\
+    \hline
+    Mở Console khi DB chưa tồn tại & Return 3 ngay, không render UI; main.cpp loop về gameStory init \\
+    \hline
+    Board click header SCORE / TIME & Danh sách resort; \texttt{boardScroll} reset 0; log algo name \\
+    \hline
+    WASM: đóng tab → mở lại & sync\_Records và Settings còn nguyên từ IDBFS \\
+    \hline
+\end{tabularx}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.55\textwidth]{03-gameConsoleRequirements-v2-screenshot}
+    \\[6pt]
+    \textit{\small Hình V2.1: Màn hình gameConsole V2 — 6 nút, SVG background, popup Settings với volume slider và color swatches.}
+\end{figure}
+
+% ============================================================
+% END PATCH V2
+% ============================================================
 
 \subsection{Yêu cầu Phiên bản V3: Tích hợp Đám mây \& Bảng xếp hạng Động}
 \begin{itemize}[leftmargin=*]

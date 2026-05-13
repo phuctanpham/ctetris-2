@@ -6,11 +6,18 @@
 \IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
 \IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
 \usepackage{docmute}
-\hypersetup{pdftitle={Hướng dẫn sử dụng tính năng cấu hình}}
+\hypersetup{pdftitle={Hướng dẫn sử dụng tính năng cấu hình -- v2}}
 
 \begin{document}
 \providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
 \StandaloneSectionSetup{09-gameConsoleGuide.tex}{LastPageGameConsoleGuide}
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Phiên bản tài liệu:} bản này mô tả \textbf{các tính năng bổ sung trong v2}.
+Các tính năng v1 (layout 9:16, scrollbar tương tác, popup Guide, điều hướng bàn phím,
+màn hình Reload WASM) đã ghi chép đầy đủ trong bản v1 và \textbf{không lặp lại} ở đây trừ
+khi có thay đổi so sánh trực tiếp.
+\end{minipage}}
+\vspace{8pt}
 \onehalfspacing
 
 \section{Hướng dẫn sử dụng tính năng cấu hình}
@@ -31,6 +38,31 @@
     \\[10pt] % Tạo khoảng cách nhỏ giữa hình và chú thích
     \textit{\small Hình 9.1: Màn hình module gameConsole}
 \end{figure}
+\noindent\textbf{Tóm tắt thay đổi chính trong v2:}
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|l|l|X|}
+    \hline
+    \textbf{Thành phần} & \textbf{V1} & \textbf{V2} \\
+    \hline
+    Nút điều hướng & 4 nút & 6 nút (thêm \textbf{STORIES}, \textbf{SETTINGS}) \\
+    \hline
+    Nền màn hình   & Màu trơn \texttt{#282C34} & SVG động, letterbox-fill 9:16 \\
+    \hline
+    Dữ liệu Board  & Mảng cứng C++ & Bảng \texttt{sync\_Records} (SQLite) \\
+    \hline
+    Cài đặt        & Không có & Popup Settings: âm lượng + màu khối \\
+    \hline
+    Tuyến truyện   & Không có & Popup Stories: DB-driven, 3 trạng thái \\
+    \hline
+    Sắp xếp Board  & Không có & Sort theo điểm hoặc thời gian (7 thuật toán) \\
+    \hline
+    Lưu trữ        & Không có & SQLite 9 bảng; IDBFS trên WASM \\
+    \hline
+    Âm lượng       & Stub log & \texttt{SDL\_SetAudioStreamGain} (SDL3 native) \\
+    \hline
+\end{tabularx}
+
 
 \subsection{Giao diện màn hình chính}
 Màn hình chính được chia thành ba vùng theo chiều dọc:
@@ -42,26 +74,58 @@ Màn hình chính được chia thành ba vùng theo chiều dọc:
 
 \noindent Nền màn hình dùng màu xám đậm \texttt{\#282C34} -- vừa đủ tối để các nút màu nổi bật, vừa dễ chịu cho mắt khi nhìn lâu.
 
-\subsection{Bốn nút điều khiển chính}
-Bốn nút bấm trung tâm là cách duy nhất để rời khỏi gameConsole. Mỗi nút có màu sắc riêng để bạn nhận diện nhanh ngay cả khi không đọc chữ:
+\subsection{Hình nền động -- v2}
+Thay thế nền trơn \texttt{#282C34} của v1, màn hình console v2 render file
+\texttt{gameConsole\_bg.svg} được nhúng trực tiếp vào binary lúc compile-time
+header \texttt{gameConsole\_bg\_svg.h} -- cùng chiến lược với logo gameStory).
+
+\noindent\textbf{Kỹ thuật render:}
+\begin{itemize}
+    \item \textit{Lazy-init}: SVG chỉ được rasterize \textbf{một lần} trong suốt vòng đời
+        của \texttt{runGameConsole()}; kết quả lưu trong biến tĩnh \texttt{g\_consoleBg}.
+    \item \textit{Letterbox-fill}: SVG có \texttt{viewBox="0 0 270 480"} khớp tỉ lệ 9:16 --
+        \texttt{dst rect} luôn bằng toàn bộ viewport, không cần tính letterbox thêm.
+        Nếu SVG sau này thay bằng tỉ lệ khác, chỉ cần thêm math tại hàm
+        \texttt{drawBackground()} mà không ảnh hưởng phần còn lại.
+    \item \textit{Cleanup}: khi \texttt{runGameConsole()} trả về (cả khi Console được
+        re-enter sau game over), texture cũ bị \texttt{SDL\_DestroyTexture()} và
+        \texttt{g\_consoleBg} reset về \texttt{\{nullptr,0,0\}} để lazy-init chạy lại
+        lần vào tiếp theo.
+    \item \textit{Fallback}: nếu rasterize thất bại (out-of-memory), hệ thống tự
+        trở về nền trơn slate của v1 -- UI vẫn hoạt động đầy đủ.
+\end{itemize}
+
+\noindent SVG nền chứa silhouette tetromino độ mờ 10\% tại bốn góc và hai đường kẻ
+accent ngang (y=110 và y=370) để phân cách vùng tiêu đề và vùng phím tắt
+mà không che phủ các nút ở vùng trung tâm (\texttt{y=130..350}).
+
+\subsection{Sáu nút điều khiển chính -- v2}
+Từ v2, màn hình chính có \textbf{6 nút} sắp xếp dọc (stride 40\,px, dải \texttt{y=130..350}).
 
 \vspace{4pt}
-\begin{tabularx}{\linewidth}{|l|l|X|}
+\begin{tabularx}{\linewidth}{|l|l|l|X|}
     \hline
-    \textbf{Nút} & \textbf{Màu nền} & \textbf{Chức năng} \\
+    \textbf{Idx} & \textbf{Nút} & \textbf{Màu nền} & \textbf{Chức năng} \\
     \hline
-    \textbf{GUIDE} & Xanh dương đậm & Mở popup hướng dẫn cách chơi (\textit{Guide Lightbox}). \\
+    0 & \textbf{GUIDE}    & Xanh dương đậm  & Popup hướng dẫn chơi (không đổi từ v1). \\
     \hline
-    \textbf{BOARD} & Xanh lá đậm   & Mở popup bảng xếp hạng (\textit{Leaderboard Lightbox}). \\
+    1 & \textbf{BOARD}    & Xanh lá đậm     & Popup bảng xếp hạng -- v2 đọc từ \texttt{sync\_Records}. \\
     \hline
-    \textbf{PLAY}  & Đỏ đậm        & Chuyển sang màn hình chơi chính \textit{gameCore}. \\
+    2 & \textbf{PLAY}     & Đỏ đậm          & Chuyển sang \textit{gameCore}; nếu đang chọn story,
+                                 chạy dialogue trước. \\
     \hline
-    \textbf{QUIT}  & Xám trung tính & Thoát ứng dụng. Trên web (WASM) sẽ chuyển sang màn hình \textit{Reload} thay vì đóng trực tiếp. \\
+    3 & \textbf{STORIES}  & Cam đất         & Popup chọn tuyến truyện (tính năng mới v2). \\
+    \hline
+    4 & \textbf{SETTINGS} & Tím nhạt        & Popup cài đặt âm lượng và màu khối (tính năng mới v2). \\
+    \hline
+    5 & \textbf{QUIT}     & Xám trung tính  & Thoát app (desktop) hoặc màn hình Reload (WASM). \\
     \hline
 \end{tabularx}
 
 \vspace{4pt}
-\noindent\textit{Mẹo nhận diện trạng thái:} nút đang được \textbf{focus} (chọn để kích hoạt) sẽ có \textbf{viền vàng đôi} bao quanh. Nhờ đó, ngay cả khi không nhìn vào con trỏ chuột, bạn vẫn biết mình đang đứng ở nút nào.
+\noindent\textit{Lưu ý điều hướng:} khi \textbf{bất kỳ} popup nào đang mở, toàn bộ 6 nút chính
+bị ẩn -- chỉ nội dung popup hiển thị. Phím \texttt{ESC} đóng popup đang mở trước;
+chỉ khi không có popup nào, \texttt{ESC} mới nhảy focus về nút \textbf{QUIT} (idx\,5).
 
 \subsection{Hệ thống điều hướng}
 gameConsole hỗ trợ song song ba kênh điều hướng và bạn có thể kết hợp tự do trong cùng một phiên.
@@ -145,34 +209,45 @@ Nhấn nút \textbf{GUIDE} (hoặc dùng phím tắt khi nút đang được foc
 Nhấn nút \textbf{BOARD} để mở popup xem bảng xếp hạng người chơi. Popup tái sử dụng kỹ thuật lightbox và scrollbar giống popup Guide, nhưng tập trung trình bày dữ liệu dạng bảng.
 
 \vspace{4pt}
-\noindent\textbf{Đặc điểm vỏ popup:}
+\noindent\textbf{Thay đổi v2 -- nguồn dữ liệu:}
 \begin{itemize}
-    \item Kích thước \texttt{260$\times$420 px}, nền màu xanh lá tối.
-    \item Hiển thị \textbf{9 dòng} cùng lúc trên tổng số \textbf{30 bản ghi} -- cuộn để xem hết.
-    \item Mỗi dòng cao 36 px để đọc thoải mái, không bị chen chúc.
-    \item \textbf{Đóng popup}: phím \texttt{ESC} hoặc click nút \texttt{[X]} ở góc trên phải.
+    \item Dữ liệu đọc từ bảng \texttt{sync\_Records} (\textit{Group 3}) thay vì mảng
+          cứng C++. Query: \texttt{ORDER BY totalScore DESC LIMIT 50}.
+    \item Nếu bảng rỗng: tự động dùng 30 bản ghi mẫu \texttt{FALLBACK\_BOARD\_ROWS}
+          (seeded lúc \texttt{dbInitSchema()} -- popup không bao giờ hiển thị trống).
+    \item Điểm số thực của người chơi \textbf{được lưu tự động} sau mỗi ván kể từ v2
+          (gameCore gọi \texttt{dbInsertRecord()} lúc game over).
 \end{itemize}
 
-\noindent\textbf{Cấu trúc một bản ghi} -- ba trường thông tin cho mỗi người chơi:
+\noindent\textbf{Thêm v2 -- sắp xếp động:}
+Hai nút \textbf{SCORE} và \textbf{TIME} nằm trên thanh header của popup. Click để
+chuyển đổi thứ tự; click lần hai trên cùng nút để đảo chiều (desc $\leftrightarrow$ asc).
 
 \vspace{4pt}
-\begin{tabularx}{\linewidth}{|l|X|}
+\begin{tabularx}{\linewidth}{|l|l|X|}
     \hline
-    \textbf{Trường} & \textbf{Mô tả} \\
+    \textbf{Nút} & \textbf{Chế độ} & \textbf{Mô tả} \\
     \hline
-    \textbf{Username} & Tên người chơi (hiển thị tối đa 12 ký tự, căn trái). \\
+    \textbf{SCORE\,↓} & \texttt{SCORE\_DESC} & Điểm cao nhất trước (mặc định). \\
     \hline
-    \textbf{Score}    & Điểm số (số nguyên 5 chữ số, căn phải). \\
+    \textbf{SCORE\,↑} & \texttt{SCORE\_ASC}  & Điểm thấp nhất trước. \\
     \hline
-    \textbf{Time}     & Thời điểm chơi, hiển thị 5 ký tự cuối theo định dạng \texttt{HH:mm}. \\
+    \textbf{TIME\,↓}  & \texttt{TIME\_DESC}  & Bản ghi mới nhất trước. \\
+    \hline
+    \textbf{TIME\,↑}  & \texttt{TIME\_ASC}   & Bản ghi cũ nhất trước. \\
     \hline
 \end{tabularx}
 
 \vspace{4pt}
-\noindent Phía dưới cùng popup có dòng nhắc \texttt{W/S to scroll, ESC close} -- hữu ích nếu bạn quen điều hướng bằng bàn phím hơn chuột.
+\noindent Nút đang active hiển thị nền xanh lá đậm. Sau mỗi lần đổi chế độ, cột
+\textbf{\#} được đánh số lại theo thứ tự đã sắp xếp (không phải index gốc).
+Timestamp hiển thị 5 ký tự cuối định dạng \texttt{MM-DD HH:MM}; trường
+\texttt{timeEpoch} (Unix UTC) dùng cho so sánh sort -- không cắt giống display.
 
-\vspace{4pt}
-\noindent\textit{Lưu ý ở phiên bản v1:} dữ liệu bảng xếp hạng hiện đang được nhúng cứng trong mã nguồn (30 bản ghi mẫu). Điểm số và tên của bạn \textbf{chưa được lưu lại tự động} sau mỗi ván -- tính năng này nằm trong kế hoạch của các phiên bản sau.
+\noindent\textit{Cơ chế sắp xếp nội bộ:} \textbf{Smart Sorting Engine v2.0}
+(\texttt{gameConsole\_sort.h}) -- 7 thuật toán + Smart Router. Với 30 bản ghi
+leaderboard, router chọn \textit{Insertion Sort} (\texttt{CTX\_DEFAULT}, $n \leq 64$),
+gần như O(n) trên dữ liệu đã sắp xếp sẵn -- chi phí thực tế dưới 1\,µs.
 
 \subsection{Nhạc nền}
 Khi bạn vào màn hình gameConsole, hệ thống tự động kích hoạt mô-đun phát nhạc nền -- không cần thao tác thủ công. Ở phiên bản v1, mô-đun này được triển khai dưới dạng \textit{stub} (khung sườn): chương trình ghi nhận sự kiện ``đã yêu cầu phát nhạc'' vào log nhưng \textbf{chưa phát âm thanh thực tế}. Nhờ kiến trúc này, các phiên bản sau có thể bổ sung nhạc nền mà không cần thay đổi giao diện hay luồng điều hướng hiện tại.
@@ -233,6 +308,34 @@ Bảng tổng hợp dưới đây gom toàn bộ phím tắt của gameConsole v
     \hline
 \end{tabularx}
 
+\subsubsection{Khi popup Settings đang mở -- v2}
+
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Phím} & \textbf{Hành động} \\
+    \hline
+    \texttt{LEFT} / \texttt{RIGHT} & Giảm / tăng âm lượng 5\%. \\
+    \hline
+    \texttt{ESC} / click \texttt{[X]} & Đóng popup \textbf{và lưu} cài đặt vào DB. \\
+    \hline
+\end{tabularx}
+
+\subsubsection{Khi popup Stories đang mở -- v2}
+
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Phím / Hành động} & \textbf{Kết quả} \\
+    \hline
+    Click radio hoặc tên story & Chọn story (cập nhật DB, giữ nguyên popup). \\
+    \hline
+    Click \textbf{Play} & Chọn story + đóng popup + trả về 2 (preview dialogue). \\
+    \hline
+    Click $\leftarrow$ / $\rightarrow$ & Chuyển chapter, reload danh sách từ DB. \\
+    \hline
+    \texttt{ESC} / click \texttt{[X]} & Đóng popup (không lưu thêm). \\
+    \hline
+\end{tabularx}
+
 \subsubsection{Trên màn hình Reload (WASM)}
 
 \begin{tabularx}{\linewidth}{|l|X|}
@@ -247,15 +350,25 @@ Bảng tổng hợp dưới đây gom toàn bộ phím tắt của gameConsole v
     \hline
 \end{tabularx}
 
-\subsection{Giới hạn của phiên bản v1}
-Để bạn nắm rõ kỳ vọng, dưới đây là những điểm \emph{chưa có} trong v1 nhưng đã nằm trong kế hoạch phát triển:
+\subsection{Giới hạn còn lại sau v2}
+Các điểm \textbf{đã hoàn thành} trong v2 (bỏ khỏi danh sách giới hạn cũ):
+nhạc nền có volume slider, màu khối tuỳ chỉnh, bảng xếp hạng lưu thật.
+
+\noindent Các điểm \textbf{chưa có} trong v2 và dự kiến cho v3:
 \begin{itemize}
-    \item Bảng xếp hạng đọc dữ liệu thật từ máy chủ (hiện đang dùng dữ liệu mẫu nhúng cứng trong mã).
-    \item Nhạc nền phát thực tế (hiện chỉ ghi log, chưa có âm thanh).
-    \item Popup \textit{Settings} cho phép bạn chỉnh âm lượng và chọn màu khối yêu thích.
-    \item Hình nền tùy biến cho màn hình chính.
+    \item Bảng xếp hạng đồng bộ lên \textbf{Cloudflare D1} (\texttt{d1\_board})
+        qua Cloudflare Worker -- hiện chỉ lưu local SQLite.
+        Durable Object \texttt{SyncManager} sẽ push cập nhật về client sau mỗi game over.
+    \item Tính năng \textbf{LOAD/SAVE} trong Settings: lưu/khôi phục file SQLite
+        qua email\,+\,OTP xác thực bởi Durable Object \texttt{OtpManager};
+        dữ liệu lưu tại \texttt{d1\_users} trên Cloudflare D1 (Task 3.1).
+    \item Nhạc nền thực sự -- v2 mở audio stream nhưng chưa nạp sample âm nhạc
+        (gain control hoạt động, sẵn sàng khi có file nhạc).
+    \item Thumbnail trong Stories popup hiển thị placeholder -- chưa load ảnh
+        thực từ \texttt{thumbnailPath} (tính năng V3).
+    \item Sort trong Board chỉ hoạt động với dữ liệu đã tải vào RAM -- chưa có
+        sort phía DB (không cần thiết với 50 bản ghi).
 \end{itemize}
-Các tính năng trên sẽ lần lượt xuất hiện ở các phiên bản v2 và v3.
 
 \label{LastPageGameConsoleGuide}
 \end{document}
