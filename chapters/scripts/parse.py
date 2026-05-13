@@ -2,27 +2,20 @@
 """
 parse.py — Convert chapters/src/c{id}/c{id}.json into c{id}.sql.
 
-Output SQL targets the `shared_data` table consumed by
-app/src/gameConsole/app.cpp::dbSeedSharedData(). Schema mirrors
-gameConsole_db.h exactly:
+Output SQL targets three tables consumed by the C++ game:
+  shared_data      → gameConsole (story catalogue, unlock conditions)
+  story_dialogues  → gameStory V2 (per-node dialogue)
+  story_choices    → gameStory V2 (branching choices per node)
 
-    INSERT OR REPLACE INTO shared_data (
-        idStory, storyName, idChapter, chapterName,
-        minScore, minSpeed, minRetries, requiredStories,
-        nextBlockScore, nextBlockSpeed,
-        tableMatrix, xmlDialogue, thumbnailPath
-    ) VALUES (...);
+Schema mirrors gameConsole_db.h and gameStory_db.h exactly.
 
 Usage:
     python3 chapters/scripts/parse.py chapters/src/c001/c001.json
 
-Reads:  the given JSON file.
-Writes: same directory, same basename with .sql extension.
-
 Exit codes:
     0  success
-    1  validation error (schema mismatch, dangling requiredStories ref, etc.)
-    2  IO error (file not found, unreadable, etc.)
+    1  validation error
+    2  IO error
 """
 
 from __future__ import annotations
@@ -35,7 +28,6 @@ from pathlib import Path
 # ---------- helpers ------------------------------------------------------ #
 
 def chapter_num_from_dir(name: str) -> int:
-    """c001 -> 1, c042 -> 42. Raises if format is wrong."""
     m = re.fullmatch(r"c(\d{3,})", name)
     if not m:
         raise ValueError(f"Bad chapter dir name: {name!r} (expected c###)")
@@ -43,15 +35,12 @@ def chapter_num_from_dir(name: str) -> int:
 
 
 def sql_str(value: str | None) -> str:
-    """SQLite single-quoted string with '' doubling. NULL for None."""
     if value is None:
         return "NULL"
     return "'" + str(value).replace("'", "''") + "'"
 
 
 def fmt_real(v: float | int) -> str:
-    """Render a REAL value the same way the hand-crafted reference SQL does:
-    integers get a `.0` suffix (e.g. 1 -> '1.0'), floats keep their form."""
     f = float(v)
     if f.is_integer():
         return f"{f:.1f}"
@@ -60,8 +49,6 @@ def fmt_real(v: float | int) -> str:
 
 # ---------- validation --------------------------------------------------- #
 
-# Required fields and the python type each must be.
-# `int` is also accepted where `float` is expected (JSON often has 1 vs 1.0).
 REQUIRED_FIELDS: list[tuple[str, type]] = [
     ("idStory",         int),
     ("storyName",       str),
@@ -78,6 +65,22 @@ REQUIRED_FIELDS: list[tuple[str, type]] = [
     ("thumbnailPath",   str),
 ]
 
+DIALOGUE_REQUIRED_FIELDS: list[tuple[str, type]] = [
+    ("nodeId",     int),
+    ("speaker",    str),
+    ("text",       str),
+    ("imageUrl",   str),
+    ("bgmUrl",     str),
+    ("sfxUrl",     str),
+    ("nextNodeId", int),
+    ("choices",    list),
+]
+
+CHOICE_REQUIRED_FIELDS: list[tuple[str, type]] = [
+    ("label",      str),
+    ("nextNodeId", int),
+]
+
 
 def check_type(value, expected: type) -> bool:
     if expected is float:
@@ -85,6 +88,14 @@ def check_type(value, expected: type) -> bool:
     if expected is int:
         return isinstance(value, int) and not isinstance(value, bool)
     return isinstance(value, expected)
+
+
+def _no_sep(val: str, field: str, story_id: int) -> None:
+    if "/" in val or "\\" in val:
+        raise ValueError(
+            f"Row idStory={story_id}: {field} must be filename only "
+            f"(no path separator): {val!r}"
+        )
 
 
 def validate(data: dict, chapter_dir: Path) -> None:
@@ -97,7 +108,7 @@ def validate(data: dict, chapter_dir: Path) -> None:
     chapter_num = chapter_num_from_dir(chapter_dir.name)
     seen_ids: set[int] = set()
 
-    # First pass: per-row field & type checks
+    # Pass 1: shared_data field & type checks
     for i, row in enumerate(stories):
         if not isinstance(row, dict):
             raise ValueError(f"Row #{i} is not an object")
@@ -121,10 +132,10 @@ def validate(data: dict, chapter_dir: Path) -> None:
         if "/" in row["thumbnailPath"] or "\\" in row["thumbnailPath"]:
             raise ValueError(
                 f"Row idStory={row['idStory']}: thumbnailPath must be a "
-                f"filename only (no path separator): {row['thumbnailPath']!r}"
+                f"filename only: {row['thumbnailPath']!r}"
             )
 
-    # Second pass: requiredStories references must resolve within this chapter
+    # Pass 2: requiredStories cross-references
     for row in stories:
         req = row["requiredStories"].strip()
         if not req:
@@ -150,6 +161,80 @@ def validate(data: dict, chapter_dir: Path) -> None:
                     f"Row idStory={row['idStory']}: cannot require itself"
                 )
 
+    # Pass 3: optional dialogues[] validation
+    for row in stories:
+        if "dialogues" not in row:
+            continue
+        diags = row["dialogues"]
+        if not isinstance(diags, list):
+            raise ValueError(
+                f"Row idStory={row['idStory']}: 'dialogues' must be an array"
+            )
+        seen_node_ids: set[int] = set()
+        for di, node in enumerate(diags):
+            if not isinstance(node, dict):
+                raise ValueError(
+                    f"Row idStory={row['idStory']} dialogue #{di}: not an object"
+                )
+            for field, expected in DIALOGUE_REQUIRED_FIELDS:
+                if field not in node:
+                    raise ValueError(
+                        f"Row idStory={row['idStory']} dialogue #{di}: "
+                        f"missing field {field!r}"
+                    )
+                if not check_type(node[field], expected):
+                    raise ValueError(
+                        f"Row idStory={row['idStory']} dialogue #{di}: "
+                        f"field {field!r} expected {expected.__name__}, "
+                        f"got {type(node[field]).__name__}"
+                    )
+            nid = node["nodeId"]
+            if nid in seen_node_ids:
+                raise ValueError(
+                    f"Row idStory={row['idStory']}: duplicate nodeId={nid}"
+                )
+            seen_node_ids.add(nid)
+            # Validate media filenames (no path separators)
+            for mf in ("imageUrl", "bgmUrl", "sfxUrl"):
+                val = node[mf]
+                if val:
+                    _no_sep(val, mf, row["idStory"])
+            # Validate choices
+            choices = node["choices"]
+            for ci, choice in enumerate(choices):
+                if not isinstance(choice, dict):
+                    raise ValueError(
+                        f"Row idStory={row['idStory']} dialogue #{di} "
+                        f"choice #{ci}: not an object"
+                    )
+                for field, expected in CHOICE_REQUIRED_FIELDS:
+                    if field not in choice:
+                        raise ValueError(
+                            f"Row idStory={row['idStory']} dialogue #{di} "
+                            f"choice #{ci}: missing {field!r}"
+                        )
+                    if not check_type(choice[field], expected):
+                        raise ValueError(
+                            f"Row idStory={row['idStory']} dialogue #{di} "
+                            f"choice #{ci}: {field!r} wrong type"
+                        )
+
+        # Pass 3b: nextNodeId cross-refs (0 = end, else must exist)
+        for di, node in enumerate(diags):
+            next_id = node["nextNodeId"]
+            if next_id != 0 and next_id not in seen_node_ids:
+                raise ValueError(
+                    f"Row idStory={row['idStory']} dialogue #{di}: "
+                    f"nextNodeId={next_id} not found in dialogue nodes"
+                )
+            for ci, choice in enumerate(node["choices"]):
+                cnext = choice["nextNodeId"]
+                if cnext != 0 and cnext not in seen_node_ids:
+                    raise ValueError(
+                        f"Row idStory={row['idStory']} dialogue #{di} "
+                        f"choice #{ci}: nextNodeId={cnext} not found"
+                    )
+
 
 # ---------- SQL emission ------------------------------------------------- #
 
@@ -164,6 +249,8 @@ def emit_sql(data: dict, chapter_id: str) -> str:
     lines.append("BEGIN TRANSACTION;")
     lines.append("")
 
+    # ---- shared_data ----
+    lines.append("-- shared_data (story catalogue, consumed by gameConsole)")
     for row in data["shared_data"]:
         lines.append(
             f"INSERT OR REPLACE INTO shared_data "
@@ -186,6 +273,48 @@ def emit_sql(data: dict, chapter_id: str) -> str:
             f"{sql_str(row['thumbnailPath'])}"
             f");"
         )
+
+    # ---- story_dialogues + story_choices ----
+    has_any_dialogue = any(
+        row.get("dialogues") for row in data["shared_data"]
+    )
+    if has_any_dialogue:
+        lines.append("")
+        lines.append("-- story_dialogues (consumed by gameStory V2)")
+        for row in data["shared_data"]:
+            for node in row.get("dialogues", []):
+                has_choices = 1 if node["choices"] else 0
+                lines.append(
+                    f"INSERT OR REPLACE INTO story_dialogues "
+                    f"(idStory, idChapter, nodeId, speaker, text, "
+                    f"imageUrl, bgmUrl, sfxUrl, nextNodeId, hasChoices) VALUES ("
+                    f"{row['idStory']}, {row['idChapter']}, {node['nodeId']}, "
+                    f"{sql_str(node['speaker'])}, {sql_str(node['text'])}, "
+                    f"{sql_str(node['imageUrl'])}, "
+                    f"{sql_str(node['bgmUrl'])}, "
+                    f"{sql_str(node['sfxUrl'])}, "
+                    f"{node['nextNodeId']}, {has_choices}"
+                    f");"
+                )
+
+        lines.append("")
+        lines.append("-- story_choices (consumed by gameStory V2)")
+        any_choices = False
+        for row in data["shared_data"]:
+            for node in row.get("dialogues", []):
+                for ci, choice in enumerate(node["choices"]):
+                    any_choices = True
+                    lines.append(
+                        f"INSERT OR REPLACE INTO story_choices "
+                        f"(idStory, idChapter, nodeId, choiceIdx, label, nextNodeId) VALUES ("
+                        f"{row['idStory']}, {row['idChapter']}, {node['nodeId']}, "
+                        f"{ci}, "
+                        f"{sql_str(choice['label'])}, "
+                        f"{choice['nextNodeId']}"
+                        f");"
+                    )
+        if not any_choices:
+            lines.append("-- (no choices in this chapter)")
 
     lines.append("")
     lines.append("COMMIT;")
@@ -212,8 +341,7 @@ def main(argv: list[str]) -> int:
         return 2
     if json_path.name != f"{chapter_id}.json":
         print(
-            f"ERROR: filename {json_path.name!r} does not match folder "
-            f"{chapter_id!r}",
+            f"ERROR: filename {json_path.name!r} does not match folder {chapter_id!r}",
             file=sys.stderr,
         )
         return 2
@@ -233,8 +361,23 @@ def main(argv: list[str]) -> int:
     sql_text = emit_sql(data, chapter_id)
     out_path = chapter_dir / f"{chapter_id}.sql"
     out_path.write_text(sql_text, encoding="utf-8")
-    print(f"OK: {json_path} -> {out_path} "
-          f"({len(data['shared_data'])} row(s), {len(sql_text)} bytes)")
+
+    # Stats
+    total_nodes = sum(
+        len(row.get("dialogues", [])) for row in data["shared_data"]
+    )
+    total_choices = sum(
+        len(node["choices"])
+        for row in data["shared_data"]
+        for node in row.get("dialogues", [])
+    )
+    print(
+        f"OK: {json_path} -> {out_path} "
+        f"({len(data['shared_data'])} stories, "
+        f"{total_nodes} dialogue nodes, "
+        f"{total_choices} choices, "
+        f"{len(sql_text)} bytes)"
+    )
     return 0
 
 

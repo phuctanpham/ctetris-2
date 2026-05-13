@@ -19,7 +19,8 @@
 #include "gameConsole_layout.h"   // [D.6] SettingsConfig contract
 #include "logger.h"               // File logging system
 
-extern int runGameStory  (SDL_Window* window, SDL_Renderer* renderer);
+extern int runGameStory  (SDL_Window* window, SDL_Renderer* renderer,
+                          int storyId = 0, int chapterId = 0);
 extern int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                           SettingsConfig& cfgInOut);
 extern int runGameCore   (SDL_Window* window, SDL_Renderer* renderer,
@@ -64,6 +65,13 @@ int main(int argc, char* argv[]) {
         if (next != 1) {
             logger.log("User quit from console menu");
             break;
+        }
+
+        // Show story dialogue before entering Core (if a story is selected)
+        if (cfg.storyId > 0) {
+            logger.logEvent("STORY", "Playing dialogue story=%d chapter=%d",
+                            cfg.storyId, cfg.chapterId);
+            runGameStory(window, renderer, cfg.storyId, cfg.chapterId);
         }
         
         int back = runGameCore(window, renderer, cfg);
