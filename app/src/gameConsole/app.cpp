@@ -2239,20 +2239,24 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                             SDL_FRect radio = storiesRadioRect(i);
                             SDL_FRect play  = storiesPlayRect(i);
                             if (hitTest(radio, mx, my) || hitTest(play, mx, my)) {
-                                // In-memory: clear all isSelected, set this one
+                                // Select story in memory + DB
                                 for (auto& r : state.storiesCache)
                                     r.isSelected = false;
-                                // mark selected in cache
                                 state.storiesCache[i].isSelected = true;
-                                // Persist selection and ensure row is activated
                                 dbSelectStory("default", sr.idStory, sr.idChapter);
-                                // Pipe selection + V2 story fields into cfg
                                 if (state.cfg) {
                                     state.cfg->storyId        = sr.idStory;
                                     state.cfg->chapterId      = sr.idChapter;
                                     state.cfg->nextBlockScore = sr.nextBlockScore;
                                     state.cfg->nextBlockSpeed = sr.nextBlockSpeed;
                                     state.cfg->tableMatrix    = sr.tableMatrix;
+                                }
+                                // [E.3] Play button -> preview story dialogue
+                                // Radio button -> select only, stay in popup
+                                if (hitTest(play, mx, my)) {
+                                    state.showStories = false;
+                                    state.isRunning   = false;
+                                    state.nextScene   = 2;   // signal: play story preview
                                 }
                                 break;
                             }

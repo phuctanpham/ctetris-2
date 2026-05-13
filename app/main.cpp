@@ -62,12 +62,24 @@ int main(int argc, char* argv[]) {
 
     while (true) {
         int next = runGameConsole(window, renderer, cfg);
-        if (next != 1) {
+
+        if (next == 0) {
             logger.log("User quit from console menu");
             break;
         }
 
-        // Show story dialogue before entering Core (if a story is selected)
+        // nextScene=2: user clicked Play in Stories popup -> preview dialogue
+        // then loop back to Console without going to gameCore.
+        if (next == 2) {
+            if (cfg.storyId > 0) {
+                logger.logEvent("STORY", "Preview dialogue story=%d chapter=%d",
+                                cfg.storyId, cfg.chapterId);
+                runGameStory(window, renderer, cfg.storyId, cfg.chapterId);
+            }
+            continue;   // back to Console
+        }
+
+        // nextScene=1: PLAY button -> show story dialogue then enter gameCore
         if (cfg.storyId > 0) {
             logger.logEvent("STORY", "Playing dialogue story=%d chapter=%d",
                             cfg.storyId, cfg.chapterId);
