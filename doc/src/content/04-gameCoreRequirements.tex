@@ -269,155 +269,47 @@ Mô tả trực quan quá trình trải nghiệm của người chơi từ lúc 
 \end{center}
 
 % ---- Luồng dữ liệu SettingsConfig ----
-\subsubsection{Luồng dữ liệu \texttt{SettingsConfig} V2 (Data Flow)}
+\subsubsection{Luồng dữ liệu \texttt{SettingsConfig} V2}
+\textit{Component diagram, DB write boundary diagram, và field mapping table
+(GameRecord sources) được đặc tả trong
+\textbf{SDS §07-gameCoreEngineering, mục 2.4 và 3.2}.}
 
-\noindent \texttt{SettingsConfig} mở rộng thêm 3 fields ở V2; gameCore đọc toàn bộ nhưng không ghi ngược.
-
-\begin{center}
-\begin{tikzpicture}[
-    every node/.style={font=\scriptsize},
-    box/.style={rectangle, draw=black, thick, fill=white, inner sep=5pt, align=left},
-    arrow/.style={-{Stealth[scale=1.1]}, thick},
-    darrow/.style={-{Stealth[scale=1.1]}, thick, dashed}
-]
-    \node[box] (cons) at (0,0) {
-        \textbf{gameConsole}\\
-        \rule{3.2cm}{0.4pt}\\
-        Settings popup\\
-        Stories popup\\
-        \texttt{dbLoadSettings()}\\
-        \texttt{dbSelectStory()}
-    };
-    \node[box, right=2.0cm of cons] (cfg) {
-        \textbf{SettingsConfig} \textit{(V2)}\\
-        \rule{3.8cm}{0.4pt}\\
-        \texttt{float  volume}\\
-        \texttt{bool   colorEnabled[7]}\\
-        \texttt{int    storyId / chapterId}\\
-        \textcolor{red}{\texttt{int    nextBlockScore} \textit{(new)}}\\
-        \textcolor{red}{\texttt{float  nextBlockSpeed} \textit{(new)}}\\
-        \textcolor{red}{\texttt{string tableMatrix} \textit{(new)}}
-    };
-    \node[box, right=2.0cm of cfg] (core) {
-        \textbf{gameCore}\\
-        \rule{3.2cm}{0.4pt}\\
-        \texttt{coreOpenBgm(volume)}\\
-        \texttt{spawnBlock(colorEnabled)}\\
-        \texttt{applyTableMatrix(tm)}\\
-        NEXT-2/3 unlock\\
-        \texttt{dbInsertRecord()}
-    };
-
-    \draw[arrow] (cons.east) -- node[above,font=\scriptsize]{mutate} (cfg.west);
-    \draw[arrow] (cfg.east)  -- node[above,font=\scriptsize]{read-only} (core.west);
-
-    \draw[darrow, blue!60] (cfg.south) -- ++(0,-0.6)
-        node[below,draw=blue!30,fill=blue!5,rounded corners,inner sep=2pt]
-        {\texttt{dbSaveSettings()} / \texttt{dbLoadSettings()}};
-\end{tikzpicture}
-\end{center}
+SRS phát biểu ràng buộc contract:
+\begin{itemize}[nosep]
+  \item gameCore nhận \texttt{const SettingsConfig\&} --- KHÔNG được ghi ngược.
+  \item \texttt{nextBlockScore}, \texttt{nextBlockSpeed}, \texttt{tableMatrix}
+        là runtime-only fields set bởi gameConsole (Stories popup);
+        gameCore reads-only.
+  \item V3 cần thêm \texttt{nextBlockScore3} và \texttt{bgmUrl} vào struct.
+\end{itemize}
 
 % ---- DB Lifecycle ----
 \subsubsection{Vòng đời Kết nối SQLite trong gameCore V2}
+\textit{DB write sequence flowchart (dbOpen $\rightarrow$ INSERT $\rightarrow$
+UPSERT $\rightarrow$ cascade unlock $\rightarrow$ dbClose) và sequence diagram
+được đặc tả trong \textbf{SDS §07-gameCoreEngineering, mục 2.3.7 và 2.4}.}
 
-\noindent\textbf{Nguyên tắc:} gameCore \emph{không sở hữu} DB connection. Mỗi game-over event mở/đóng connection trong cùng một transaction block. Console tự mở lại khi re-enter.
-
-\begin{center}
-\begin{tikzpicture}[
-    every node/.style={font=\scriptsize},
-    proc/.style={rectangle, draw=black, fill=orange!10, thick,
-                 minimum width=4.0cm, minimum height=0.55cm, align=center},
-    dec/.style={diamond, draw=black, fill=green!10, thick,
-                aspect=2.2, align=center},
-    term/.style={rectangle, rounded corners, draw=black, fill=red!10, thick,
-                 minimum width=3.2cm, minimum height=0.55cm, align=center},
-    arrow/.style={-{Stealth[scale=1.1]}, thick},
-    note/.style={rectangle, draw=gray, dashed, fill=yellow!5,
-                 rounded corners, inner sep=3pt, font=\tiny}
-]
-    \node[term]  (go)   {isGameOver = true};
-    \node[proc,  below=0.5cm of go]   (open) {\texttt{dbOpen("default")}};
-    \node[dec,   below=0.5cm of open] (ok)   {open\\success?};
-    \node[proc,  below=0.5cm of ok]   (ins)  {\texttt{dbInsertRecord(rec)}};
-    \node[proc,  below=0.5cm of ins]  (ups)  {\texttt{dbUpsertStoryProgress(...)}};
-    \node[proc,  below=0.5cm of ups]  (unl)  {\texttt{dbCheckAndUnlockStories("default")}};
-    \node[proc,  below=0.5cm of unl]  (cls)  {\texttt{dbClose()}};
-    \node[term,  below=0.5cm of cls]  (end)  {gameOverRecorded = true};
-
-    \node[note, right=1.5cm of ins]  {startTS, endTS, score,\\storyId, chapterId,\\avgSpeed, retryNo};
-    \node[note, right=1.5cm of unl]  {cascade unlock\\per requiredStories CSV};
-    \node[note, left=1.5cm of ok]    {log warn,\\skip record};
-
-    \draw[arrow] (go) -- (open);
-    \draw[arrow] (open) -- (ok);
-    \draw[arrow] (ok) -- node[left]{yes} (ins);
-    \draw[arrow] (ok.west) -- ++(-1.5,0) |- node[right,pos=0.1]{no} (end.west);
-    \draw[arrow] (ins) -- (ups);
-    \draw[arrow] (ups) -- (unl);
-    \draw[arrow] (unl) -- (cls);
-    \draw[arrow] (cls) -- (end);
-\end{tikzpicture}
-\end{center}
+SRS phát biểu ràng buộc lifecycle:
+\begin{itemize}[nosep]
+  \item gameCore KHÔNG sở hữu DB schema hay connection lâu dài.
+  \item \texttt{onGameOver()} mở, dùng, đóng trong cùng 1 call.
+        \texttt{gameOverRecorded} guard prevents duplicate writes.
+  \item Console và gameCore dùng \textbf{hai \texttt{sqlite3*} riêng biệt}
+        --- không double-open conflict.
+\end{itemize}
 
 % ---- Scoring \& Speed diagram ----
 \subsubsection{Hệ thống Điểm số và Tốc độ V2}
+\textit{Step-function speed chart và combo score table được vẽ trong
+\textbf{SDS §07-gameCoreEngineering, mục 2.3.4 (getFallInterval diagram)}.}
 
-\begin{center}
-\begin{tikzpicture}[every node/.style={font=\scriptsize}]
-% Speed curve
-\begin{scope}
-    \draw[->] (0,0) -- (6.2,0) node[right] {Score};
-    \draw[->] (0,0) -- (0,3.2) node[above] {Fall interval (ms)};
-
-    % step function
-    \draw[blue!70, very thick]
-        (0,2.5)   -- (0.8,2.5)
-        (0.8,2.0) -- (1.5,2.0)
-        (1.5,1.5) -- (2.3,1.5)
-        (2.3,1.0) -- (3.5,1.0)
-        (3.5,0.5) -- (6.0,0.5);
-
-    % tick labels x
-    \foreach \x/\lbl in {0/0, 0.8/5, 1.5/15, 2.3/30, 3.5/50} {
-        \draw (\x,0.05) -- (\x,-0.05) node[below] {\lbl};
-    }
-    % tick labels y
-    \foreach \y/\lbl in {2.5/500, 2.0/400, 1.5/300, 1.0/200, 0.5/100} {
-        \draw (0.05,\y) -- (-0.05,\y) node[left] {\lbl};
-    }
-
-    % soft drop = /5 reference
-    \draw[red!60, dashed, thin]
-        (0,0.5)   -- (0.8,0.5)
-        (0.8,0.4) -- (1.5,0.4)
-        (1.5,0.3) -- (2.3,0.3)
-        (2.3,0.2) -- (3.5,0.2)
-        (3.5,0.1) -- (6.0,0.1);
-    \node[red!60] at (5.5,0.3) {Soft Drop (÷5)};
-    \node[blue!70] at (5.0,1.2) {Normal};
-\end{scope}
-
-% Combo table
-\begin{scope}[xshift=7.5cm]
-    \node[draw=black, fill=gray!10, thick, minimum width=3.5cm,
-          minimum height=0.5cm, align=center] at (1.75,3.0) {\textbf{Combo Score ($n^2$)}};
-    \foreach \row/\lines/\pts/\clr in {
-        0/1 line/1 pt/white,
-        1/2 lines/4 pts/yellow!10,
-        2/3 lines/9 pts/orange!10,
-        3/4 lines/16 pts/red!10
-    }{
-        \node[draw=black, fill=\clr, minimum width=1.6cm,
-              minimum height=0.45cm, align=center]
-            at (0.8, 2.4 - \row*0.5) {\lines};
-        \node[draw=black, fill=\clr, minimum width=1.6cm,
-              minimum height=0.45cm, align=center]
-            at (2.7, 2.4 - \row*0.5) {\pts};
-    }
-    \node[font=\tiny] at (1.75, 0.35) {cap: 99999};
-\end{scope}
-\end{tikzpicture}
-\end{center}
+SRS phát biểu ràng buộc hành vi:
+\begin{itemize}[nosep]
+  \item 5 mốc tốc độ: 500/400/300/200/100ms tại score 0/5/15/30/50.
+  \item Soft drop = \texttt{interval / 5} (không hằng số cứng 100ms).
+  \item Combo: $\Delta\text{score} = n^2$ ($n$ = số dòng đồng thời); cap 99999.
+  \item Tốc độ recompute mỗi frame (không cache).
+\end{itemize}
 
 % ---- Unlock Logic ----
 \subsubsection{Logic mở khóa NEXT-2 / NEXT-3 (Story-gated Preview)}
@@ -453,39 +345,17 @@ Mô tả trực quan quá trình trải nghiệm của người chơi từ lúc 
 
 % ---- Flash Effect Sequence ----
 \subsubsection{Chuỗi Hiệu ứng Flash khi Xóa dòng (Timing Diagram)}
+\textit{Flash timing diagram (6 ticks $\times$ 80ms, fall-blocked bar,
+finishLineClear trigger) được vẽ trong
+\textbf{SDS §07-gameCoreEngineering, mục 2.3.3}.}
 
-\begin{center}
-\begin{tikzpicture}[every node/.style={font=\scriptsize}, x=1.1cm, y=0.7cm]
-    % timeline axis
-    \draw[->] (0,0) -- (8.5,0) node[right] {time (ms)};
-
-    % tick marks every ~80ms (1 unit = 80ms)
-    \foreach \x in {0,1,...,8} {
-        \draw (\x, 0.1) -- (\x, -0.1) node[below] {\x×80};
-    }
-
-    % flash state bar
-    \foreach \x/\c in {0/white!80!black, 1/black!80, 2/white!80!black,
-                        3/black!80, 4/white!80!black, 5/black!80} {
-        \fill[\c] (\x, 0.3) rectangle (\x+1, 0.8);
-        \draw[black] (\x, 0.3) rectangle (\x+1, 0.8);
-    }
-    \node[left] at (0, 0.55) {Flash row};
-
-    % fall blocked bar
-    \fill[red!20] (0, 1.0) rectangle (6, 1.5);
-    \draw[red!60] (0, 1.0) rectangle (6, 1.5);
-    \node[left] at (0, 1.25) {Fall blocked};
-
-    % actual clear
-    \draw[green!60!black, very thick] (6, -0.4) -- (6, 1.6);
-    \node[green!60!black, below] at (6, -0.5) {Lines cleared};
-
-    % labels
-    \node at (3, 0.55) {\tiny flashTick 0→5};
-    \node at (3, 1.25) {\tiny pendingClear = true};
-\end{tikzpicture}
-\end{center}
+SRS phát biểu ràng buộc hành vi:
+\begin{itemize}[nosep]
+  \item Flash bắt buộc \textbf{không interruptible} --- fall bị khoá
+        (\texttt{pendingClear=true}) trong toàn bộ 6 ticks.
+  \item Event polling vẫn chạy bình thường --- input không bị block.
+  \item Sau \texttt{finishLineClear()}: \texttt{lastFallTime} reset ngay.
+\end{itemize}
 
 % ---- tableMatrix format ----
 \subsubsection{Định dạng \texttt{tableMatrix} (Board Pre-population)}

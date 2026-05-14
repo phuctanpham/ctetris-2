@@ -155,6 +155,15 @@ kiểm soát màu nào được phép xuất hiện:
 hệ thống fallback về toàn bộ 6 màu gốc -- gameCore không bao giờ crash do
 \texttt{enabledIndices} rỗng.
 
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} swipe gesture decision tree
+(threshold 15px, trục ưu thế, swipeOnBlock vs board zone),
+checkCollision formula (matrix-based O(4)), và rotation pivot
+\texttt{(px=1,py=1)} được đặc tả trong
+\textbf{SDS §07-gameCoreEngineering, mục 2.3.2 và 2.3.6}.
+\end{minipage}}
+\vspace{6pt}
+
 \subsection{Hệ thống điều khiển}
 
 \subsubsection{Điều khiển bằng bàn phím}
@@ -248,6 +257,14 @@ Bạn có thể tạm dừng trò chơi bất cứ lúc nào theo một trong ba
 \end{itemize}
 Trong thời gian tạm dừng, đồng hồ play timer ngừng đếm và khối ngừng rơi.
 
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} \texttt{getFallInterval()} decision tree (5 thresholds),
+softDrop = interval$\div$5 (dynamic), và elapsed time formula
+(pause-excluded: \texttt{nowMs - gameStartTime - totalPausedMs})
+được đặc tả trong \textbf{SDS §07-gameCoreEngineering, mục 2.3.4 và 2.3.5}.
+\end{minipage}}
+\vspace{6pt}
+
 \subsection{Độ khó tăng dần theo điểm số -- v2}
 Thay thế hằng số \texttt{FALL\_INTERVAL\_NORMAL = 500} của v1, tốc độ rơi
 được tính \textbf{động mỗi frame} bởi hàm \texttt{getFallInterval(score)}:
@@ -276,6 +293,15 @@ Khi khối đang trong pha flash (\texttt{pendingClear = true}), bộ đếm
 \texttt{lastFallTime} bị đóng băng -- khối không rơi trong 6 tick $\times$ 80\,ms
 $\approx$ 480\,ms của hiệu ứng chớp. Đây là hành vi chủ ý: người chơi có
 thời gian quan sát trước khi dòng biến mất.
+
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} Flash clear sequence flowchart
+(lockBlock $\rightarrow$ pendingClear $\rightarrow$ 6-tick flash loop
+$\rightarrow$ finishLineClear), timing diagram, và combo score
+formula ($\Delta\text{score} = n^2$) được đặc tả trong
+\textbf{SDS §07-gameCoreEngineering, mục 2.3.3}.
+\end{minipage}}
+\vspace{6pt}
 
 \subsection{Hiệu ứng xoá dòng và điểm thưởng -- v2}
 
@@ -447,6 +473,15 @@ Bạn có thể kích hoạt làm mới trang theo bốn cách:
     \item Nhấn \texttt{ENTER} hoặc \texttt{SPACE}.
 \end{itemize}
 Khi đó, trình duyệt sẽ tải lại trang và bạn được khởi động lại từ màn hình gameStory đầu tiên. Trên phiên bản desktop, \textbf{Quit} sẽ đóng cửa sổ ngay lập tức và không hiển thị màn hình này.
+
+\noindent\fbox{\begin{minipage}{0.95\linewidth}
+\textit{Tham khảo kỹ thuật:} DB write boundary diagram (gameCore không sở hữu
+schema), sequence diagram của onGameOver() (dbOpen $\rightarrow$ INSERT
+$\rightarrow$ UPSERT $\rightarrow$ cascade $\rightarrow$ dbClose),
+\texttt{gameOverRecorded} idempotency guard, và GameRecord field mapping
+được đặc tả trong \textbf{SDS §07-gameCoreEngineering, mục 2.4 và 3.2}.
+\end{minipage}}
+\vspace{6pt}
 
 \subsection{Lưu thành tích vào cơ sở dữ liệu -- v2}
 Hàm \texttt{onGameOver()} thực hiện 3 bước theo thứ tự:
