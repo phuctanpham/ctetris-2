@@ -34,15 +34,15 @@ foreign-key relationships, 3 ownership groups) được đặc tả trong
 SRS chỉ phát biểu ràng buộc schema:
 \begin{itemize}[nosep]
   \item File: \texttt{SDL\_GetPrefPath("uit","cTetris")} $+$
-        	exttt{idUser} $+$ \texttt{".sqlite"}; mặc định \texttt{default.sqlite}.
+      	exttt{idUser} $+$ \texttt{".sqlite"}.
   \item User-prefix tables: \texttt{g\_dbCurrentUser + "\_" + suffix}
-        (Group 1 --- R/W owner).
-  \item \texttt{shared\_*}: tạo schema bởi gameConsole, ghi bởi gameStory
-        (Group 2 --- read-only cho gameConsole).
-  \item \texttt{sync\_Records}: sink từ Cloudflare D1, seed 30 rows khi init
-        (Group 3).
+      (Group 1 --- R/W owner).
+  \item \texttt{shared\_*}: schema owner = \texttt{gameConsole}; gameStory
+      populates content (Group 2 --- read-only to gameConsole).
+  \item \texttt{sync\_Records}: D1-fed leaderboard sink; seeded fallback rows
+      (Group 3).
   \item \texttt{dbInitSchema()} idempotent --- \texttt{CREATE TABLE IF NOT EXISTS}
-        cho cả 8 bảng.
+      for all 8 tables; safely re-runnable on each entry.
 \end{itemize}
 
 \subsubsection{Hợp đồng dữ liệu \texttt{SettingsConfig} (Cross-module Contract)}
@@ -53,13 +53,13 @@ flow (Console $\leftrightarrow$ Core $\leftrightarrow$ DBLayer) được đặc 
 SRS phát biểu ràng buộc contract:
 \begin{itemize}[nosep]
   \item \textbf{Persisted fields} (10 rows in \texttt{default\_Settings}):
-        	exttt{volume}, \texttt{color0-6}, \texttt{storyId}, \texttt{chapterId}.
+      	exttt{volume}, \texttt{color0-6}, \texttt{storyId}, \texttt{chapterId}.
   \item \textbf{Runtime-only fields} (NOT persisted):
-        	exttt{nextBlockScore}, \texttt{nextBlockSpeed}, \texttt{tableMatrix} ---
-        set from Stories popup, forwarded to \texttt{runGameCore()}.
+      	exttt{nextBlockScore}, \texttt{nextBlockSpeed}, \texttt{tableMatrix} ---
+      set from Stories popup, forwarded to \texttt{runGameCore()}.
   \item Single \texttt{volume} field (no separate bgm/sfx split in V2).
   \item \texttt{SettingsConfig\&} is a \textbf{borrowed pointer} inside
-        	exttt{AppState::cfg} --- \texttt{runGameConsole()} does not own it.
+      	exttt{AppState::cfg} --- \texttt{runGameConsole()} does not own it.
 \end{itemize}
 ]
 \node[root] {Module \\ gameConsole}

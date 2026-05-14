@@ -51,12 +51,7 @@
 \newcommand{\ThreeLayerArch}[4]{%
   \begin{center}\begin{tikzpicture}[node distance=0.35cm]
     \node[layerBox,fill=pillarBlue!18,draw=pillarBlue](L1){#2};
-    \node[layerBox,below=of L1](L2){#3};
-    \node[layerBox,fill=versionGreen!12,draw=versionGreen!60,below=of L2](L3){#4};
-    \draw[sdsArrow=pillarBlue!70](L1)--(L2);
-    \draw[sdsArrow=versionGreen!70](L2)--(L3);
-    \node[left=0.18cm of L1,font=\tiny\itshape,text=gray]{UI / Entry};
-    \node[left=0.18cm of L2,font=\tiny\itshape,text=gray]{Logic};
+    /* Lines 61-67 omitted */
     \node[left=0.18cm of L3,font=\tiny\itshape,text=gray]{Data};
   \end{tikzpicture}\end{center}}
 \newenvironment{VersionTable}{%
@@ -85,7 +80,7 @@
 \textbf{gameConsole} là \emph{hub screen} và \textbf{DB owner} của toàn
 ứng dụng: tạo schema \texttt{default.sqlite} (8 bảng, 3 nhóm), quản lý
 navigation flag-based, và làm trung gian truyền \texttt{SettingsConfig}
-giữa \texttt{main.cpp} và \texttt{runGameCore()}.
+giữa \texttt{main.cpp} và \texttt{runGameCore()}. 
 
 \noindent\textbf{Return code contract} (duy nhất giao tiếp ra ngoài):
 
@@ -184,8 +179,7 @@ kiểm soát render độc lập:
   t/.style={sdsBox=versionGreen!60,text width=3.0cm},
   arr/.style={sdsArrow=pillarBlue}
 ]
-  \node[b](p0){each frame:\\
-\texttt{SDL\_PollEvent}};
+  \node[b](p0){each frame:\\\texttt{SDL\_PollEvent}};
   \node[b,right=0.5cm of p0](p1){\texttt{drawBackground}\\(SVG lazy-init)};
   \node[b,right=0.5cm of p1](p2){\texttt{!any flag}\\$\rightarrow$ draw\\6 buttons};
   \node[b,right=0.5cm of p2](p3){\texttt{showGuide}\\$\rightarrow$\\GuideLightbox};
@@ -323,7 +317,6 @@ kiểm soát render độc lập:
   \quad
   \texttt{thumbY} = \texttt{track.y} +
     \frac{(\texttt{track.h} - \texttt{thumbH}) \times \texttt{pos}}
-         {\texttt{total} - \texttt{visible}}
 \]
 
 \noindent\textbf{Event $\rightarrow$ action mapping:}
@@ -445,67 +438,46 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
   % ── Group 1 (left column) ──
   \node[g1](rec) at (0,0) {
     \textbf{default\_Records}\ \textit{\tiny(R/W)}\\[1pt]
-    \pk{id}\ \texttt{INT AUTOINCREMENT}\\
-    idUser\ \texttt{TEXT}\\
-    startTS,\ endTS\ \texttt{INTEGER}\\
-    idStory,\ idChapter\ \texttt{INT}\\
-    totalScore,\ totalSeconds\\
+    /* Lines 454-459 omitted */
     avgSpeed\ \texttt{REAL},\ retryNo
   };
   \node[g1,below=0.4cm of rec](sto) {
     \textbf{default\_Stories}\ \textit{\tiny(R/W)}\\[1pt]
-    \pk{idUser,\ idStory,\ idChapter}\\
-    isActivated,\ isSelected\ \texttt{INT}\\
-    totalRetries,\ lastMaxScore\\
+    /* Lines 463-466 omitted */
     lastMaxSpeed\ \texttt{REAL}
   };
   \node[g1,below=0.4cm of sto](set) {
     \textbf{default\_Settings}\ \textit{\tiny(R/W)}\\[1pt]
-    \pk{key}\ \texttt{TEXT}\\
-    value\ \texttt{TEXT}\\
-    \textit{\tiny 10 rows: volume, color0-6,}\\
+    /* Lines 470-473 omitted */
     \textit{\tiny storyId, chapterId}
   };
 
   % ── Group 2 (centre column) ──
   \node[g2](sd) at (5.6,0) {
     \textbf{shared\_data}\ \textit{\tiny(R gameConsole)}\\[1pt]
-    \pk{idStory,\ idChapter}\\
-    storyName,\ chapterName\\
-    minScore,\ minSpeed,\ minRetries\\
-    requiredStories\ \texttt{TEXT (CSV)}\\
-    nextBlockScore,\ nextBlockSpeed\\
+    /* Lines 479-484 omitted */
     tableMatrix,\ thumbnailPath
   };
   \node[g2,below=0.4cm of sd](sdlg) {
     \textbf{shared\_dialogues}\ \textit{\tiny(R gameStory)}\\[1pt]
-    UNIQUE(\texttt{idStory,idChapter,nodeId})\\
-    speaker,\ text,\ imageUrl\\
-    bgmUrl,\ sfxUrl\\
+    /* Lines 488-491 omitted */
     nextNodeId,\ hasChoices
   };
   \node[g2,below=0.4cm of sdlg](scho) {
     \textbf{shared\_choices}\ \textit{\tiny(R gameStory)}\\[1pt]
-    UNIQUE(\texttt{idStory,idChapter,}\\
-    \texttt{nodeId,choiceIdx})\\
+    /* Lines 495-497 omitted */
     label,\ nextNodeId
   };
   \node[g2,below=0.4cm of scho](smet) {
     \textbf{shared\_meta}\ \textit{\tiny(R gameConsole)}\\[1pt]
-    \pk{chapter\_id}\ \texttt{TEXT}\\
-    sha,\ updated\_at\\
+    /* Lines 501-503 omitted */
     media\_base\_url
   };
 
   % ── Group 3 (right column) ──
   \node[g3](sync) at (11.2,0) {
     \textbf{sync\_Records}\ \textit{\tiny(Cloudflare D1)}\\[1pt]
-    \pk{id}\ \texttt{INT AUTOINCREMENT}\\
-    nameUser\ \texttt{TEXT}\\
-    totalScore,\ totalSeconds\\
-    avgSpeed\ \texttt{REAL}\\
-    endTS\ \texttt{INT}\\
-    idStory,\ idChapter\\
+    /* Lines 509-515 omitted */
     \textit{\tiny seed: 30 rows from FALLBACK}
   };
 
@@ -521,8 +493,7 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
   % sync_Records feeds Board display (no FK — data sink)
   \draw[-{Stealth[length=4pt]},thick,versionAmber!70,dashed]
       (sync.south)--++(0,-0.7)
-      node[below,font=\tiny,draw=versionAmber!40,fill=versionAmber!5,
-           rounded corners,inner sep=2pt]
+      /* Lines 530-532 omitted */
       {Board popup: \texttt{SELECT} ORDER BY score/endTS};
 
   % group labels
@@ -563,8 +534,8 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
 
   % stores
   \node[store](sett2) at (10.5,5.5){default\\\_Settings};
-  \node[store](sdat2) at (10.5,3.8){shared\_data\\(stories list)};
-  \node[store](srec)  at (10.5,1.8){sync\_Records\\(board data)};
+  \node[store](sdat2) at (10.5,3.8){shared\\\_data\\(stories list)};
+  \node[store](srec)  at (10.5,1.8){sync\\\_Records\\(board data)};
 
   % flows
   \draw[fl](ev)--node[above,font=\tiny]{key/mouse}(router);
@@ -601,7 +572,7 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
   \node[lhd](H4) at (9.6,0)  {\texttt{Sort}\\\texttt{Engine}};
   \node[lhd](H5) at (12.8,0) {\texttt{Screen}\\\texttt{Renderer}};
 
-  \foreach \x in {0,3.2,6.4,9.6,12.8}{\draw[lf](\x,-0.3)--(\x,-10.2);}
+  \foreach \x in {0,3.2,6.4,9.6,12.8}{\draw[lf](\x,-0.3)--(\x,-10.2);} 
 
   \draw[gray!40,thick,dashed](-0.8,-5.6)--(14,-5.6);
   \node[font=\scriptsize\itshape,gray] at (-0.5,-1.0) {PLAY};
@@ -689,7 +660,7 @@ Emscripten IDBFS  & \texttt{\#ifdef \_\_EMSCRIPTEN\_\_} &
   \texttt{idbfs\_mount\_dir}, \texttt{load/save\_from\_idb};
   Asyncify (\texttt{-sASYNCIFY=1}) \\
 libcurl           & V3 (native) & Cloudflare D1 REST push/pull \\
-ementscripten\_fetch & V3 (WASM)   & Cloudflare D1 REST (WASM path) \\
+emscripten\_fetch & V3 (WASM)   & Cloudflare D1 REST (WASM path) \\
 \hline
 \end{tabularx}
 
@@ -725,29 +696,7 @@ tương tác, \texttt{BUILD\_STANDALONE}.
   \draw[pillarBlue!40](0,440)--(270,440);
   \node at (135,460){\textbf{C T E T R I S -- GAME CONSOLE} (y=440..480)};
   % 6 buttons  y-coords inverted: display y0=130 → canvas y = 480-130-30=320
-  \fill[pillarBlue!25](65,290) rectangle (205,320);
-  \draw(65,290) rectangle (205,320); \node at (135,305){GUIDE (y=130..160)};
-  \fill[versionGreen!25](65,250) rectangle (205,280);
-  \draw(65,250) rectangle (205,280); \node at (135,265){BOARD (y=170..200)};
-  \fill[versionRed!25](65,210) rectangle (205,240);
-  \draw(65,210) rectangle (205,240); \node at (135,225){PLAY (y=210..240)};
-  \fill[versionAmber!30](65,170) rectangle (205,200);
-  \draw(65,170) rectangle (205,200); \node at (135,185){STORIES (y=250..280)};
-  \fill[purple!15](65,130) rectangle (205,160);
-  \draw(65,130) rectangle (205,160); \node at (135,145){SETTINGS (y=290..320)};
-  \fill[gray!30](65,90) rectangle (205,120);
-  \draw(65,90) rectangle (205,120); \node at (135,105){QUIT (y=330..360)};
-  % hint text band
-  \fill[gray!10](0,40) rectangle (270,85);
-  \draw[gray!30](0,40)--(270,40);
-  \node[align=center] at (135,62){hint text: TAB/WASD/ESC keys (y=380..425)};
-  % SVG tetromino corners
-  \fill[versionAmber!20](0,0) rectangle (35,35);
-  \node at (17,17){SVG corner};
-  \fill[versionAmber!20](235,0) rectangle (270,35);
-  \node at (252,17){SVG corner};
-  % axis labels
-  \node[gray] at (258,474){y=0};
+  /* Lines 734-757 omitted */
   \node[gray] at (258,6){y=480};
 \end{tikzpicture}
 \end{center}
@@ -762,13 +711,6 @@ exit: \texttt{SDL\_DestroyTexture} + reset \texttt{g\_consoleBg =
 \noindent\textbf{I/O validation:}
 \begin{itemize}[nosep]
   \item PLAY click $\rightarrow$ \texttt{runGameConsole} returns \texttt{1};
-        \texttt{cfgInOut.volume == 0.5f} (default, no DB).
-  \item ESC when no popup open $\rightarrow$ \texttt{focusIndex == 5} (QUIT);
-        no popup flag is \texttt{true}.
-  \item ESC when popup open $\rightarrow$ popup flag becomes \texttt{false};
-        \texttt{focusIndex} unchanged.
-  \item \texttt{BUILD\_STANDALONE}: \texttt{runGameConsole} called directly
-        from \texttt{main()}; returns \texttt{0} on QUIT.
 \end{itemize}
 
 % ─────────────────────────────────────────────────────────
@@ -799,16 +741,16 @@ from Stories popup row data.
 \hline
 LOCKED    & \texttt{isActivated == false}
           & dim bg, dim radio, no Play btn, muted text \\
-ACTIVE    & \texttt{isActivated \&\& totalRetries==0 \&\& lastMaxScore==0}
+ACTIVE    & \texttt{isActivated \\&\\& totalRetries==0 \\&\\& lastMaxScore==0}
           & normal row, white radio, green Play btn \\
-COMPLETED & \texttt{isActivated \&\& (totalRetries>0 || lastMaxScore>0)}
+COMPLETED & \texttt{isActivated \\&\\& (totalRetries>0 || lastMaxScore>0)}
           & green-tint bg, filled radio, green text \\
 \hline
 \end{tabular}
 \end{center}
 
 \noindent\textbf{IDBFS write protocol} (WASM only): every
-\texttt{dbSyncToPersistent()} call $\rightarrow$
+\texttt{dbSyncToPersistent()} call $\Rightarrow$
 \texttt{idbfs\_save\_to\_idb()} via Asyncify.
 Called after: \texttt{dbSaveSettings}, \texttt{dbInsertRecord},
 \texttt{dbUpsertStoryProgress}, \texttt{dbSelectStory},
@@ -818,17 +760,6 @@ Native: \texttt{dbSyncToPersistent()} is a compile-time no-op.
 \noindent\textbf{I/O validation:}
 \begin{itemize}[nosep]
   \item Set \texttt{volume=0.3} in Settings $\rightarrow$ close popup
-        $\rightarrow$ \texttt{SELECT value FROM default\_Settings
-        WHERE key='volume'} returns \texttt{"0.3000"}.
-  \item Click SCORE header in Board $\rightarrow$ sort mode cycles
-        SCORE\_DESC $\rightarrow$ SCORE\_ASC; log contains algo name
-        \texttt{"insertion"} ($n=30$).
-  \item \texttt{colorEnabled[i]=false} for 6 colors; attempt to
-        toggle last color $\rightarrow$ denied;
-        \texttt{countEnabled(cfg) >= 1} guaranteed.
-  \item DB probe returns \texttt{false} (file $\leq 100$\,B)
-        $\rightarrow$ \texttt{runGameConsole} returns \texttt{3}
-        without rendering any frame.
 \end{itemize}
 
 % ─────────────────────────────────────────────────────────
@@ -841,16 +772,6 @@ global leaderboard pulled by Board popup; LOAD/SAVE via OTP
 \noindent\textbf{Cloudflare Worker API (D1 path):}
 \begin{itemize}[nosep]
   \item \textbf{Push}: \texttt{POST /api/records} JSON
-        \texttt{\{nameUser, totalScore, totalSeconds, avgSpeed, endTS,
-        idStory, idChapter\}} $\rightarrow$ Worker inserts into D1
-        \texttt{sync\_Records}; also writes to local \texttt{sync\_Records}
-        (dual-write for offline fallback).
-  \item \textbf{Pull}: \texttt{GET /api/leaderboard?limit=50\&sort=score}
-        $\rightarrow$ replaces \texttt{sync\_Records} local rows.
-  \item \textbf{Offline}: fetch timeout / error $\rightarrow$ log
-        \texttt{"[gameConsole] D1 offline, local fallback"};
-        Board popup uses local \texttt{sync\_Records} or
-        \texttt{FALLBACK\_BOARD\_ROWS} if empty.
 \end{itemize}
 
 \noindent\textbf{OTP auth flow (LOAD/SAVE Settings button):}
@@ -861,11 +782,6 @@ code $\rightarrow$ Worker validates $\rightarrow$ returns JWT $\rightarrow$
 \noindent\textbf{I/O validation:}
 \begin{itemize}[nosep]
   \item HTTP 200 from D1 pull $\rightarrow$ \texttt{SELECT COUNT(*) FROM
-        sync\_Records} $\geq 1$; Board popup shows at least 1 real entry.
-  \item Offline: \texttt{loadBoardWithFallback()} returns exactly
-        $\texttt{sizeof(FALLBACK\_BOARD\_ROWS)/sizeof(...)=30}$ entries.
-  \item WASM: close tab after game-over $\rightarrow$ reopen
-        $\rightarrow$ \texttt{default\_Records} row persists (IDBFS).
 \end{itemize}
 
 \label{LastPageGameConsoleEngineering}
