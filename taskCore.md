@@ -6,7 +6,7 @@
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tao-giao-dien-169-00  
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí đầu tiên sau các khai báo và trên 01.  
     - Cấu hình layout chi tiết: bảng game 240x480 và một sidebar 30x480 bên phải.  
-[x] Task 1.3: viết v1 gameCore/app.cpp - tạo 6 khối hình học cơ bản (L, I, T, S, Z, O)  
+[x] Task 1.3: viết v1 gameCore/app.cpp - tạo 5 khối hình học cơ bản (L, I, T, Z, O)  
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tao-cac-khoi-xep-hinh-LITZO-01  
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 00 và trên 02.  
 [x] Task 1.4: viết v1 gameCore/app.cpp - đổ màu ngẫu nhiên (Blue, Red, Green, Yellow, Orange, Purple)  
@@ -28,10 +28,10 @@
 [x] Task 1.8: viết v1 gameCore/app.cpp - hiệu ứng xoá dòng  
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-xu-ly-xoa-dong-06  
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 05 và trên 07.  
-[x] Task 1.9: viết v1 gameCore/app.cpp - tính điểm với quy tắc định dạng 6 chữ số  
+[x] Task 1.9: viết v1 gameCore/app.cpp - tính điểm với quy tắc định dạng 5 chữ số  
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tinh-diem-07  
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 06 và trên 08.  
-    - Quy tắc điểm: mỗi dòng xoá = 1 điểm. Giới hạn điểm số tối đa là 999999.  
+    - Quy tắc điểm: mỗi dòng xoá = 1 điểm. Giới hạn điểm số tối đa là 99999.  
     - Điểm được hiển thị ở định dạng chuỗi 6 chữ số (ví dụ "000005").  
 [x] Task 1.10: viết v1 gameCore/app.cpp - xây dựng Sidebar UI và Procedural Icons  
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-sidebar-ui-08  
@@ -69,7 +69,6 @@
     - Cung cấp 4 nút chức năng: Restart (chơi lại), Console (về menu), Quit (thoát app), và Cancel.  
 [x] Task 1.17: tích hợp v1 với các modules khác trong app/src  
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameCore/app.cpp là: integration/v1  
-
 ### V2
 
 > **Cross-module dependency note (đọc trước khi làm):**
@@ -80,6 +79,7 @@
 > - `shared_data` chứa `nextBlockScore`, `nextBlockSpeed`, `tableMatrix` per story
 > - `dbOpen/dbClose/dbInitSchema/dbSeedSharedData/dbLoadStories/dbCheckAndUnlockStories/dbMaxActivatedChapter` đã implement
 > - `dbSelectStory` đã implement (trong app.cpp, không có trong header)
+> - Board data source: per updated Console V2, board JSON is provided via environment variable `CTETRIS_BOARD_URL` and Console will sync board data into DB (`sync_Records` / `shared_data`) — gameCore must read `tableMatrix` from DB/shared_data, not from any repo JSON file.
 >
 > **Những gì gameConsole V2 CHƯA implement (cần làm trước gameCore V2):**
 > - `dbInsertRecord()` — khai báo trong header nhưng THIẾU body trong app.cpp
@@ -137,8 +137,6 @@
 
 ---
 
-#### gameCore V2 Tasks
-
 [ ] Task 2.1: viết v2 gameCore/app.cpp - nhạc nền trong suốt tiến trình
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-chen-nhac-nen-15
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 14 và trên 16.
@@ -148,7 +146,7 @@
     - Depends on: P1 (để dùng cfg.volume đúng cách).
     - I/O validation: volume=0.0 → gain=0.0; volume=0.5 → gain=0.5; volume=1.0 → gain=1.0.
 
-[ ] Task 2.2: viết v2 gameCore/app.cpp - tốc độ rơi nhanh dần theo điểm số
+[x] Task 2.2: viết v2 gameCore/app.cpp - tốc độ rơi nhanh dần theo điểm số
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-tang-do-kho-16
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 15 và trên 17.
     - Thay thế hằng số `FALL_INTERVAL_NORMAL = 500` bằng hàm tính động theo state.score:
@@ -162,7 +160,7 @@
     - Soft drop interval = fallInterval / 5 (giữ tỷ lệ x5 từ v1).
     - I/O validation: score=0 → fall mỗi 500ms; score=50 → fall mỗi 100ms; soft drop luôn = fallInterval/5.
 
-[ ] Task 2.3: viết v2 gameCore/app.cpp - dự báo 3 khối liên tiếp với góc xoay ngẫu nhiên
+[x] Task 2.3: viết v2 gameCore/app.cpp - dự báo 3 khối liên tiếp với góc xoay ngẫu nhiên
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-du-bao-ba-khoi-xep-hinh-lien-tiep-17
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 16 và trên 18.
     - Thêm `nextBlock2`, `nextBlock3` vào GameState (gameCore_layout.h).
@@ -176,14 +174,14 @@
     - Depends on: P1, P4.
     - I/O validation: story 1 (nextBlockScore=50) → NEXT-2 ẩn lúc đầu → xuất hiện khi đạt 50 điểm.
 
-[ ] Task 2.4: viết v2 gameCore/app.cpp - hiệu ứng chớp tắt khi xoá dòng
+[x] Task 2.4: viết v2 gameCore/app.cpp - hiệu ứng chớp tắt khi xoá dòng
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-hieu-ung-khi-xoa-dong-18
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 17 và trên 19.
     - Thêm flash state vào GameState: `flashRows[4]` (indices of rows to clear), `flashCount`, `flashTimer`, `pendingClear` flag.
     - Flow: phát hiện full rows → lưu vào flashRows → set flashCount=6 (3 blinks × 2 frames) → trong khi flashCount>0: render rows luân phiên trắng/tối mỗi ~80ms, block fall tạm dừng → sau khi flashCount==0: thực hiện xoá dòng thật.
     - I/O validation: xoá 1 dòng → quan sát 3 lần chớp trước khi dòng biến mất.
 
-[ ] Task 2.5: viết v2 gameCore/app.cpp - tăng điểm thưởng khi xoá nhiều dòng cùng thời điểm
+[x] Task 2.5: viết v2 gameCore/app.cpp - tăng điểm thưởng khi xoá nhiều dòng cùng thời điểm
     - Comment codeblock này trong gameCore/app.cpp là: gamecore-diem-thuong-khi-xoa-nhieu-dong-19
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 18 và trên 20.
     - Sửa hàm `clearLines()`: `state.score += linesCleared * linesCleared`.
@@ -233,12 +231,11 @@
     - Kiểm tra SettingsConfig flow: Console chọn story → cfg populated → Core dùng đúng → back to Console.
     - Kiểm tra DB lifecycle: dbOpen/dbClose không bị double-open giữa Console và Core.
     - CMakeLists.txt: đảm bảo `sqlite3.c` + `gameConsole_db.h` include path accessible từ gameCore/app.cpp.
-
 ### V3
-[ ] Task 3.1: Tự động lưu thành tích Game Over (hoặc restart / quit)
+[ ] Task 3.1: Tự động đối chiếu thành tích Game Over (hoặc restart / quit)
     - Comment: `gamecore-game-over-screen-24`
     - Vị trí: sau `gamecore-update-story-progress-23`.
-    - Tự động lưu thành tích với các cột cột cần thiết như userID, chapterID,... riêng recordID bắt đầu từ {userID}-{YYMMDD}-{HHMMSS}, với YYMMDD là ngày kết thúc, HHMMSS là thời điểm kết thúc game.
+    - Đối chiếu thành tích bảng, nếu phá vỡ kỷ lục lớn nhất lần cuối thì nhắc nhở nên vào board nhấn nút sync để đồng bộ. 
 
 [ ] Task 3.2: Tích hợp V3
     - Comment: `integration/v3` trong `gameCore/app.cpp`.
@@ -254,14 +251,14 @@
 [x] Issue 1.5: Tinh chỉnh độ dày nét chữ (Thinning) và viền (Stroke) cho khối Preview
 [x] Issue 1.6: Thêm cử chỉ vuốt cảm ứng (Swipe Gesture) trên vùng bảng game
 ### V2
-[ ] Issue 2.1: `spawnBlock()` hiện dùng `std::rand() % 6 + 1` hardcode — sau Task 2.6 phải dùng enabled palette.
+[x] Issue 2.1: `spawnBlock()` hiện dùng `std::rand() % 6 + 1` hardcode — sau Task 2.6 phải dùng enabled palette.
     - Build `enabledIndices[]` từ `cfg.colorEnabled[7]`, chọn ngẫu nhiên trong danh sách đó.
     - Guard: nếu tất cả `colorEnabled[i]=false` (không thể xảy ra từ Console guard nhưng cần phòng) → fallback toàn bộ palette.
 
-[ ] Issue 2.2: `FALL_INTERVAL_FAST = 500 / 5` hardcode — sau Task 2.2 phải = `getFallInterval(score) / 5`.
+[x] Issue 2.2: `FALL_INTERVAL_FAST = 500 / 5` hardcode — sau Task 2.2 phải = `getFallInterval(score) / 5`.
     - Xoá hằng số `FALL_INTERVAL_FAST`, thay bằng `softDropInterval = getFallInterval(state.score) / 5` tính lại mỗi frame.
 
-[ ] Issue 2.3: `dbOpen/dbClose` trong gameCore phải tránh double-open nếu Console đã giữ connection.
+[x] Issue 2.3: `dbOpen/dbClose` trong gameCore phải tránh double-open nếu Console đã giữ connection.
     - Kiểm tra `g_db != nullptr` trước `dbOpen()`. Nếu đã mở, dùng luôn.
     - Dùng flag `bool g_dbOwnedByCore` để chỉ `dbClose()` khi Core là người đã open.
 
@@ -269,19 +266,19 @@
     - Format chuẩn: `"r0c0,...,r0c9;r1c0,..."` (semicolon rows, comma cols, value = colorID 0-6).
     - Cập nhật `dbSeedSharedData()` trong `gameConsole/app.cpp` có ít nhất 1 story với tableMatrix mẫu hợp lệ.
 
-[ ] Issue 2.5: Cập nhật DB khi Quit, Restart và Game Over — không mất dữ liệu.
+[x] Issue 2.5: Cập nhật DB khi Quit, Restart và Game Over — không mất dữ liệu.
     - **Game Over:** `dbInsertRecord()` → `dbUpsertStoryProgress()` → `dbCheckAndUnlockStories()` theo thứ tự Task 2.8→2.9.
     - **Restart:** `dbInsertRecord()` với score tại thời điểm restart (kể cả score=0) → `resetGame()`.
     - **Quit:** `dbInsertRecord()` → `dbClose()` → return `SCREEN_GAMECONSOLE`.
     - WASM: `EM_ASM({ Module.FS.syncfs(false, function(){}); })` sau mỗi write.
     - I/O validation: chơi 30 giây → quit → `SELECT COUNT(*) FROM idUser_Records` = 1, `endTS - startTS >= 30`.
 
-[ ] Issue 2.6: Parse và hiển thị `tableMatrix` từ cfg — đồng bộ trạng thái bàn cờ.
+[x] Issue 2.6: Parse và hiển thị `tableMatrix` từ cfg — đồng bộ trạng thái bàn cờ.
     - `resetGame()` parse `cfg.tableMatrix` và điền `board[][]` TRƯỚC khi spawn khối đầu tiên.
     - Parse lỗi → log warning, blank board, không crash.
     - I/O validation: story có tableMatrix 2 dòng đáy → board hiện 2 dòng màu ngay khi bắt đầu.
 
-[ ] Issue 2.7: Hiển thị thông tin story hiện tại trên Sidebar từ cfg.
+[x] Issue 2.7: Hiển thị thông tin story hiện tại trên Sidebar từ cfg.
     - Đọc `cfg.storyId` và `cfg.chapterId` → hiển thị `"S{storyId}-C{chapterId}"` trên 1 ô sidebar (ô 1, dưới score).
     - `cfg.storyId == 0` → ô đó để trống.
     - I/O validation: chọn story 2 chapter 1 ở Console → vào Core → sidebar hiện "S2-C1".
@@ -290,27 +287,8 @@
     - Task 2.3 dùng `cfg.nextBlockScore * 2` làm ngưỡng NEXT-3 khi không có field riêng.
     - Thêm comment `// TODO(V3): add nextBlockScore3 to SettingsConfig when shared_data extends schema`.
     - Không thay đổi logic V2, chỉ ghi nhận để tránh magic number bị bỏ sót khi nâng cấp.
-
 ### V3
 [ ] bổ sung sau
-
-## Execution Order (V2)
-```
-P1 (SettingsConfig expand)
-  → P2 (dbInsertRecord impl)
-  → P3 (dbUpsertStoryProgress impl)
-  → P4 (Console populate cfg fields)
-  → C1=Task 2.1 (BGM stream + volume)
-  → C2=Task 2.2 (dynamic fall speed)
-  → C3=Task 2.3 (3-block preview + unlock)
-  → C4=Task 2.4 (flash effect)
-  → C5=Task 2.5 (multi-line bonus score)
-  → C6=Task 2.6 (colorEnabled in spawnBlock)
-  → C7=Task 2.7 (tableMatrix board init)
-  → C8=Task 2.8 (write idUser_Records)
-  → C9=Task 2.9 (update idUser_Stories + unlock)
-  → C10=Task 2.10 (integration/v2)
-```
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameCore/app.cpp) duy nhất để viết.

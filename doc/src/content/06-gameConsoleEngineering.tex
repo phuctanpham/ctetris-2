@@ -1,4 +1,4 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
@@ -51,7 +51,8 @@
 \newcommand{\ThreeLayerArch}[4]{%
   \begin{center}\begin{tikzpicture}[node distance=0.35cm]
     \node[layerBox,fill=pillarBlue!18,draw=pillarBlue](L1){#2};
-    /* Lines 61-67 omitted */
+    \node[layerBox,fill=pillarBlue!8,draw=pillarBlue!40,below=of L1](L2){#3};
+    \node[layerBox,fill=gray!10,draw=gray!50,below=of L2](L3){#4};
     \node[left=0.18cm of L3,font=\tiny\itshape,text=gray]{Data};
   \end{tikzpicture}\end{center}}
 \newenvironment{VersionTable}{%
@@ -156,7 +157,6 @@ Group 3 & \texttt{sync\_Records} &
   \node[ext] (sq)    at (7.6,-3.2)                  {SQLite\\\texttt{default.sqlite}};
   \node[ext] (svg)   at (0,-3.2)                    {nanosvg\\rasterizer};
   \node[ext] (sdl)   at (3.8,-3.2)                  {SDL3 Events\\+ AudioStream};
-
   \draw[iface](main)--node[above,font=\tiny]{\texttt{cfg\&}}(entry);
   \draw[iface](entry)--(app);
   \draw[iface](app)--(rend)  node[above,font=\tiny,midway]{node,flags};
@@ -187,7 +187,6 @@ kiểm soát render độc lập:
   \node[t,below=0.6cm of p2](p5){\texttt{showSettings}\\$\rightarrow$\\SettingsLightbox};
   \node[t,below=0.6cm of p1](p6){\texttt{showStories}\\$\rightarrow$\\StoriesLightbox};
   \node[b,below=0.6cm of p0](p7){\texttt{wasmShutdown}\\$\rightarrow$\\ReloadScreen};
-
   \foreach \x/\y in {p0/p1,p1/p2,p2/p3}{\draw[arr](\x)--(\y);}
   \draw[arr,dashed,versionGreen](p2.south)--(p5);
   \draw[arr,dashed,versionGreen](p1.south)--(p6);
@@ -218,16 +217,15 @@ kiểm soát render độc lập:
   \node[dec] (d0) at (0,-1.0){file\\exists?};
   \node[ret] (r3a)at (4.5,-1.0){return \texttt{3}\\(no DB)};
   \node[proc](p1) at (0,-2.0){WASM: \texttt{idbfs\_mount\_dir} + \texttt{idbfs\_load\_from\_idb}};
-  \node[proc](p2) at (0,-3.0){\texttt{dbOpen("default")} $\rightarrow$ \texttt{sqlite3\_open}};
+  \node[proc](p2) at (0,-3.0){\foreignlanguage{english}{\texttt{dbOpen("default")}} $\rightarrow$ \texttt{sqlite3\_open}};
   \node[proc](p3) at (0,-4.0){\texttt{dbInitSchema()} --- \texttt{CREATE TABLE IF NOT EXISTS} $\times 8$};
   \node[proc](p4) at (0,-5.0){\texttt{dbSeedSharedData()} --- \texttt{SELECT COUNT(*) FROM shared\_data}};
   \node[dec] (d1) at (0,-6.0){rows\\$>0$?};
   \node[ret] (r3b)at (4.5,-6.0){return \texttt{3}\\(missing data)};
   \node[proc](p5) at (0,-7.0){\texttt{dbLoadSettings(cfgInOut)} + \texttt{applyVolumeToStream}};
-  \node[proc](p6) at (0,-8.0){\texttt{dbCheckAndUnlockStories("default")}};
+  \node[proc](p6) at (0,-8.0){\foreignlanguage{english}{\texttt{dbCheckAndUnlockStories("default")}}};
   \node[proc](p7) at (0,-9.0){restore \texttt{isSelected=1} story $\rightarrow$ \texttt{cfgInOut.storyId}};
   \node[ok]  (p8) at (0,-10.0){\texttt{loadBoardWithFallback()} + \texttt{applyBoardSort(SCORE\_DESC)}};
-
   \draw[arr](p0)--(d0);
   \draw[arr](d0)--node[above,font=\tiny]{no}(r3a);
   \draw[arr](d0)--node[left,font=\tiny]{yes}(p1);
@@ -242,24 +240,24 @@ kiểm soát render độc lập:
 
 \begin{center}
 \begin{tikzpicture}[
-  b/.style={sdsBox=pillarBlue!60,text width=2.6cm},
+  b/.style={sdsBox=pillarBlue!60,text width=2.5cm},
   dec/.style={diamond,draw=versionAmber!80,fill=versionAmber!8,
               aspect=2.6,align=center,font=\scriptsize},
   arr/.style={-{Stealth[length=4pt]},thick}
 ]
-  \node[b](in){BoardSortMode\\enum input};
-  \node[b,right=0.5cm of in](b1){build\\comparator\\lambda};
-  \node[b,right=0.5cm of b1](b2){\texttt{SortEngine}::\\\texttt{sort(arr, n,}\\cmp, CTX\_DEFAULT)};
-  \node[dec,right=0.5cm of b2](d0){$n \leq 64$?};
-  \node[b,above right=0.4cm and 0.5cm of d0](ins){Insertion\\Sort\\near-O(n)};
-  \node[b,below right=0.4cm and 0.5cm of d0](intro){IntroSort\\(Quick+Heap\\+Insertion)};
-  \node[b,right=1.2cm of d0](out){\texttt{boardScroll=0}\\log algo\\name};
-
+  \node[b](in) at (0,0) {BoardSortMode\\enum input};
+  \node[b,right=0.4cm of in](b1){build\\comparator\\lambda};
+  \node[b,right=0.4cm of b1](b2){\texttt{SortEngine}::\\\texttt{sort(arr, n,}\\cmp, CTX\_DEFAULT)};
+  \node[dec,right=0.4cm of b2](d0){$n \leq 64$?};
+  \node[b,above right=0.3cm and 0.4cm of d0](ins){Insertion\\Sort\\near-O(n)};
+  \node[b,below right=0.3cm and 0.4cm of d0](intro){IntroSort\\(Quick+Heap\\+Insertion)};
+  \node[b,right=2.8cm of d0](out){\texttt{boardScroll=0}\\log algo\\name};
+  
   \foreach \x/\y in {in/b1,b1/b2,b2/d0}{\draw[arr](\x)--(\y);}
   \draw[arr](d0)--node[above,font=\tiny]{yes}(ins);
   \draw[arr](d0)--node[below,font=\tiny]{no}(intro);
-  \draw[arr](ins.east)to[bend left=15](out.north);
-  \draw[arr](intro.east)to[bend right=15](out.south);
+  \draw[arr](ins.east) -- ++(0.4,0) |- (out.west);
+  \draw[arr](intro.east) -- ++(0.4,0) |- (out.west);
 \end{tikzpicture}
 \end{center}
 
@@ -271,40 +269,46 @@ kiểm soát render độc lập:
 
 \subsubsection{Story Unlock Cascade --- \texttt{dbCheckAndUnlockStories()}}
 
+\subsubsection{Story Unlock Cascade --- \texttt{dbCheckAndUnlockStories()}}
+
 \begin{center}
 \begin{tikzpicture}[
   proc/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=2pt,
-               minimum width=4.5cm,minimum height=0.55cm,align=center,font=\scriptsize},
+               text width=5.5cm,minimum height=0.65cm,align=center,font=\small},
+  skipbox/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=2pt,
+                  text width=3.0cm,minimum height=0.65cm,align=center,font=\small},
   dec/.style={diamond,draw=versionAmber!80,fill=versionAmber!8,
-              aspect=2.8,align=center,font=\scriptsize},
+              aspect=2.8,align=center,font=\small,inner sep=2pt},
   arr/.style={-{Stealth[length=4pt]},thick}
 ]
-  \node[proc](q0) at (0,0)   {\texttt{SELECT} \texttt{shared\_data} WHERE
-                               \texttt{requiredStories != ''}};
-  \node[proc](q1) at (0,-1.0){parse CSV \texttt{requiredStories}
-                               $\rightarrow$ \texttt{parents[]}};
-  \node[proc](q2) at (0,-2.0){\texttt{lookupParent}: fetch
-                               \texttt{lastMaxScore}, \texttt{Speed}, \texttt{Retries}};
-  \node[dec] (d0) at (0,-3.0){all parents\\satisfy child\\min thresholds?};
-  \node[proc](d1) at (4.2,-3.0){skip $\rightarrow$ next\\candidate};
-  \node[dec] (d2) at (0,-4.2){already\\activated?};
-  \node[proc](d3) at (4.2,-4.2){skip\\(idempotent)};
-  \node[proc](q3) at (0,-5.2){\texttt{INSERT \ldots ON CONFLICT DO UPDATE}
-                               \texttt{isActivated=1}};
-  \node[proc](q4) at (0,-6.2){\texttt{unlocked++}};
-  \node[proc](q5) at (0,-7.2){after loop: \texttt{unlocked > 0}
-                               $\rightarrow$ \texttt{dbSyncToPersistent()}};
+  \node[proc](q0) at (0,0)   {\texttt{SELECT} \texttt{shared\_data} WHERE\\ \texttt{requiredStories != ''}};
+  \node[proc](q1) at (0,-1.5){parse CSV \texttt{requiredStories}\\ $\rightarrow$ \texttt{parents[]}};
+  \node[proc](q2) at (0,-3.0){\texttt{lookupParent}: fetch\\ \texttt{lastMaxScore}, \texttt{Speed}, \texttt{Retries}};
+  
+  \node[dec] (d0) at (0,-5.2){all parents\\satisfy child\\min thresholds?};
+  % Căn lề tự động: Cách mép phải của d0 đúng 1.5cm
+  \node[skipbox, right=1.5cm of d0](d1){skip $\rightarrow$ next\\candidate};
+  
+  \node[dec] (d2) at (0,-7.8){already\\activated?};
+  % Căn lề tự động: Cách mép phải của d2 đúng 1.5cm
+  \node[skipbox, right=1.5cm of d2](d3){skip\\(idempotent)};
+  
+  \node[proc](q3) at (0,-10.2){\texttt{INSERT \ldots ON CONFLICT DO UPDATE}\\ \texttt{isActivated=1}};
+  \node[proc](q4) at (0,-11.4){\texttt{unlocked++}};
+  \node[proc](q5) at (0,-12.6){after loop: \texttt{unlocked > 0}\\ $\rightarrow$ \texttt{dbSyncToPersistent()}};
 
-  \draw[arr](q0)--(q1);\draw[arr](q1)--(q2);\draw[arr](q2)--(d0);
-  \draw[arr](d0)--node[above,font=\tiny]{no}(d1);
-  \draw[arr](d0)--node[left,font=\tiny]{yes}(d2);
-  \draw[arr](d2)--node[above,font=\tiny]{yes}(d3);
-  \draw[arr](d2)--node[left,font=\tiny]{no}(q3);
-  \draw[arr](q3)--(q4);\draw[arr](q4)--(q5);
-  \draw[arr,gray,dashed](d1.east)--++(0.4,0)--++(0,1.6)--
-      node[right,font=\tiny]{next ch}++(-0.4,0)--(q1.east);
-  \draw[arr,gray,dashed](d3.east)--++(0.4,0)--++(0,1.0)--
-      node[right,font=\tiny]{next ch}++(-0.4,0)--(q1.east);
+  % --- NỐI CÁC KHỐI TRỤC DỌC ---
+  \draw[arr](q0)--(q1); \draw[arr](q1)--(q2); \draw[arr](q2)--(d0);
+  \draw[arr](d0)--node[above,font=\footnotesize]{no}(d1);
+  \draw[arr](d0)--node[left,font=\footnotesize]{yes}(d2);
+  \draw[arr](d2)--node[above,font=\footnotesize]{yes}(d3);
+  \draw[arr](d2)--node[left,font=\footnotesize]{no}(q3);
+  \draw[arr](q3)--(q4); \draw[arr](q4)--(q5);
+
+  % --- NỐI CÁC KHỐI SKIP VÒNG NGƯỢC LÊN Q1 ---
+  % ++(0.5,0) và ++(1.0,0) tạo ra 2 đường song song không đè lên nhau
+  \draw[arr,gray,dashed](d1.east) -- ++(0.5,0) |- node[pos=0.25,right,font=\footnotesize]{next ch} (q1.east);
+  \draw[arr,gray,dashed](d3.east) -- ++(1.0,0) |- node[pos=0.25,right,font=\footnotesize]{next ch} (q1.east);
 \end{tikzpicture}
 \end{center}
 
@@ -316,7 +320,7 @@ kiểm soát render độc lập:
     \tfrac{\texttt{visible}}{\texttt{total}}\Bigr),
   \quad
   \texttt{thumbY} = \texttt{track.y} +
-    \frac{(\texttt{track.h} - \texttt{thumbH}) \times \texttt{pos}}
+    \frac{(\texttt{track.h} - \texttt{thumbH}) \times \texttt{pos}}{\texttt{track.h}}
 \]
 
 \noindent\textbf{Event $\rightarrow$ action mapping:}
@@ -361,11 +365,11 @@ clamped to $[0,1]$.
 \textbf{\texttt{key}} & \textbf{\texttt{value} type} &
 \textbf{Field in \texttt{SettingsConfig}} \\
 \hline
-\texttt{"volume"}            & float string (\texttt{"\%.4f"}) & \texttt{volume} \\
-\texttt{"color0"}\ldots\texttt{"color6"} & \texttt{"0"}/\texttt{"1"} &
+\foreignlanguage{english}{\texttt{"volume"}}            & float string (\foreignlanguage{english}{\texttt{"\%.4f"}}) & \texttt{volume} \\
+\foreignlanguage{english}{\texttt{"color0"}}\ldots\foreignlanguage{english}{\texttt{"color6"}} & \foreignlanguage{english}{\texttt{"0"}}/\foreignlanguage{english}{\texttt{"1"}} &
   \texttt{colorEnabled[0..6]} \\
-\texttt{"storyId"}           & int string & \texttt{storyId} \\
-\texttt{"chapterId"}         & int string & \texttt{chapterId} \\
+\foreignlanguage{english}{\texttt{"storyId"}}           & int string & \texttt{storyId} \\
+\foreignlanguage{english}{\texttt{"chapterId"}}         & int string & \texttt{chapterId} \\
 \hline
 \end{tabular}
 \end{center}
@@ -438,49 +442,46 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
   % ── Group 1 (left column) ──
   \node[g1](rec) at (0,0) {
     \textbf{default\_Records}\ \textit{\tiny(R/W)}\\[1pt]
-    /* Lines 454-459 omitted */
+    % (omitted)
     avgSpeed\ \texttt{REAL},\ retryNo
   };
   \node[g1,below=0.4cm of rec](sto) {
     \textbf{default\_Stories}\ \textit{\tiny(R/W)}\\[1pt]
-    /* Lines 463-466 omitted */
+    % (omitted)
     lastMaxSpeed\ \texttt{REAL}
   };
   \node[g1,below=0.4cm of sto](set) {
     \textbf{default\_Settings}\ \textit{\tiny(R/W)}\\[1pt]
-    /* Lines 470-473 omitted */
+    % (omitted)
     \textit{\tiny storyId, chapterId}
   };
-
   % ── Group 2 (centre column) ──
   \node[g2](sd) at (5.6,0) {
     \textbf{shared\_data}\ \textit{\tiny(R gameConsole)}\\[1pt]
-    /* Lines 479-484 omitted */
+    % (omitted)
     tableMatrix,\ thumbnailPath
   };
   \node[g2,below=0.4cm of sd](sdlg) {
     \textbf{shared\_dialogues}\ \textit{\tiny(R gameStory)}\\[1pt]
-    /* Lines 488-491 omitted */
+    % (omitted)
     nextNodeId,\ hasChoices
   };
   \node[g2,below=0.4cm of sdlg](scho) {
     \textbf{shared\_choices}\ \textit{\tiny(R gameStory)}\\[1pt]
-    /* Lines 495-497 omitted */
+    % (omitted)
     label,\ nextNodeId
   };
   \node[g2,below=0.4cm of scho](smet) {
     \textbf{shared\_meta}\ \textit{\tiny(R gameConsole)}\\[1pt]
-    /* Lines 501-503 omitted */
+    % (omitted)
     media\_base\_url
   };
-
   % ── Group 3 (right column) ──
   \node[g3](sync) at (11.2,0) {
     \textbf{sync\_Records}\ \textit{\tiny(Cloudflare D1)}\\[1pt]
-    /* Lines 509-515 omitted */
+    % (omitted)
     \textit{\tiny seed: 30 rows from FALLBACK}
   };
-
   % ── relationships ──
   \draw[rel](sd.west)to[bend right=8]
       node[lbl,pos=0.35]{1}node[lbl,pos=0.8]{N}(sto.east);
@@ -493,9 +494,8 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
   % sync_Records feeds Board display (no FK — data sink)
   \draw[-{Stealth[length=4pt]},thick,versionAmber!70,dashed]
       (sync.south)--++(0,-0.7)
-      /* Lines 530-532 omitted */
+      node[above,font=\tiny,align=center]
       {Board popup: \texttt{SELECT} ORDER BY score/endTS};
-
   % group labels
   \node[font=\scriptsize\bfseries,pillarBlue] at (0,-5.6)
       {Group 1 --- Per-user R/W};
@@ -522,7 +522,6 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
   % external actors
   \node[extio](ev)    at (0,5.5)   {SDL\\Events};
   \node[extio](main2) at (0,0)     {\texttt{main.cpp}};
-
   % processes
   \node[proc](router) at (3.5,5.5) {Event\\Router};
   \node[proc](flags)  at (3.5,3.8) {AppState\\flag update};
@@ -531,15 +530,13 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
   \node[proc](rend2)  at (3.5,1.8) {Screen\\Renderer};
   \node[proc](audio)  at (7.0,1.8) {AudioStream\\gain update};
   \node[extio](ret)   at (3.5,0)   {return\\0/1/2/3};
-
   % stores
   \node[store](sett2) at (10.5,5.5){default\\\_Settings};
   \node[store](sdat2) at (10.5,3.8){shared\\\_data\\(stories list)};
   \node[store](srec)  at (10.5,1.8){sync\\\_Records\\(board data)};
-
   % flows
   \draw[fl](ev)--node[above,font=\tiny]{key/mouse}(router);
-  \draw[fl](router)--node[left,font=\tiny]{popup\\flags}(flags);
+  \draw[fl](router)--node[left,font=\tiny,align=center]{popup\\flags}(flags);
   \draw[fl](router)--node[above,font=\tiny]{CRUD call}(dblay);
   \draw[fl](dblay)--node[above,font=\tiny]{R/W}(sett2);
   \draw[dfl](dblay.south)--node[right,font=\tiny]{R stories}(sdat2);
@@ -547,8 +544,8 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
       node[right,font=\tiny]{R board}(srec);
   \draw[fl](dblay.south)to[bend left=8]
       node[left,font=\tiny]{sort trigger}(sort2);
-  \draw[fl](sort2)--node[right,font=\tiny]{sorted\\g\_board[]}(flags.east);
-  \draw[fl](flags)--node[left,font=\tiny]{render\\state}(rend2);
+  \draw[fl](sort2)--node[right,font=\tiny,align=center]{sorted\\g\_board[]}(flags.east);
+  \draw[fl](flags)--node[left,font=\tiny,align=center]{render\\state}(rend2);
   \draw[fl](flags.east)to[bend right=12]
       node[below right,font=\tiny]{vol}(audio.north);
   \draw[fl](rend2)--node[above,font=\tiny]{SDL\_RenderPresent}(ret);
@@ -571,13 +568,10 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
   \node[lhd](H3) at (6.4,0)  {\texttt{DBLayer}};
   \node[lhd](H4) at (9.6,0)  {\texttt{Sort}\\\texttt{Engine}};
   \node[lhd](H5) at (12.8,0) {\texttt{Screen}\\\texttt{Renderer}};
-
   \foreach \x in {0,3.2,6.4,9.6,12.8}{\draw[lf](\x,-0.3)--(\x,-10.2);} 
-
   \draw[gray!40,thick,dashed](-0.8,-5.6)--(14,-5.6);
   \node[font=\scriptsize\itshape,gray] at (-0.5,-1.0) {PLAY};
   \node[font=\scriptsize\itshape,gray] at (-0.5,-6.3) {STORIES};
-
   % ── PLAY path ──
   \draw[msg](0,-1.0)--(3.2,-1.0)
       node[above,font=\tiny,midway]{runGameConsole(win,ren,cfg)};
@@ -598,13 +592,12 @@ struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
       node[above,font=\tiny,midway]{user clicks PLAY};
   \draw[ret](6.4,-5.2)--(0,-5.2)
       node[above,font=\tiny,midway]{return 1, cfg.storyId/chapterId set};
-
   % ── STORIES path ──
   \draw[msg](0,-6.3)--(3.2,-6.3)
       node[above,font=\tiny,midway]{runGameConsole(win,ren,cfg)};
   \draw[msg](3.2,-6.9)--(3.2,-6.9);
   \draw[msg](3.2,-7.3)--(6.4,-7.3)
-      node[above,font=\tiny,midway]{showStories=true\\dbLoadStories("default",ch)};
+      node[above,font=\tiny,midway,align=center]{showStories=true\\dbLoadStories("default",ch)};
   \draw[ret](6.4,-7.8)--(3.2,-7.8)
       node[above,font=\tiny,midway]{storiesCache[] (StoryRow)};
   \draw[msg](3.2,-8.2)--(12.8,-8.2)
@@ -638,7 +631,7 @@ struct SettingsConfig { ... };   // see §2.4
 \end{verbatim}
 
 \noindent\textbf{DB init idempotency contract:}
-\texttt{dbOpen("default")} + \texttt{dbInitSchema()} safe to call on
+\foreignlanguage{english}{\texttt{dbOpen("default")}} + \texttt{dbInitSchema()} safe to call on
 every \texttt{runGameConsole} entry including re-entries after
 gameCore back-to-console; all \texttt{CREATE TABLE IF NOT EXISTS}
 are no-ops when schema exists.
@@ -695,8 +688,8 @@ tương tác, \texttt{BUILD\_STANDALONE}.
   \fill[pillarBlue!15](0,440) rectangle (270,480);
   \draw[pillarBlue!40](0,440)--(270,440);
   \node at (135,460){\textbf{C T E T R I S -- GAME CONSOLE} (y=440..480)};
-  % 6 buttons  y-coords inverted: display y0=130 → canvas y = 480-130-30=320
-  /* Lines 734-757 omitted */
+  % 6 buttons  y-coords inverted: display y0=130 $\rightarrow$ canvas y = 480-130-30=320
+  % (omitted)
   \node[gray] at (258,6){y=480};
 \end{tikzpicture}
 \end{center}
@@ -720,15 +713,15 @@ exit: \texttt{SDL\_DestroyTexture} + reset \texttt{g\_consoleBg =
 Stories popup DB-driven; IDBFS WASM flush.
 
 \noindent\textbf{DB path formula:}
-$\texttt{SDL\_GetPrefPath("uit","cTetris")} + \texttt{idUser} + \texttt{".sqlite"}$
+$\foreignlanguage{english}{\texttt{SDL\_GetPrefPath("uit","cTetris")}} + \texttt{idUser} + \foreignlanguage{english}{\texttt{".sqlite"}}$
 $\Rightarrow$ \texttt{default.sqlite}.
-User table names: \texttt{g\_dbCurrentUser + "\_" + suffix}
+User table names: \foreignlanguage{english}{\texttt{g\_dbCurrentUser + "\_" + suffix}}
 $\Rightarrow$ \texttt{default\_Records}, \texttt{default\_Stories},
 \texttt{default\_Settings}.
 
 \noindent\textbf{Settings key mapping} (10 rows, see §2.3.5):
 \texttt{volume} (4 decimal places); \texttt{color0}\ldots\texttt{color6}
-(\texttt{"0"}/\texttt{"1"}); \texttt{storyId}, \texttt{chapterId}.
+(\foreignlanguage{english}{\texttt{"0"}}/\foreignlanguage{english}{\texttt{"1"}}); \texttt{storyId}, \texttt{chapterId}.
 Range clamp on load: \texttt{volume} $\in [0,1]$.
 \texttt{nextBlockScore/Speed/tableMatrix} are NOT stored --- set at runtime
 from Stories popup row data.
@@ -741,9 +734,9 @@ from Stories popup row data.
 \hline
 LOCKED    & \texttt{isActivated == false}
           & dim bg, dim radio, no Play btn, muted text \\
-ACTIVE    & \texttt{isActivated \\&\\& totalRetries==0 \\&\\& lastMaxScore==0}
+ACTIVE    & \texttt{isActivated \&\& totalRetries==0 \&\& lastMaxScore==0}
           & normal row, white radio, green Play btn \\
-COMPLETED & \texttt{isActivated \\&\\& (totalRetries>0 || lastMaxScore>0)}
+COMPLETED & \texttt{isActivated \&\& (totalRetries>0 || lastMaxScore>0)}
           & green-tint bg, filled radio, green text \\
 \hline
 \end{tabular}
@@ -781,7 +774,7 @@ code $\rightarrow$ Worker validates $\rightarrow$ returns JWT $\rightarrow$
 
 \noindent\textbf{I/O validation:}
 \begin{itemize}[nosep]
-  \item HTTP 200 from D1 pull $\rightarrow$ \texttt{SELECT COUNT(*) FROM
+  \item HTTP 200 from D1 pull $\rightarrow$ \texttt{SELECT COUNT(*) FROM sync\_Records} verified.
 \end{itemize}
 
 \label{LastPageGameConsoleEngineering}

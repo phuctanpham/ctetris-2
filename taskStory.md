@@ -37,7 +37,7 @@
     - Viết hướng dẫn sử dụng/tích hợp cho developer mới (README hoặc comment chi tiết trong code).
 
 ### V2
-[ ] Task 2.1: Tổ chức lại cấu trúc thư mục theo chuẩn mới.
+[x] Task 2.1: Tổ chức lại cấu trúc thư mục theo chuẩn mới.
     - Di chuyển nội dung chapter ra ngoài thư mục `app/`, đặt `chapters/` cùng cấp với `app/`.
     - Cấu trúc thư mục chuẩn sau khi hoàn thành:
       ```
@@ -120,7 +120,7 @@
       }
       ```
 
-[ ] Task 2.3: Viết v2 gameStory/app.cpp — Cơ chế đồng bộ CSDL SQLite từ xa dùng manifest.json.
+[x] Task 2.3: Viết v2 gameStory/app.cpp — Cơ chế đồng bộ CSDL SQLite từ xa dùng manifest.json.
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-dong-bo-sqlite-05a
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 04 và trước gamestory-phan-cot-game-05b.
 
@@ -145,7 +145,7 @@
     - Desktop: dùng `libcurl` + file SQLite thông thường như mô tả trên.
     - WASM (`#ifdef __EMSCRIPTEN__`): không gọi `libcurl` trực tiếp. Thay vào đó bundle sẵn file SQL vào build output của Emscripten, hoặc dùng `emscripten_fetch` kết hợp IndexedDB. Tách logic này thành hàm riêng để dễ bảo trì.
 
-[ ] Task 2.4: viết v2 gameStory/app.cpp - tạo dialogue story engine để hiển thị cốt truyện kèm nhạc nền.
+[x] Task 2.4: viết v2 gameStory/app.cpp - tạo dialogue story engine để hiển thị cốt truyện kèm nhạc nền.
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-phan-cot-game-05b
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 05a và trên 06.
     - Đọc dữ liệu hội thoại từ SQLite local (đã được đồng bộ bởi Task 2.3).
@@ -153,12 +153,12 @@
     - Hỗ trợ tuyến tính (`next`) và phân nhánh (`choices`). Khi có `choices`, dùng phím Tab để chuyển đổi giữa các lựa chọn, Enter/Space để xác nhận.
     - Mỗi dialogue node hiển thị: hình ảnh scene, tên nhân vật, nội dung thoại, nhạc nền nếu có `bgm`.
 
-[ ] Task 2.5: viết v2 gameStory/app.cpp - nút skip để bỏ qua phần cốt truyện.
+[x] Task 2.5: viết v2 gameStory/app.cpp - nút skip để bỏ qua phần cốt truyện.
     - Comment codeblock này trong gameStory/app.cpp là: gamestory-nut-bo-qua-cot-truyen-06
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau 05b và trên 07.
     - Sau khi skip, chuyển nhịp nhàng sang màn hình gameConsole.
 
-[ ] Task 2.6: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp.
+[x] Task 2.6: tích hợp v2 với các modules còn lại trong app/src qua file app/main.cpp.
     - Nếu có viết thêm để hỗ trợ tích hợp, Comment codeblock này trong gameStory/app.cpp là: integration/v2
     - Đặt thứ tự codeblock này từ trên xuống ở vị trí sau codeblock của integration/v1.
 
@@ -208,7 +208,7 @@
     - Story mặc định sau init: story có `idStory` nhỏ nhất của chapter có `idChapter` nhỏ nhất trong manifest.
     - I/O validation: xoá DB → chạy lại → DB mới tên chứa device-id, bảng `meta` có ít nhất 1 row sau sync.
 
-[ ] Issue 2.2: So sánh phiên bản manifest và cập nhật có chọn lọc — Flow A (DB đã tồn tại).
+[x] Issue 2.2: So sánh phiên bản manifest và cập nhật có chọn lọc — Flow A (DB đã tồn tại).
     - Fetch `manifest.json` gist → so sánh từng `{ "id", "sha" }` với bảng `meta` local.
     - SHA khớp → bỏ qua chapter. SHA khác → fetch `c{id}.json` từ gist tương ứng → parse JSON trong C++ (không qua `parse.py`) → diff từng object `idStory`:
         + `idStory` mới → INSERT vào `stories`, `dialogues`, `choices`.
@@ -263,6 +263,24 @@
     - Sau khi user chọn "Yes" trên prompt: `UPDATE idUser_Stories SET isSelected=0` story cũ, `isSelected=1` và `isActivated=1` story mới.
     - WASM: `EM_ASM({ Module.FS.syncfs(false, function(){}); })` ngay sau UPDATE.
     - I/O validation: confirm Yes → query `idUser_Stories` → story mới `isSelected=1`, story cũ `isSelected=0`.
+
+[ ] Issue 2.10: DB device-id namespacing and initialization behavior.
+    - Current: `storyDbOpen()` opens `default.sqlite` under `SDL_GetPrefPath` and does not namespace DB filename by device id.
+    - Desired V2 behavior: create `{deviceId}.sqlite` where `deviceId` is stable hash of platform+basepath. Also, initial sync should seed story selection from manifest-derived data.
+    - Task: implement device-id prefixing, ensure `main.cpp` / story code uses same pref path and device-id when opening DB, and update tests for I/O validation.
+
+[ ] Issue 2.11: In-memory media streaming (images/bgm/sfx) — no disk cache.
+    - Current: dialogue image area is a placeholder; BGM is a stub logging URL but not played.
+    - Desired V2 behavior: fetch image/audio from `media_base_url` or raw URL, decode in-memory and create `SDL_Texture` / audio stream on-the-fly without writing to disk. Provide graceful offline fallback.
+    - Task: implement async/native fetch + texture/audio creation, timeouts, and placeholder fallback.
+
+[ ] Issue 2.12: Skip-button visibility differs from spec.
+    - Current: Skip button is hidden during sync (correct) but visible during logo intro and dialogue. Spec requires Skip only in Dialogue Screen.
+    - Task: change visibility to only render and accept Skip events during dialogue phase; ensure logo phase skip behavior is handled via explicit logo-skip config or UX decision.
+
+[ ] Issue 2.13: `requiredStories` unlock logic not enforced.
+    - Current: `postSyncConditionCheck()` only checks `minScore` / `minSpeed` of the next story; it does not evaluate `requiredStories` (cross-story prerequisites).
+    - Task: implement parsing and enforcement of `requiredStories` (comma-separated ids), including cross-chapter references per spec, and unit tests for unlock flows.
 
 ### V3
 [ ] bổ sung sau
@@ -388,72 +406,7 @@ Trước khi đánh dấu V2 done, xác nhận:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.
     - Các *.h phải để trong thư mục include của ứng dụng (app/src/gameStory/include).
     - Cần tách 1 file layout.h (app/src/gameStory/include/layout.h) để đảm bảo ứng dụng chạy theo khung hình có tỷ lệ 9:16.
-<<<<<<< HEAD
     - Các file hình ảnh, âm thanh, phim... của module app phải để trong chính thư mục đang làm việc và đặt tên bắt đầu bằng tiền tố là tên thư mục. VD: cần thêm 1 file nhạc nền tên music.mp3 cho gameStory thì phải để trong app/src/gameStory/gameStory_music.mp3.
     - Nội dung chapter (JSON, media) được đặt trong `chapters/src/c{id}/`, không nằm trong thư mục `app/`. Tên file media không chứa ID chapter hay ID story — đặt tên theo nội dung gợi nhớ kèm suffix `_sfx` hoặc `_bgm` để phân biệt loại âm thanh.
     - File `chapters/manifest.json` và các file `*.sql` được tự động sinh bởi CI. Không commit hoặc chỉnh sửa tay các file này.
     - File `chapters/prompts/json.md` là nguồn tham chiếu duy nhất cho cấu trúc JSON và quy tắc thư mục. Khi thay đổi schema, cập nhật file này trước, sau đó mới chỉnh `parse.py` và code C++.
-=======
-### Phase B — Task 2.2: CI/CD
-- **B.1** Create `chapters/scripts/parse.py` (JSON → SQL emitter, rewrites `media/x.png` → raw GitHub URL)
-- **B.2** Create `chapters/scripts/build_manifest.py` (collects per-file `git log` SHA → manifest.json)
-- **B.3** Create `.github/workflows/sync-chapters.yml` (trigger, parse, commit `[skip ci]`, loop-guarded)
-- **I/O check**: run `python3 parse.py c001.json` locally, assert output contains expected `INSERT OR REPLACE INTO stories`, `dialogues`, `choices` statements
-
-### Phase C — Task 2.3: Remote sync `gamestory-dong-bo-sqlite-05a`
-- **C.1** Add `gameStory_db.h` (new file) declaring `dbInitStoryTables()` + 4-table schema
-- **C.2** Implement `dbInitStoryTables()` in `gameStory/app.cpp` (creates `meta`, `stories`, `dialogues`, `choices` if absent — does NOT touch gameConsole's `shared_data`)
-- **C.3** Create `app/src/shared/http.h` + `http_native.cpp` (libcurl) + `http_wasm.cpp` (`emscripten_fetch`)
-- **C.4** Add libcurl detection to `build.sh` (apt/brew/pacman) and `build.ps1` (vcpkg or pre-built)
-- **C.5** Implement `syncChaptersFromManifest()` in gameStory/app.cpp — fetch manifest → diff SHA → fetch+exec changed SQL → update `meta`
-- **C.6** WASM split: `#ifdef __EMSCRIPTEN__` calls `syncChapters_WASM()` (async emscripten_fetch + IDBFS persist); else `syncChapters_Desktop()`
-- **C.7** Offline fallback: any HTTP failure → log + skip, never block startup
-- **I/O check**: native run with `--offline` flag → assert no crash, log shows "offline"; native online → assert `meta` table has 1 row after first sync
-
-### Phase D — Task 2.4: Dialogue engine `gamestory-phan-cot-game-05b`
-- **D.1** Add `loadDialogueByChapter(chapterId, storyId)` → returns `std::map<int, DialogueNode>` from SQLite
-- **D.2** Define `DialogueNode { int id; string speaker; string text; string imageUrl; string bgmUrl; string sfxUrl; int nextId; vector<Choice> choices; }`
-- **D.3** Add `DialogueRuntime` state: `currentNodeId`, `selectedChoiceIdx`, `bgmStream`, `imageTexture`
-- **D.4** Render: full-screen `imageUrl` (load via `loadImageFromUrl()` — cache to memory), text box bottom 30%, speaker label
-- **D.5** Audio: `playBgm(url)` / `playSfx(url)` using `SDL_OpenAudioDeviceStream` (reuse gameConsole pattern)
-- **D.6** Input: ENTER/SPACE/click → `currentNodeId = next_id`; TAB cycles choices when `has_choices=1`; ENTER on choice → `currentNodeId = choices[idx].next_id`
-- **D.7** Terminate condition: `next_id = 0` (or no row) → break dialogue loop, return from gameStory
-- **I/O check**: seed SQLite with 3 nodes (linear→branch→ending), walk through, assert correct path taken for each TAB choice
-
-### Phase E — Task 2.5: Skip button `gamestory-nut-bo-qua-cot-truyen-06`
-- **E.1** Add `SKIP_BTN` rect top-right (40×20 px), fade-in synced with logo intro
-- **E.2** Event handler: hit-test + ESC key
-- **E.3** On skip: stop BGM, free textures, `running = false`, return 0 → main.cpp falls through to gameConsole
-- **I/O check**: native run, click skip during intro → window transitions to gameConsole within 1 frame, no error logs
-
-### Phase F — V3 Task 3.1: Per-file media cache
-- **F.1** After C.5 finishes, query distinct media URLs from `dialogues`
-- **F.2** For each URL, derive local path = `SDL_GetPrefPath/cache/<basename>`; skip if exists
-- **F.3** Download via `http.h` to that path
-- **F.4** Substitute URLs in `DialogueNode` to local paths at load time
-- **I/O check**: clear cache, run → assert 1 file per unique URL appears in cache dir; rerun → assert no new downloads
-
-### Phase G — V3 Task 3.2: Download-speed loading bar
-- **G.1** Track `bytesDone / bytesTotal` across all in-flight downloads
-- **G.2** Compute speed (KB/s) over 500ms windows
-- **G.3** Loop logo fade-in cycle while downloads active (currently single-shot fade)
-- **G.4** Render `"X.X MB/s   Y/Z files"` under bar
-- **I/O check**: throttle network, observe bar fills proportionally to bytes
-
----
-
-## Execution order
-
-```
-A.1→A.6 → B.1→B.3 → C.1→C.7 → D.1→D.7 → E.1→E.3 → F.1→F.4 → G.1→G.4
-```
-
-Stop after each lettered item, verify I/O, then proceed.
-
----
-
-**Confirm:**
-- `agree` → start at **A.1** (create `chapters/prompts/json.md`)
-- `agree, but skip Phase F+G` → V2 only
-- `change X.Y to ...` → adjust before starting
->>>>>>> test

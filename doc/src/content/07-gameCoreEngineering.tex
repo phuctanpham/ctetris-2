@@ -1,4 +1,4 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
@@ -119,41 +119,60 @@ WASM\_RELOAD & * & * & * & * & T \\
    (via \texttt{gameConsole\_db.h})}
 
 \noindent\textbf{Biểu đồ thành phần:}
-
 \begin{center}
 \begin{tikzpicture}[
   comp/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=3pt,
-               minimum width=2.6cm,minimum height=0.65cm,align=center,font=\small},
+                minimum width=3.0cm,minimum height=0.8cm,align=center,font=\small},
   ext/.style={rectangle,draw=gray!55,fill=gray!8,rounded corners=2pt,
-              minimum width=2.4cm,minimum height=0.6cm,align=center,font=\scriptsize},
+              minimum width=2.6cm,minimum height=0.7cm,align=center,font=\scriptsize},
   ro/.style={rectangle,draw=versionGreen,fill=versionGreen!7,rounded corners=2pt,
-             minimum width=2.4cm,minimum height=0.6cm,align=center,font=\scriptsize},
-  iface/.style={-{Stealth[length=4pt]},thick},
+              minimum width=2.6cm,minimum height=0.7cm,align=center,font=\scriptsize},
+  iface/.style={-{Stealth[length=5pt]},thick},
   use/.style={-{Stealth[length=4pt]},dashed,gray!70},
-  write/.style={-{Stealth[length=4pt]},thick,versionAmber!80}
+  write/.style={-{Stealth[length=5pt]},thick,versionAmber!80}
 ]
-  \node[ro](main)  at (0,0)    {\texttt{main.cpp}};
-  \node[comp](entry) at (3.6,0) {\texttt{runGameCore()}\\+\texttt{GameState}};
-  \node[comp](phys) at (3.6,-1.6){\texttt{physics loop}\\(fall/lock/flash)};
-  \node[comp](rend) at (0,-1.6) {\texttt{render layer}};
-  \node[comp](inp)  at (7.2,-1.6){\texttt{event router}\\(kbd/mouse/touch)};
-  \node[comp](ogo)  at (3.6,-3.2){\texttt{onGameOver()}};
-  \node[ext](sdl)   at (0,-3.2) {SDL3 Events\\+ Renderer};
-  \node[ext](bgm)   at (7.2,0)  {\texttt{SDL\_AudioStream}\\(silent stub V2)};
-  \node[ext](dbw)   at (7.2,-3.2){SQLite\\write-only};
-  \node[ro](cfg)    at (0,-4.6) {\texttt{SettingsConfig}\\read-only ref};
+  % --- LAYOUT GRID (Tăng khoảng cách y từ 2.2 -> 3.0 để nhãn logic không bị đè) ---
+  \node[ro](main)    at (0,0)      {\texttt{main.cpp}};
+  \node[comp](entry) at (5.0,0)    {\texttt{runGameCore()}\\+\texttt{GameState}};
+  \node[ext](bgm)    at (10.0,0)   {\texttt{SDL\_AudioStream}};
 
-  \draw[iface](main)--node[above,font=\tiny]{\texttt{const cfg\&}}(entry);
-  \draw[iface](entry)--(phys);
-  \draw[iface](phys)--(rend) node[above,font=\tiny,midway]{board state};
-  \draw[iface](inp)--(phys)  node[above,font=\tiny,midway]{actions};
-  \draw[iface](entry)--(ogo);
-  \draw[write](ogo.east)--node[above,font=\tiny]{INSERT/UPSERT}(dbw.west);
-  \draw[use](rend)--(sdl);
-  \draw[use](inp.north)--(bgm.south);
-  \draw[use](entry.east)to[bend left=12]node[above,font=\tiny]{gain}(bgm.south west);
-  \draw[use](cfg.east)to[bend right=12]
-      node[below,font=\tiny]{colorEnabled\\volume\\tableMatrix}(entry.south);
+  \node[comp](phys)  at (5.0,-3.0) {\texttt{physics loop}\\(fall/lock/flash)};
+  \node[comp](rend)  at (0,-3.0)   {\texttt{render layer}};
+  \node[comp](inp)   at (10,-3.0)  {\texttt{event router}};
+
+  \node[comp](ogo)   at (5.0,-6.0) {\texttt{onGameOver()}};
+  \node[ext](sdl)    at (0,-6.0)   {SDL3 Events};
+  \node[ext](dbw)    at (10.0,-6.0) {SQLite Write};
+
+  \node[ro](cfg)     at (5.0,-8.0) {\texttt{SettingsConfig} (Ref)};
+
+  % --- CONNECTIONS (Sử dụng xshift/yshift để tránh overlaid) ---
+  
+  % Mũi tên LOGIC (Entry -> Phys) - Fix Overlaid
+  \draw[iface](entry) -- node[right=3pt, font=\tiny\color{gray}]{logic flow} (phys);
+  
+  % Mũi tên MAIN -> ENTRY
+  \draw[iface](main) -- node[above=2pt, font=\tiny]{const cfg\&} (entry);
+  
+  % Mũi tên ACTIONS (Inp -> Phys)
+  \draw[iface](inp) -- node[above=2pt, font=\tiny]{actions} (phys);
+  
+  % Mũi tên BOARD STATE (Phys -> Rend)
+  \draw[iface](phys) -- node[above=2pt, font=\tiny]{board state} (rend);
+  
+  % Mũi tên TRIGGER (Phys -> Ogo)
+  \draw[iface](phys) -- node[right=3pt, font=\tiny]{game-over signal} (ogo);
+  
+  % Mũi tên DB WRITE
+  \draw[write](ogo) -- node[above=2pt, font=\tiny]{INSERT/UPSERT} (dbw);
+  
+  % Mũi tên CFG (Đi vòng để không đè lên khối khác)
+  \draw[use, versionGreen] (cfg.north) -- (ogo.south);
+  \draw[use, versionGreen] (cfg.west) -| node[pos=0.2, above, font=\tiny]{config data} (rend.south);
+
+  % Audio Gain
+  \draw[use](entry) -- node[above=1pt, font=\tiny]{gain} (bgm);
+
 \end{tikzpicture}
 \end{center}
 
@@ -162,41 +181,55 @@ WASM\_RELOAD & * & * & * & * & T \\
 \begin{center}
 \begin{tikzpicture}[
   st/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=3pt,
-             minimum width=2.4cm,minimum height=0.65cm,align=center,font=\scriptsize},
+             minimum width=2.4cm,minimum height=0.8cm,align=center,font=\scriptsize},
   wasm/.style={rectangle,draw=versionRed,fill=versionRed!8,rounded corners=3pt,
-               minimum width=2.4cm,minimum height=0.65cm,align=center,font=\scriptsize},
-  arr/.style={-{Stealth[length=4pt]},thick},
-  darr/.style={-{Stealth[length=4pt]},dashed,gray!60,thick}
+               minimum width=2.4cm,minimum height=0.8cm,align=center,font=\scriptsize},
+  arr/.style={-{Stealth[length=5pt]},thick, pillarBlue},
+  input/.style={-{Stealth[length=5pt]},thick, dashed, gray!80},
+  trans/.style={font=\tiny, align=center, inner sep=2pt, fill=white} % label style
 ]
-  \node[st](init)  at (0,0)       {INIT};
-  \node[st](play)  at (3.0,0)     {PLAYING};
-  \node[st](flash) at (3.0,-1.8)  {FLASH\\CLEAR};
-  \node[st](pause) at (6.0,0)     {PAUSED};
-  \node[st](popup) at (6.0,-1.8)  {QUIT\\POPUP};
-  \node[st](over)  at (9.0,-1.8)  {GAME\\OVER};
-  \node[wasm](wasm)at (9.0,0)     {WASM\\RELOAD};
+  % --- Nodes Positioning ---
+  \node[st] (init)  at (0,0)      {INIT};
+  \node[st] (play)  at (4.5,0)    {PLAYING};
+  \node[st] (flash) at (4.5,-2.5) {FLASH\\CLEAR};
+  
+  \node[st] (pause) at (9,1.5)    {PAUSED};
+  \node[st] (popup) at (9,-1.5)   {QUIT\\POPUP};
+  
+  \node[st] (over)  at (13.5,0)   {GAME\\OVER};
+  \node[wasm](wasm) at (13.5,-2.5){WASM\\RELOAD};
 
-  \draw[arr](init)--node[above,font=\tiny]{entry}(play);
-  \draw[arr](play)--node[left,font=\tiny]{row full}(flash);
-  \draw[arr](flash.west)to[bend right=35]
-      node[left,font=\tiny]{6 ticks}(play.south west);
-  \draw[arr](play.east)to[bend left=20]
-      node[above,font=\tiny]{ENTER/pause btn}(pause.west);
-  \draw[arr](pause.west)to[bend left=20]
-      node[below,font=\tiny]{ENTER again}(play.east);
-  \draw[arr](play.east)to[bend right=10]
-      node[below,font=\tiny]{ESC/quit btn}(popup.west);
-  \draw[arr](pause.south)--node[right,font=\tiny]{ESC}(popup.north);
-  \draw[arr](popup.east)--node[above,font=\tiny]{block\\at top}(over.west);
-  \draw[arr](play.south east)to[bend right=8]
-      node[below,font=\tiny]{block at top}(over.north west);
-  \draw[darr](over.north)--node[right,font=\tiny]{Restart}(play.south east);
-  \draw[arr](over.north)to[bend right=30]
-      node[above,font=\tiny]{Restart→INIT}(init.south);
-  \draw[arr](popup.north east)--node[above,font=\tiny]{Quit\\(WASM)}(wasm.south);
-  \node[font=\scriptsize,draw=versionGreen!50,fill=versionGreen!8,rounded corners,
-        inner sep=3pt] at (11.5,-1.8) {ret 2\\Console};
-  \draw[arr,versionGreen](over.east)--node[above,font=\tiny]{Console btn}(11.0,-1.8);
+  % --- Transitions: PLAYING & PHYSICS ---
+  \draw[arr] (init) -- node[trans, above] {entry} (play);
+  
+  \draw[arr] (play.south) to[bend left=20] 
+        node[trans, right] {row full} (flash.north);
+  \draw[arr] (flash.west) to[bend left=20] 
+        node[trans, left] {6 ticks\\done} (play.south west);
+
+  \draw[arr] (play.east) -- node[trans, above, pos=0.6] {block\\at top} (over.west);
+
+  % --- Transitions: UI/USER (Nét đứt) ---
+  \draw[input] (play.north east) to[out=45, in=180] 
+        node[trans, above left] {ENTER /\\Pause btn} (pause.west);
+  \draw[input] (pause.south west) to[out=225, in=60] 
+        node[trans, below right] {Resume} (play.north east);
+
+  \draw[input] (play.south east) to[out=-45, in=180] 
+        node[trans, below left] {ESC /\\Quit btn} (popup.west);
+  \draw[input] (pause.south) -- node[trans, right] {ESC} (popup.north);
+
+  \draw[input] (over.north) to[bend right=30] 
+        node[trans, above] {Restart (INIT)} (init.north);
+  
+  \draw[input] (popup.east) to[bend right=15] 
+        node[trans, above] {Quit (WASM)} (wasm.west);
+        
+  % FIXED NODE: Added align=center to handle the \\ command
+  \node[font=\tiny,draw=versionGreen!50,fill=versionGreen!8,rounded corners,inner sep=3pt, align=center] 
+        (ret) at (13.5,1.5) {ret 2\\Console};
+  \draw[input, versionGreen] (over.north) -- (ret.south);
+
 \end{tikzpicture}
 \end{center}
 
@@ -268,41 +301,54 @@ $\texttt{blocks}[i].x = \texttt{maxX} - \texttt{blocks}[i].x$ for all 4 blocks.
   \quad \text{where relX/Y} = x/y - 1
 \]
 
-\subsubsection{Flash Clear Sequence --- lockBlock() $\rightarrow$ finishLineClear()}
+\subsubsection{Flash Clear Sequence --- lockBlock() → finishLineClear()}
 
 \begin{center}
 \begin{tikzpicture}[
   proc/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=2pt,
-               minimum width=4.2cm,minimum height=0.55cm,align=center,font=\scriptsize},
+                minimum width=4.5cm,minimum height=0.6cm,align=center,font=\scriptsize},
   dec/.style={diamond,draw=versionAmber!80,fill=versionAmber!8,
-              aspect=2.6,align=center,font=\scriptsize},
-  arr/.style={-{Stealth[length=4pt]},thick}
+              aspect=2.6,align=center,font=\scriptsize, inner sep=0pt},
+  arr/.style={-{Stealth[length=4pt]},thick},
+  label/.style={font=\tiny, pos=0.4}
 ]
-  \node[proc](p0)  at (0,0)   {\texttt{lockBlock()}: write colorID to board};
-  \node[proc](p1)  at (0,-1.0){scan rows: collect full rows into
-                                \texttt{clearRows[4]}};
-  \node[dec] (d0)  at (0,-2.0){clearRowCount\\$> 0$?};
-  \node[proc](pnc) at (4.5,-2.0){no clear: advance queue\\spawn next; check game-over};
-  \node[proc](p2)  at (0,-3.0){\texttt{pendingClear=true}; \texttt{flashTick=0};
-                                fall loop blocked};
-  \node[proc](p3)  at (0,-4.0){every 80ms: \texttt{flashTick++};
-                                \texttt{flashOn} = tick \% 2 == 0};
-  \node[proc](p4)  at (0,-5.0){render clearRows[]
-                                white (flashOn) or dark (!flashOn)};
-  \node[dec] (d1)  at (0,-6.0){flashTick\\$\geq 6$?};
-  \node[proc](p5)  at (4.5,-6.0){wait next\\80ms tick};
-  \node[proc](p6)  at (0,-7.0){\texttt{finishLineClear()}:
-                                \texttt{score += n²}; shift rows; advance queue};
-  \node[proc](p7)  at (0,-8.0){\texttt{pendingClear=false};
-                                \texttt{lastFallTime} reset; check game-over};
+  % --- Nodes Positioning (Tăng khoảng cách dọc giữa dec và proc lên 1.5cm) ---
+  \node[proc](p0)  at (0,0)    {\texttt{lockBlock()}: write colorID to board};
+  \node[proc](p1)  at (0,-1.2) {scan rows: collect full rows into \texttt{clearRows[4]}};
+  
+  \node[dec] (d0)  at (0,-2.7) {clearRowCount\\$> 0$?};
+  \node[proc](pnc) at (5.5,-2.7){no clear: advance queue\\spawn next; check game-over};
+  
+  \node[proc](p2)  at (0,-4.2) {\texttt{pendingClear=true}; \texttt{flashTick=0};\\fall loop blocked};
+  \node[proc](p3)  at (0,-5.4) {every 80ms: \texttt{flashTick++};\\\texttt{flashOn} = tick \% 2 == 0};
+  \node[proc](p4)  at (0,-6.6) {render clearRows[]\\white (flashOn) or dark (!flashOn)};
+  
+  \node[dec] (d1)  at (0,-8.1) {flashTick\\$\geq 6$?};
+  \node[proc](p5)  at (5.5,-8.1){wait next\\80ms tick};
+  
+  \node[proc](p6)  at (0,-9.6) {\texttt{finishLineClear()}:\\\texttt{score += n²}; shift rows; advance queue};
+  \node[proc](p7)  at (0,-10.8){\texttt{pendingClear=false};\\\texttt{lastFallTime} reset; check game-over};
 
-  \draw[arr](p0)--(p1);\draw[arr](p1)--(d0);
-  \draw[arr](d0)--node[above,font=\tiny]{no}(pnc);
-  \draw[arr](d0)--node[left,font=\tiny]{yes}(p2);
-  \draw[arr](p2)--(p3);\draw[arr](p3)--(p4);\draw[arr](p4)--(d1);
-  \draw[arr](d1)--node[above,font=\tiny]{no}(p5);
-  \draw[arr,gray,dashed](p5.north)--++(0,0.4)--++(-4.5,0)--(p3.east);
-  \draw[arr](d1)--node[left,font=\tiny]{yes}(p6);\draw[arr](p6)--(p7);
+  % --- Connections with Fixed Labels & Paths ---
+  \draw[arr](p0)--(p1);
+  \draw[arr](p1)--(d0);
+  
+  % Fix 1: Đẩy nhãn "no" và "yes" ra khỏi viền khối
+  \draw[arr](d0)--node[above, font=\tiny]{no}(pnc);
+  \draw[arr](d0)--node[left=2pt, font=\tiny]{yes}(p2);
+  
+  \draw[arr](p2)--(p3);
+  \draw[arr](p3)--(p4);
+  \draw[arr](p4)--(d1);
+  
+  \draw[arr](d1)--node[above, font=\tiny]{no}(p5);
+  
+  % Fix 2: Định tuyến lại mũi tên nét đứt đi vòng bên ngoài
+  \draw[arr, gray, dashed] (p5.east) -- ++(1.0,0) |- (p3.east);
+  
+  \draw[arr](d1)--node[left=2pt, font=\tiny]{yes}(p6);
+  \draw[arr](p6)--(p7);
+  
 \end{tikzpicture}
 \end{center}
 
@@ -333,33 +379,45 @@ $\texttt{blocks}[i].x = \texttt{maxX} - \texttt{blocks}[i].x$ for all 4 blocks.
 \begin{center}
 \begin{tikzpicture}[
   dec/.style={diamond,draw=versionAmber!80,fill=versionAmber!8,
-              aspect=2.4,align=center,font=\scriptsize},
+              aspect=2.4,align=center,font=\scriptsize, inner sep=1pt},
   val/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=2pt,
-              minimum width=1.8cm,minimum height=0.5cm,align=center,font=\scriptsize},
-  arr/.style={-{Stealth[length=4pt]},thick}
+              minimum width=2.0cm,minimum height=0.6cm,align=center,font=\scriptsize},
+  arr/.style={-{Stealth[length=4pt]},thick},
+  lbl/.style={font=\tiny, fill=white, inner sep=2pt} % Nhãn có nền trắng để chống đè
 ]
+  % --- Nodes Positioning (Tăng khoảng cách dọc lên 2.0cm để các hình thoi không chạm nhau) ---
   \node[dec](d0) at (0,0)    {score\\$\geq 50$?};
-  \node[dec](d1) at (0,-1.2) {score\\$\geq 30$?};
-  \node[dec](d2) at (0,-2.4) {score\\$\geq 15$?};
-  \node[dec](d3) at (0,-3.6) {score\\$\geq 5$?};
-  \node[val](v100) at (3.0,0)   {100\,ms};
-  \node[val](v200) at (3.0,-1.2){200\,ms};
-  \node[val](v300) at (3.0,-2.4){300\,ms};
-  \node[val](v400) at (3.0,-3.6){400\,ms};
-  \node[val](v500) at (3.0,-4.8){500\,ms (default)};
-  \foreach \d/\v in {d0/v100,d1/v200,d2/v300,d3/v400}{
-    \draw[arr](\d)--node[above,font=\tiny]{yes}(\v);
+  \node[dec](d1) at (0,-2.0) {score\\$\geq 30$?};
+  \node[dec](d2) at (0,-4.0) {score\\$\geq 15$?};
+  \node[dec](d3) at (0,-6.0) {score\\$\geq 5$?};
+  
+  \node[val](v100) at (3.5,0)    {100\,ms};
+  \node[val](v200) at (3.5,-2.0) {200\,ms};
+  \node[val](v300) at (3.5,-4.0) {300\,ms};
+  \node[val](v400) at (3.5,-6.0) {400\,ms};
+  \node[val](v500) at (3.5,-8.0) {500\,ms (default)};
+
+  % --- Connections: YES (To the right) ---
+  \foreach \d/\v in {d0/v100, d1/v200, d2/v300, d3/v400}{
+    \draw[arr](\d) -- node[above, font=\tiny, pos=0.4]{yes}(\v);
   }
-  \foreach \d/\dn in {d0/d1,d1/d2,d2/d3}{
-    \draw[arr](\d)--node[left,font=\tiny]{no}(\dn);
+
+  % --- Connections: NO (Downward) ---
+  % Sửa lỗi đè nhãn "no" bằng cách dời sang trái=3pt
+  \draw[arr](d0) -- node[left=3pt, font=\tiny, midway]{no}(d1);
+  \draw[arr](d1) -- node[left=3pt, font=\tiny, midway]{no}(d2);
+  \draw[arr](d2) -- node[left=3pt, font=\tiny, midway]{no}(d3);
+  \draw[arr](d3) |- node[left=3pt, font=\tiny, pos=0.2]{no}(v500.west);
+
+  % --- Soft Drop Section (Fixed Overlap) ---
+  % Đẩy trục sang phải 6.5cm và dùng lbl (fill=white) cho biểu thức
+  \node[lbl, align=center] (sd_txt) at (6.5,-1.0) {softDrop:\\$\times\frac{1}{5}$};
+  \draw[arr, versionAmber, dashed] (6.5,-1.8) -- (6.5,-7.5);
+  
+  \foreach \y/\v in {0/20, -2.0/40, -4.0/60, -6.0/80, -8.0/100}{
+    \node[font=\tiny, gray, anchor=west] at (6.8,\y){$\rightarrow$\v\,ms};
   }
-  \draw[arr](d3)--node[left,font=\tiny]{no}(v500);
-  \node[font=\scriptsize,right=0.2cm of v100] at (4.8,0)
-      {softDrop: $\times\frac{1}{5}$};
-  \draw[sdsArrow=versionAmber,dashed](4.8,0.2)--(4.8,-4.8);
-  \foreach \y/\v in {0/20, -1.2/40, -2.4/60, -3.6/80, -4.8/100}{
-    \node[font=\tiny,gray] at (5.3,\y){$\rightarrow$\v\,ms};
-  }
+
 \end{tikzpicture}
 \end{center}
 
@@ -386,8 +444,8 @@ $\texttt{blocks}[i].x = \texttt{maxX} - \texttt{blocks}[i].x$ for all 4 blocks.
 
 \subsubsection{applyTableMatrix() --- board pre-population}
 
-\noindent Format: \texttt{";"-separated rows (bottom-aligned), ","-separated
-colorID values (0=empty, 1--7=colors)}.
+\noindent Format: \foreignlanguage{english}{\texttt{";"-separated rows (bottom-aligned), ","-separated
+colorID values (0=empty, 1--7=colors)}}.
 
 \begin{center}
 \begin{tikzpicture}[node distance=0.5cm,
@@ -403,43 +461,63 @@ colorID values (0=empty, 1--7=colors)}.
 \end{tikzpicture}
 \end{center}
 
-\noindent\textbf{Empty string} (\texttt{""}) $\rightarrow$ blank board; parse error per cell $\rightarrow$ silently skip (no crash). Called in \texttt{resetGame()} \textbf{after} \texttt{srand} and \textbf{before} first \texttt{spawnBlock()}.
+\noindent\textbf{Empty string} (\foreignlanguage{english}{\texttt{""}}) $\rightarrow$ blank board; parse error per cell $\rightarrow$ silently skip (no crash). Called in \texttt{resetGame()} \textbf{after} \texttt{srand} and \textbf{before} first \texttt{spawnBlock()}.
 
 \subsubsection{Swipe Gesture Recognition}
 
 \begin{center}
 \begin{tikzpicture}[
   dec/.style={diamond,draw=versionAmber!80,fill=versionAmber!8,
-              aspect=2.6,align=center,font=\scriptsize},
+              aspect=2.6,align=center,font=\scriptsize, inner sep=1pt},
   act/.style={rectangle,draw=versionGreen,fill=versionGreen!8,rounded corners=2pt,
-              minimum width=2.2cm,minimum height=0.5cm,align=center,font=\scriptsize},
+              minimum width=2.0cm,minimum height=0.6cm,align=center,font=\scriptsize},
   proc/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=2pt,
-               minimum width=3.0cm,minimum height=0.5cm,align=center,font=\scriptsize},
+                minimum width=3.2cm,minimum height=0.6cm,align=center,font=\scriptsize},
   arr/.style={-{Stealth[length=4pt]},thick}
 ]
-  \node[proc](p0) at (0,0)    {MOUSE\_DOWN at (mx, my)\\where mx $<$ BOARD\_W};
-  \node[dec] (d0) at (0,-1.2) {\texttt{isTouchOn}\\FallingBlock?};
-  \node[proc](p1) at (0,-2.4) {MOUSE\_UP: $dx$=x-startX,\\$dy$=y-startY;
-                                 $|dx|,|dy|$};
-  \node[dec] (d1) at (-3.0,-3.8){swipeOnBlock\\$|dx|>|dy|$\\$\&$ $|dx|\geq 15$?};
-  \node[dec] (d2) at (3.0,-3.8){!swipeOnBlock\\$|dy|>|dx|$\\$\&$ $|dy|\geq 15$?};
-  \node[act](left)  at (-5.0,-5.4){move LEFT\\if $dx<0$};
-  \node[act](right) at (-1.5,-5.4){move RIGHT\\if $dx>0$};
-  \node[act](up)    at (1.5,-5.4) {rotate CCW\\if $dy<0$};
-  \node[act](down)  at (5.0,-5.4) {rotate CW\\if $dy>0$};
-  \node[proc](ign)  at (0,-5.4)   {ignore\\(diagonal)};
+  % --- Nodes Positioning (Giãn khoảng cách dọc p0-d0 lên 2.0cm) ---
+  \node[proc](p0) at (0,0)      {MOUSE\_DOWN at (mx, my)\\where mx $<$ BOARD\_W};
+  
+  \node[dec] (d0) at (0,-2.0)   {\texttt{isTouchOn}\\FallingBlock?};
+  
+  \node[proc](p1) at (0,-3.8)   {MOUSE\_UP: $dx$=x-startX,\\$dy$=y-startY; $|dx|,|dy|$};
 
-  \draw[arr](p0)--node[left,font=\tiny]{swipeActive=true\\record startX/Y}(d0);
-  \draw[arr](d0)--node[left,font=\tiny]{yes}(p1);
-  \draw[arr](d0)--node[right,font=\tiny]{no}(p1);
-  \draw[arr](p1.south)--++(0,-0.4)--++(-3.0,0)--(d1.north);
-  \draw[arr](p1.south)--++(0,-0.4)--(d2.north);
-  \draw[arr](d1)--node[left,font=\tiny]{yes}(left);
-  \draw[arr](d1)--node[right,font=\tiny]{yes}(right);
-  \draw[arr](d2)--node[left,font=\tiny]{yes}(up);
-  \draw[arr](d2)--node[right,font=\tiny]{yes}(down);
-  \draw[arr](d1.south)to[bend left=10]node[above,font=\tiny]{no}(ign.west);
-  \draw[arr](d2.south)to[bend right=10]node[above,font=\tiny]{no}(ign.east);
+  % --- Cấp độ các khối điều kiện so sánh dx, dy (Giãn ngang) ---
+  \node[dec] (d1) at (-4.0,-5.8) {swipeOnBlock\\$|dx|>|dy|$\\$\&$ $|dx|\geq 15$?};
+  \node[dec] (d2) at (4.0,-5.8)  {!swipeOnBlock\\$|dy|>|dx|$\\$\&$ $|dy|\geq 15$?};
+
+  % --- Cấp độ các khối hành động ---
+  \node[act](left)  at (-5.5,-8.0) {move LEFT\\if $dx<0$};
+  \node[act](right) at (-2.5,-8.0) {move RIGHT\\if $dx>0$};
+  \node[act](up)    at (2.5,-8.0)  {rotate CCW\\if $dy<0$};
+  \node[act](down)  at (5.5,-8.0)  {rotate CW\\if $dy>0$};
+
+  % --- Khối Ignore đưa xuống tầng cuối cùng để tránh đè lấp ---
+  \node[proc](ign)  at (0,-9.5)    {ignore (diagonal)};
+
+  % --- Connections ---
+  
+  % Fix phần trên: label đưa sang right=5pt để tránh lấp viền
+  \draw[arr](p0)--node[right=5pt, font=\tiny, align=left]{swipeActive=true\\record startX/Y}(d0);
+  
+  \draw[arr](d0)--node[left=3pt, font=\tiny]{yes}(p1);
+  \draw[arr](d0.east) to[out=0, in=0, looseness=1.8] node[right, font=\tiny]{no}(p1.east);
+
+  % Phân nhánh từ p1 xuống d1 và d2
+  \draw[arr](p1.south) -- ++(0,-0.6) -- (-4.0,-4.4) -- (d1.north);
+  \draw[arr](p1.south) -- ++(0,-0.6) -- (4.0,-4.4) -- (d2.north);
+
+  % Kết nối yes/no rõ ràng
+  \draw[arr](d1.south) -- ++(-1.5,-0.5) -- (left.north) node[pos=0.2, left, font=\tiny]{yes};
+  \draw[arr](d1.south) -- ++(1.5,-0.5) -- (right.north) node[pos=0.2, right, font=\tiny]{yes};
+  
+  \draw[arr](d2.south) -- ++(-1.5,-0.5) -- (up.north) node[pos=0.2, left, font=\tiny]{yes};
+  \draw[arr](d2.south) -- ++(1.5,-0.5) -- (down.north) node[pos=0.2, right, font=\tiny]{yes};
+
+  % Fix phần dưới: Đường dẫn "no" đi vòng xuống ign
+  \draw[arr](d1.south) -- ++(0,-2.5) -- node[above, font=\tiny]{no} (ign.west);
+  \draw[arr](d2.south) -- ++(0,-2.5) -- node[above, font=\tiny]{no} (ign.east);
+
 \end{tikzpicture}
 \end{center}
 
@@ -501,9 +579,9 @@ struct GameState {
 \hline
 0 & QUIT      & Power-off icon (circular arc + vertical bar) \\
 1 & PAUSE     & Square (playing) $\leftrightarrow$ triangle (paused) \\
-2 & SCORE     & \texttt{"\%05d"} at 0.65 scale (5 chars $\times$ 8px $\times$ 0.65) \\
-3 & TIMER     & \texttt{"\%02d:\%02d"} (HH:MM) at 0.65 scale \\
-4 & NEXT-1    & Always visible; + story label \texttt{"S\{id\}-C\{id\}"} overlay \\
+2 & SCORE     & \foreignlanguage{english}{\texttt{"\%05d"}} at 0.65 scale (5 chars $\times$ 8px $\times$ 0.65) \\
+3 & TIMER     & \foreignlanguage{english}{\texttt{"\%02d:\%02d"}} (HH:MM) at 0.65 scale \\
+4 & NEXT-1    & Always visible; + story label \foreignlanguage{english}{\texttt{"S\{id\}-C\{id\}"}} overlay \\
 5 & NEXT-2    & Visible if \texttt{nextBlockScore>0 \&\& score$\geq$nextBlockScore} \\
 6 & NEXT-3    & Visible if NEXT-2 open \&\& \texttt{score$\geq$nextBlockScore$\times$2} \\
 7 & ARR UP    & CCW rotate arrow \\
@@ -521,18 +599,18 @@ struct GameState {
 created and owned by gameConsole.
 
 \begin{center}
-% Lesson: define \pk locally inside center block
+% Định nghĩa lệnh \pk cục bộ để gạch chân khóa chính
 \newcommand{\pk}[1]{\underline{#1}}
 \begin{tikzpicture}[
   inmem/.style={rectangle,draw=pillarBlue,fill=pillarBlue!7,rounded corners=2pt,
-                align=left,font=\scriptsize,inner sep=5pt,minimum width=3.4cm},
+                align=left,font=\scriptsize,inner sep=5pt,minimum width=3.6cm},
   owned/.style={rectangle,draw=versionAmber,fill=versionAmber!6,rounded corners=2pt,
-                align=left,font=\scriptsize,inner sep=5pt,minimum width=3.4cm},
+                align=left,font=\scriptsize,inner sep=5pt,minimum width=3.6cm},
   write/.style={-{Stealth[length=4pt]},thick,versionAmber!80},
   read/.style={-{Stealth[length=4pt]},dashed,gray!60},
-  lbl/.style={font=\tiny,fill=white,inner sep=1pt}
+  lbl/.style={font=\tiny,fill=white,inner sep=1.5pt} % fill=white giúp xóa đường kẻ dưới chữ
 ]
-  % in-memory (left)
+  % --- In-memory (Left side) ---
   \node[inmem](gs) at (0,0) {
     \textbf{GameState}\ \textit{\tiny(in-memory)}\\[1pt]
     board[20][10], score\\
@@ -542,7 +620,9 @@ created and owned by gameConsole.
     gameStartTime, totalPausedMs\\
     retryCount, exitCode
   };
-  \node[inmem,below=0.5cm of gs](cfg) {
+
+  % Tăng khoảng cách xuống -4.5cm để nhãn giữa không bị đè
+  \node[inmem](cfg) at (0,-4.5) {
     \textbf{SettingsConfig}\ \textit{\tiny(read-only ref)}\\[1pt]
     volume, colorEnabled[7]\\
     storyId, chapterId\\
@@ -550,7 +630,7 @@ created and owned by gameConsole.
     tableMatrix
   };
 
-  % DB write targets (right, owned by gameConsole)
+  % --- DB Write Targets (Right side) ---
   \node[owned](rec) at (7.5,1.2) {
     \textbf{default\_Records}\ \textit{\tiny(owner: gameConsole)}\\[1pt]
     \pk{id}\ \texttt{AUTOINCREMENT}\\
@@ -559,14 +639,16 @@ created and owned by gameConsole.
     totalScore, totalSeconds\\
     avgSpeed, retryNo
   };
-  \node[owned,below=0.4cm of rec](stor) {
+
+  \node[owned](stor) at (7.5,-1.5) {
     \textbf{default\_Stories}\ \textit{\tiny(owner: gameConsole)}\\[1pt]
     \pk{idUser, idStory, idChapter}\\
     isActivated, isSelected\\
     totalRetries, lastMaxScore\\
     lastMaxSpeed
   };
-  \node[owned,below=0.4cm of stor](sd) {
+
+  \node[owned](sd) at (7.5,-4.0) {
     \textbf{shared\_data}\ \textit{\tiny(read in cascade unlock)}\\[1pt]
     \pk{idStory, idChapter}\\
     requiredStories (CSV)\\
@@ -574,23 +656,24 @@ created and owned by gameConsole.
     minRetries
   };
 
-  % write arrows (via onGameOver)
-  \draw[write](gs.east)to[bend left=10]
-      node[lbl,pos=0.4]{INSERT}(rec.west);
-  \draw[write](gs.east)to[bend right=10]
-      node[lbl,pos=0.35]{UPSERT}(stor.west);
+  % --- Connections ---
 
-  % cfg feeds gs
-  \draw[read,pillarBlue!60](cfg.east)to[bend right=15]
-      node[lbl,pos=0.5]{coreOpenBgm\\applyTableMatrix\\spawnBlock}(gs.south east);
+  % Nhãn INSERT/UPSERT rõ ràng hơn
+  \draw[write](gs.east) to[out=20, in=180] node[lbl, pos=0.4]{INSERT} (rec.west);
+  \draw[write](gs.east) to[out=-20, in=180] node[lbl, pos=0.4]{UPSERT} (stor.west);
 
-  % cascade unlock
-  \draw[read](stor.south)--node[lbl,right]{lookup}(sd.north);
+  % Khu vực trung tâm: Các nhãn được căn lề trái của mũi tên để thoáng hơn
+  \draw[read, pillarBlue!60](cfg.north) -- (gs.south) 
+      node[lbl, midway, align=left] {coreOpenBgm\\applyTableMatrix\\spawnBlock};
 
-  % guard note
-  \node[font=\tiny,draw=gray!40,fill=gray!5,rounded corners,inner sep=2pt]
-    at (3.5,-3.8)
-    {\texttt{gameOverRecorded} guard: onGameOver() fires exactly once per session};
+  % Sửa lỗi đè chữ "lookup"
+  \draw[read](stor.south) -- node[lbl, left=2pt] {lookup} (sd.north);
+
+  % Guard note: Đưa xuống hẳn phía dưới, tách biệt hoàn toàn
+  \node[font=\tiny,draw=gray!40,fill=gray!5,rounded corners,inner sep=3pt, align=center]
+    at (3.8,-6.0)
+    {\texttt{gameOverRecorded} guard:\\onGameOver() fires exactly once per session};
+
 \end{tikzpicture}
 \end{center}
 
@@ -599,36 +682,48 @@ created and owned by gameConsole.
 \begin{center}
 \begin{tikzpicture}[
   proc/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=2pt,
-               minimum width=2.6cm,minimum height=0.6cm,align=center,font=\scriptsize},
+                minimum width=2.6cm,minimum height=0.6cm,align=center,font=\tiny},
   store/.style={cylinder,draw=gray!60,fill=gray!10,shape border rotate=90,
-                minimum width=2.2cm,minimum height=0.55cm,align=center,font=\scriptsize},
-  extio/.style={ellipse,draw=gray!50,fill=gray!6,minimum width=1.8cm,
-                minimum height=0.5cm,align=center,font=\scriptsize},
-  fl/.style={-{Stealth[length=4pt]},thick},
-  dfl/.style={-{Stealth[length=4pt]},dashed,gray!60}
+                minimum width=1.8cm,minimum height=0.5cm,align=center,font=\tiny},
+  extio/.style={ellipse,draw=gray!50,fill=gray!6,minimum width=2.0cm,
+                minimum height=0.5cm,align=center,font=\tiny},
+  fl/.style={-{Stealth[length=3pt]},thick},
+  dfl/.style={-{Stealth[length=3pt]},dashed,gray!80},
+  lbl/.style={font=\fontsize{5}{6}\selectfont, fill=white, inner sep=1pt, align=center} 
 ]
-  \node[extio](ev)   at (0,5.5)  {SDL Events\\(kbd/mouse/touch)};
-  \node[extio](cfg2) at (7.5,5.5){SettingsConfig\\(read-only)};
-  \node[proc](route) at (3.5,5.5){event router\\+ swipe FSM};
-  \node[proc](phys2) at (3.5,3.8){physics update:\\fall/lock/rotate};
-  \node[store](gs2)  at (7.5,3.8){GameState\\(in-memory)};
-  \node[proc](flash2)at (3.5,2.2){flash anim:\\80ms tick loop};
-  \node[proc](rend3) at (0,2.2)  {renderBoard\\+ drawSidebar};
-  \node[proc](ogo)   at (3.5,0.5){onGameOver():\\dbOpen→INSERT\\→UPSERT→dbClose};
-  \node[store](db3)  at (7.5,0.5){default\_Records\\default\_Stories};
-  \node[extio](ret2) at (0,0.5)  {exitCode\\0 / 2};
+  % --- Nodes Positioning (Thu hẹp chiều ngang từ 8.0 xuống 6.5) ---
+  \node[extio](ev)    at (0,5.5)   {SDL Events};
+  \node[extio](cfg2)  at (6.5,5.5) {SettingsConfig};
+  \node[proc](route)  at (3.25,5.5){event router};
 
-  \draw[fl](ev)--node[above,font=\tiny]{actions}(route);
-  \draw[fl](route)--node[left,font=\tiny]{move/rotate\\pause/quit}(phys2);
-  \draw[fl](phys2)--node[above,font=\tiny]{read/write}(gs2);
-  \draw[fl](gs2.south)--node[right,font=\tiny]{pendingClear}(flash2.east);
-  \draw[fl](flash2)--node[above,font=\tiny]{board\\state}(rend3);
-  \draw[fl](gs2.south)to[bend right=8]
-      node[right,font=\tiny]{isGameOver\\!recorded}(ogo.east);
-  \draw[fl](ogo.east)--node[above,font=\tiny]{INSERT\\UPSERT}(db3.west);
-  \draw[fl](rend3.south)--node[left,font=\tiny]{SDL\_Render\\Present}(ret2.north);
-  \draw[dfl](cfg2.south)to[bend left=10]
-      node[right,font=\tiny]{volume/colors\\tableMatrix}(phys2.north east);
+  \node[proc](phys2)  at (3.25,3.5) {physics update};
+  \node[store](gs2)   at (6.5,3.5)  {GameState};
+
+  \node[proc](flash2) at (3.25,1.5) {flash anim};
+  \node[proc](rend3)  at (0,1.5)    {render layer};
+
+  \node[proc](ogo)    at (3.25,-0.5){onGameOver()};
+  \node[store](db3)   at (6.5,-0.5) {SQLite DB};
+  \node[extio](ret2)  at (0,-0.5)   {exitCode};
+
+  % --- Connections (Đường nối gọn hơn) ---
+  
+  \draw[fl](ev) -- node[lbl, above]{actions} (route);
+  \draw[fl](route) -- node[lbl, left, pos=0.4]{logic} (phys2);
+  
+  \draw[fl](phys2) -- node[lbl, above]{read/write} (gs2);
+  
+  \draw[dfl](cfg2) -- node[lbl, right]{config\\vars} (gs2);
+  \draw[dfl](cfg2.west) to[out=180, in=45] node[lbl, pos=0.3]{apply} (phys2.north east);
+
+  \draw[fl](gs2.south) to[bend left=20] node[lbl, right]{pending} (flash2.east);
+  \draw[fl](flash2) -- node[lbl, above]{board} (rend3);
+
+  \draw[fl](gs2.south) to[out=270, in=0] node[lbl, pos=0.6]{isGameOver} (ogo.east);
+  \draw[fl](ogo.east) -- node[lbl, above]{WRITE} (db3.west);
+
+  \draw[fl](rend3.south) -- node[lbl, left]{present} (ret2.north);
+
 \end{tikzpicture}
 \end{center}
 
@@ -647,16 +742,13 @@ created and owned by gameConsole.
   \node[lhd](H3) at (6.4,0)  {\texttt{physics}\\loop};
   \node[lhd](H4) at (9.6,0)  {\texttt{onGame}\\\texttt{Over()}};
   \node[lhd](H5) at (12.8,0) {\texttt{DBLayer}};
-
   \foreach \x in {0,3.2,6.4,9.6,12.8}{\draw[lf](\x,-0.3)--(\x,-10.2);}
-
   % dividers
   \draw[gray!40,thick,dashed](-0.6,-3.4)--(14,-3.4);
   \draw[gray!40,thick,dashed](-0.6,-6.8)--(14,-6.8);
   \node[font=\scriptsize\itshape,gray] at (-0.5,-0.8){Entry};
   \node[font=\scriptsize\itshape,gray] at (-0.5,-4.5){Flash};
   \node[font=\scriptsize\itshape,gray] at (-0.5,-7.5){GameOver};
-
   % ── Entry ──
   \draw[msg](0,-0.8)--(3.2,-0.8)
       node[above,font=\tiny,midway]{runGameCore(win, ren, cfg)};
@@ -669,7 +761,6 @@ created and owned by gameConsole.
       node[above,font=\tiny,midway]{board pre-filled, queue ready};
   \draw[msg](3.2,-3.0)--(6.4,-3.0)
       node[above,font=\tiny,midway]{main event loop starts};
-
   % ── Flash-clear ──
   \draw[msg](3.2,-4.0)--(6.4,-4.0)
       node[above,font=\tiny,midway]{lockBlock(): full row detected};
@@ -681,7 +772,6 @@ created and owned by gameConsole.
       node[above,font=\tiny,midway]{flashTick $\geq$ 6: finishLineClear()};
   \draw[ret](6.4,-6.1)--(3.2,-6.1)
       node[above,font=\tiny,midway]{score += n²; rows shifted; queue advanced};
-
   % ── Game-over DB ──
   \draw[msg](3.2,-7.4)--(9.6,-7.4)
       node[above,font=\tiny,midway]{isGameOver=true \&\& !gameOverRecorded};
@@ -737,7 +827,7 @@ sqlite3           & always & Write-only via \texttt{gameConsole\_db.h} (no direc
                               \texttt{dbCheckAndUnlockStories} \\
 \texttt{gameConsole\_layout.h} & always & \texttt{SettingsConfig} definition \\
 Emscripten        & \texttt{\#ifdef \_\_EMSCRIPTEN\_\_} &
-  \texttt{emscripten\_run\_script("window.location.reload()")} for WASM reload \\
+  \foreignlanguage{english}{\texttt{emscripten\_run\_script("window.location.reload()")}} for WASM reload \\
 \hline
 \end{tabularx}
 
@@ -843,7 +933,7 @@ capped at $\texttt{99999}$. Applied once in \texttt{finishLineClear()}.
 \hline
 \textbf{GameRecord field} & \textbf{Source} & \textbf{Notes} \\
 \hline
-\texttt{idUser}       & \texttt{"default"} & hardcoded V2 \\
+\texttt{idUser}       & \foreignlanguage{english}{\texttt{"default"}} & hardcoded V2 \\
 \texttt{startTS}      & \texttt{state.gameStartTime} & Uint32 ms, cast to int64\_t \\
 \texttt{endTS}        & \texttt{SDL\_GetTicks()} & at game-over moment \\
 \texttt{idStory/Chapter} & \texttt{s\_cfg} & 0 if no story selected \\
@@ -861,7 +951,7 @@ capped at $\texttt{99999}$. Applied once in \texttt{finishLineClear()}.
         500,400,300,200,100 at each threshold crossing.
   \item Clear 4 rows: \texttt{score} increases by exactly 16; cap
         enforced: \texttt{score > 99999} clamped to 99999.
-  \item \texttt{tableMatrix = "1,0,0,0,0,0,0,0,0,2"}:
+  \item \foreignlanguage{english}{\texttt{tableMatrix = "1,0,0,0,0,0,0,0,0,2"}}:
         \texttt{board[19][0]=1}; \texttt{board[19][9]=2};
         all others 0. Parse error in one cell: cell stays 0.
   \item Game-over $\rightarrow$ Console: \texttt{SELECT COUNT(*) FROM

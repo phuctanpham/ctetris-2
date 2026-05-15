@@ -1,4 +1,4 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
@@ -345,12 +345,12 @@ gameCore    & \texttt{g++ src/gameCore/app.cpp tests/test\_core.cpp -I src/gameC
 
 \subsubsection{Nhóm Test v3 -- Tích Hợp API}
 
-\tcbox{CON\_TC\_009 \quad Gọi API Mongo Atlas cho Leaderboard}{
+\tcbox{CON\_TC\_009 \quad Gọi API Cloudflare (D1 + Durable Objects) cho Leaderboard}{
 \textbf{Mã Test Case}       & CON\_TC\_009 \\ \hline
-\textbf{Tiêu Đề}            & Gọi API Mongo Atlas cho Leaderboard \\ \hline
+\textbf{Tiêu Đề}            & Gọi API Cloudflare (D1 + Durable Objects) cho Leaderboard \\ \hline
 \textbf{Module / Phiên Bản} & gameConsole / v3 \\ \hline
 \textbf{Loại Test}          & Manual + API Test \\ \hline
-\textbf{Điều Kiện Tiên Quyết} & Kết nối Mongo Atlas đã cấu hình. API endpoint khả dụng. \\ \hline
+\textbf{Điều Kiện Tiên Quyết} & Kết nối Cloudflare (D1 + Durable Objects) đã cấu hình. API endpoint khả dụng. \\ \hline
 \textbf{Các Bước Thực Hiện} &
   1. Vào popup Board, quan sát ứng dụng gọi API thay vì đọc \texttt{board.json}. \newline
   2. Xác nhận dữ liệu từ API hiển thị đúng: name/score/time chính xác. \newline
@@ -358,7 +358,7 @@ gameCore    & \texttt{g++ src/gameCore/app.cpp tests/test\_core.cpp -I src/gameC
   4. Test khi API lỗi mạng – kiểm tra thông báo lỗi rõ ràng. \newline
   5. Test khi API trả về dữ liệu trống hoặc thiếu trường. \\ \hline
 \textbf{Kết Quả Mong Đợi}   & API gọi đúng, dữ liệu hiển thị chính xác. Lỗi được xử lý an toàn, không crash. \\ \hline
-\textbf{Trường Hợp Biên}    & API chậm/timeout, token Mongo Atlas sai, trường dữ liệu không đúng định dạng. \\ \hline
+\textbf{Trường Hợp Biên}    & API chậm/timeout, token Cloudflare (D1 + Durable Objects) sai, trường dữ liệu không đúng định dạng. \\ \hline
 \textbf{Tiêu Chí Pass/Fail} & \textbf{PASS:} API OK, lỗi xử lý an toàn. \textbf{FAIL:} Crash, vẫn dùng board.json, không xử lý lỗi. \\ \hline
 }
 
@@ -481,7 +481,7 @@ CORE\_TC\_012 & Dự Báo 3 Khối Tiếp Theo    & Chơi và quan sát khu vự
 CORE\_TC\_013 & Pause và Resume            & Nhấn P để pause, quan sát dừng chuyển động + nhạc; nhấn lại để tiếp tục & Game dừng/tiếp tục chính xác, state không bị mất \\ \hline
 CORE\_TC\_014 & Quit Game                  & Nhấn nút Quit trong khi chơi, xác nhận thoát & Ứng dụng đóng đúng, không crash, không process còn chạy ngầm \\ \hline
 CORE\_TC\_015 & Nhập Tên Game Over         & Chơi đến khi hết mạng, nhập tên và xác nhận & Tên được chấp nhận, hiển thị trên kết quả \\ \hline
-CORE\_TC\_016 & Gửi Điểm lên Mongo Atlas   & Kết thúc game, nhập tên, gửi data lên API & Dữ liệu gửi thành công, API phản hồi 200 \\ \hline
+CORE\_TC\_016 & Gửi Điểm lên Cloudflare (D1 + Durable Objects)   & Kết thúc game, nhập tên, gửi data lên API & Dữ liệu gửi thành công, API phản hồi 200 \\ \hline
 \end{tabularx}
 \end{table}
 

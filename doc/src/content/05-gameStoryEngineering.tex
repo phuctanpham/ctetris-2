@@ -1,4 +1,4 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
@@ -166,7 +166,6 @@ dialogues / choices} là read-only.
   \node[ext]  (sqlite)at (4.5,-5.8) {SQLite\\\texttt{default.sqlite}};
   \node[ext]  (svg)   at (0,-4.4)   {nanosvg\\rasterizer};
   \node[ext]  (http)  at (8.8,-4.4) {libcurl /\\emscripten\_fetch};
-
   \draw[iface](main)--(entry)  node[above,font=\tiny,midway]{storyId, chapterId};
   \draw[iface](entry)--(sync);
   \draw[iface](entry)--(loop);
@@ -194,7 +193,6 @@ dialogues / choices} là read-only.
   \node[b,right=0.6cm of b](c){\texttt{NSVGrasterize}\\$\rightarrow$ pixels[]};
   \node[b,right=0.6cm of c](d){\texttt{SDL\_Surface}\\$\rightarrow$ Texture};
   \node[b,right=0.6cm of d](e){Store in\\SvgTexture};
-
   \foreach \x/\y in {a/b,b/c,c/d,d/e}{\draw[sdsArrow=pillarBlue](\x)--(\y);}
   \draw[sdsArrow=versionGreen,bend right=30](a.south)to
       node[below,font=\tiny]{cached $\rightarrow$ skip}(e.south);
@@ -233,7 +231,6 @@ $\texttt{outH} = \lfloor \texttt{image->height} \times \texttt{scale} + 0.5 \rfl
   \node[proc](p4) at (0,-6.0) {\texttt{applyChapterJson(db, body, chapterId)}};
   \node[proc](p5) at (0,-7.0) {\texttt{metaSetSha()}; WASM: \texttt{FS.syncfs()}};
   \node[wterm](dn)at (0,-8.0) {\texttt{SYNC\_DONE}};
-
   \draw[arr](p0)--(d0);
   \draw[arr](d0)--node[above,font=\tiny]{yes}(off);
   \draw[arr](d0)--node[left,font=\tiny]{no}(p1);
@@ -241,7 +238,6 @@ $\texttt{outH} = \lfloor \texttt{image->height} \times \texttt{scale} + 0.5 \rfl
   \draw[arr](d1)--node[above,font=\tiny]{yes}(sk);
   \draw[arr](d1)--node[left,font=\tiny]{no}(p3);
   \draw[arr](p3)--(p4); \draw[arr](p4)--(p5); \draw[arr](p5)--(dn);
-
   % loop-back arrow for chapters
   \draw[arr,gray,dashed](sk.east)--++(0.6,0)--++(0,3.05)--
       node[right,font=\tiny]{next ch}++(-0.6,0)--(p2.east);
@@ -270,7 +266,6 @@ $\texttt{outH} = \lfloor \texttt{image->height} \times \texttt{scale} + 0.5 \rfl
   \node[st,right=of wait](adv) {ADVANCE\\resolve\\nextId};
   \node[st,right=of adv] (chk) {CHK\\load new\\choices};
   \node[st,below=1.1cm of adv,draw=versionGreen,fill=versionGreen!8](end){END\\return};
-
   \draw[sdsArrow=pillarBlue](init)--(wait);
   \draw[sdsArrow=pillarBlue](wait)--node[above, align=center, font=\tiny]{ENTER/SPACE\\or click}(adv);
   \draw[sdsArrow=pillarBlue](adv)--(chk);
@@ -293,7 +288,7 @@ $\texttt{outH} = \lfloor \texttt{image->height} \times \texttt{scale} + 0.5 \rfl
         bỏ leading spaces.
 \end{enumerate}
 
-\subsubsection{Post-sync Condition Check --- Return Value Contract}
+\subsubsection{Post-sync Condition Check --- Return Value Contract}\label{sec:postSyncSRS}
 
 \noindent\textit{State-machine diagram đã trình bày trong SRS §\ref{sec:postSyncSRS}.
 SDS bổ sung implementation contract:}
@@ -380,7 +375,7 @@ struct SyncProgress { int total = 0, done = 0;
   };
   \node[rw](meta) at (0,-3.6) {
     \textbf{shared\_meta}\ \textit{\tiny(R/W $\leftarrow$ gameStory)}\\[1pt]
-    \pk{chapter\_id} \textit{\tiny(e.g. "c001")}\\
+    \pk{chapter\_id} \textit{\tiny(e.g. ''c001'')}\\
     sha, updated\_at\\
     media\_base\_url
   };
@@ -390,23 +385,20 @@ struct SyncProgress { int total = 0, done = 0;
     isActivated, isSelected\\
     lastMaxScore, lastMaxSpeed
   };
-
-  % shared_data → shared_dialogues (1:N on idStory+idChapter)
+  % shared_data $\rightarrow$ shared_dialogues (1:N on idStory+idChapter)
   \draw[rel](sd.north east)to[bend left=10]
       node[lbl,pos=0.3]{1}node[lbl,pos=0.75]{N}(dlg.west);
-  % shared_dialogues → shared_choices (1:N on idStory+idChapter+nodeId)
+  % shared_dialogues $\rightarrow$ shared_choices (1:N on idStory+idChapter+nodeId)
   \draw[rel](dlg.south)--node[lbl,left,pos=0.4]{1}node[lbl,pos=0.85]{N}(cho.north);
-  % shared_data → shared_choices direct FK (idStory+idChapter)
+  % shared_data $\rightarrow$ shared_choices direct FK (idStory+idChapter)
   \draw[rel](sd.east)to[bend right=8]
       node[lbl,below,pos=0.3]{1}node[lbl,pos=0.78]{N}(cho.west);
-
   % shared_meta linked to shared_data by chapter scope (dashed, logical)
   \draw[wrrel,dashed](meta.east)--
       node[lbl,above,pos=0.45]{chapter\_id ↔ idChapter (logical)}(sd.south);
-  % shared_data → idUser_Stories
+  % shared_data $\rightarrow$ idUser_Stories
   \draw[wrrel](sd.east)to[bend left=8]
       node[lbl,pos=0.3]{1}node[lbl,pos=0.78]{0..1/user}(us.west);
-
 \end{tikzpicture}
 \end{center}
 
@@ -434,7 +426,6 @@ struct SyncProgress { int total = 0, done = 0;
   \node[proc] (loop) at (3.8,0)  {dialRunLoop()};
   \node[proc] (draw) at (0,0)    {drawDialogue\\Page()};
   \node[extio](user) at (0,1.5)  {SDL Events};
-
   \draw[fl](gist)--node[above,font=\tiny]{httpGetSync()}(sync);
   \draw[fl](sync)--node[above,font=\tiny]{UPSERT sha}(meta);
   \draw[dfl](meta.south)to[bend right=12]
@@ -466,28 +457,22 @@ struct SyncProgress { int total = 0, done = 0;
   \node[lhd] (H3) at (6.0,0)  {\texttt{storyDb*()}};
   \node[lhd] (H4) at (9.0,0)  {\texttt{syncFrom}\\\texttt{Gist()}};
   \node[lhd] (H5) at (12.0,0) {\texttt{dialRun}\\\texttt{Loop()}};
-
   % lifelines
   \foreach \x in {0,3.0,6.0,9.0,12.0} { \draw[lf](\x,-0.3)--(\x,-8.8); }
-
   % ---- path label divider
   \draw[gray!40,thick,dashed](-0.8,-4.5)--(13,-4.5);
   \node[font=\scriptsize\itshape,gray!80] at (-0.4,-1.0) {id=0};
   \node[font=\scriptsize\itshape,gray!80] at (-0.4,-5.3) {id>0};
-
   % ---- storyId=0 ----
   \draw[msg](0,-1.0)--(3.0,-1.0)   node[above,font=\tiny,midway]{runGameStory(0,0)};
   \draw[msg](3.0,-1.6)--(6.0,-1.6) node[above,font=\tiny,midway]{storyDbOpen()};
   \draw[ret](6.0,-2.0)--(3.0,-2.0) node[above,font=\tiny,midway]{ok};
   \draw[msg](3.0,-2.4)--(9.0,-2.4) node[above,font=\tiny,midway]{syncFromGist(db)};
   \draw[ret](9.0,-2.9)--(3.0,-2.9) node[above,font=\tiny,midway]{SYNC\_DONE};
-
   \node[font=\tiny,gray] at (4.5,-3.3) {\textit{8s logo anim + bar}};
-
   \draw[msg](3.0,-3.6)--(6.0,-3.6) node[above,font=\tiny,midway]{postSyncCheck(db)};
   \draw[ret](6.0,-4.0)--(3.0,-4.0) node[above,font=\tiny,midway]{+storyId};
   \draw[msg](3.0,-4.3)--(12.0,-4.3)node[above,font=\tiny,midway]{dialRunLoop(nodes)};
-
   % ---- storyId>0 ----
   \draw[msg](0,-5.3)--(3.0,-5.3)   node[above,font=\tiny,midway]{runGameStory(N,ch)};
   \draw[msg](3.0,-5.9)--(6.0,-5.9) node[above,font=\tiny,midway]{storyDbOpen()};
@@ -496,7 +481,6 @@ struct SyncProgress { int total = 0, done = 0;
   \draw[msg](3.0,-7.5)--(12.0,-7.5)node[above,font=\tiny,midway]{dialRunLoop(nodes)};
   \draw[ret](12.0,-8.0)--(3.0,-8.0)node[above,font=\tiny,midway]{return 0};
   \draw[msg](3.0,-8.4)--(6.0,-8.4) node[above,font=\tiny,midway]{storyDbClose()};
-
   \draw[ret](6.0,-8.8)--(0,-8.8)   node[above,font=\tiny,midway]{return 0};
 \end{tikzpicture}
 \end{center}
@@ -526,7 +510,7 @@ std::vector<DialogueChoice> storyDbLoadChoices (int idStory, int idChapter,
 \noindent\textbf{Compile-time define} (inject via \texttt{app/.env}):
 \begin{verbatim}
 -DMANIFEST_GIST_URL="https://gist.githubusercontent.com/..."
-// Empty string → auto SYNC_OFFLINE fallback, no crash.
+// Empty string $\rightarrow$ auto SYNC_OFFLINE fallback, no crash.
 
 \end{verbatim}
 
@@ -578,31 +562,24 @@ SVG lazy-init; \texttt{BUILD\_STANDALONE} mode.
 \begin{center}
 \begin{tikzpicture}[x=0.72pt, y=0.72pt, every node/.style={font=\tiny}]
   \draw[thick](0,0) rectangle (270,480);
-
   % skip button top-right  y=5..23  (y axis inverted for display)
   \fill[gray!25](200,457) rectangle (265,475);
   \draw(200,457) rectangle (265,475);
-
   \node at (232,466){\texttt{SKIP\_BTN} \{200,5,65,18\}};
   % logo area  centre-ish
   \fill[pillarBlue!18](65,245) rectangle (205,355);
   \draw[pillarBlue](65,245) rectangle (205,355);
   \node[align=center] at (135,320){\texttt{LOGO\_SVG}\\targetW=140\\centre−60};
-
   \node at (135,300){\texttt{C T E T R I S} (grey 220,220,220)};
-
   % loading bar  barY = 480−110 = 370
   \fill[versionGreen!35](45,100) rectangle (225,113);
   \draw(45,100) rectangle (225,113); \node[right] at (227,107){180×12 px};
-
   \node[left] at (43,107){y=370};
   % status line above bar
   \draw[gray!40,dashed](45,120)--(225,120);
   \node at (135,128){\texttt{SyncState} status (y=352)};
-
   % corp credit below bar
   \node[align=center] at (135,80){"Powered up by " + CORP\_SVG (h=16)\\\textit{centred}};
-
   % axis labels
   \node[gray] at (255,470){y=0};
   \node[gray] at (255,10){y=480};
@@ -649,7 +626,7 @@ post-sync condition check.
   \item \texttt{nextNodeId=0} on last node $\rightarrow$ \texttt{dialRunLoop()} exits;
         \texttt{runGameStory} returns \texttt{0} within one frame.
 
-  \item \texttt{MANIFEST\_GIST\_URL=""} $\rightarrow$ \texttt{SYNC\_OFFLINE}; no crash;
+  \item \foreignlanguage{english}{\texttt{MANIFEST\_GIST\_URL=""}} $\rightarrow$ \texttt{SYNC\_OFFLINE}; no crash;
         dialogue proceeds from local DB.
 
 \end{itemize}
@@ -662,7 +639,7 @@ post-sync condition check.
 logo fade-in loops until all files ready.
 
 \noindent\textbf{Cache key:}
-\texttt{SDL\_GetPrefPath("uit","cTetris") + "cache/" + \textit{basename}(url)}.
+\foreignlanguage{english}{\texttt{SDL\_GetPrefPath("uit","cTetris") + "cache/" + \textit{basename}(url)}}.
 Skip if file exists on disk.
 
 \noindent\textbf{Download-speed bar:}

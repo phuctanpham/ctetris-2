@@ -2207,7 +2207,7 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
 
     // [C.5] Load leaderboard tu JSON; fallback ve hardcoded array neu fail.
     // Re-load moi lan vao Console -- cho phep refresh data sau khi V3 add
-    // sync tu MongoDB. Cost ~300us, khong noticeable.
+    // sync tu Cloudflare (D1 + Durable Objects). Cost ~300us, khong noticeable.
     loadBoardWithFallback();
     // [G/H] Apply default sort (SCORE_DESC) right after load -- locks in
     // a deterministic order regardless of whether JSON or fallback array

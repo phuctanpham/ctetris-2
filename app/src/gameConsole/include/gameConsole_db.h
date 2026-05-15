@@ -6,7 +6,7 @@
 // Schema mirrors task.md spec:
 //   idUser_Records  : per-session game log (one row per game-over)
 //   idUser_Stories  : per-user progress overlay (isActivated, isSelected, ...)
-//   shared_data     : static story catalogue (seeded V2, synced V3 from MongoDB)
+//   shared_data     : static story catalogue (seeded V2, synced V3 from Cloudflare (D1 + Durable Objects))
 // =============================================================================
 
 #include <string>

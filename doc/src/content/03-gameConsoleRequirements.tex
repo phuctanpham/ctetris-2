@@ -1,4 +1,4 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
@@ -26,15 +26,15 @@ Phân hệ \textbf{gameConsole} đóng vai trò là Trung tâm điều phối (H
 \subsection{Mô hình hóa Hệ thống (System Modeling)}
 
 \subsubsection{Kiến trúc Cơ sở dữ liệu (SQLite --- 3 nhóm bảng)}
-	extit{ERD đầy đủ với DDL-level precision (8 bảng, tên thực
-	exttt{default\_Records}/\texttt{default\_Stories}/\texttt{default\_Settings},
+\textit{ERD đầy đủ với DDL-level precision (8 bảng, tên thực
+\texttt{default\_Records}/\texttt{default\_Stories}/\texttt{default\_Settings},
 foreign-key relationships, 3 ownership groups) được đặc tả trong
-	extbf{SDS §06-gameConsoleEngineering, mục 2.4}.}
+\textbf{SDS §06-gameConsoleEngineering, mục 2.4}.}
 
 SRS chỉ phát biểu ràng buộc schema:
 \begin{itemize}[nosep]
   \item File: \texttt{SDL\_GetPrefPath("uit","cTetris")} $+$
-      	exttt{idUser} $+$ \texttt{".sqlite"}.
+      \texttt{idUser} $+$ \texttt{".sqlite"}.
   \item User-prefix tables: \texttt{g\_dbCurrentUser + "\_" + suffix}
       (Group 1 --- R/W owner).
   \item \texttt{shared\_*}: schema owner = \texttt{gameConsole}; gameStory
@@ -46,40 +46,51 @@ SRS chỉ phát biểu ràng buộc schema:
 \end{itemize}
 
 \subsubsection{Hợp đồng dữ liệu \texttt{SettingsConfig} (Cross-module Contract)}
-	extit{Component diagram và sequence diagram của \texttt{SettingsConfig}
+\textit{Component diagram và sequence diagram của \texttt{SettingsConfig}
 flow (Console $\leftrightarrow$ Core $\leftrightarrow$ DBLayer) được đặc tả trong
-	extbf{SDS §06-gameConsoleEngineering, mục 2.5}.}
+\textbf{SDS §06-gameConsoleEngineering, mục 2.5}.}
 
 SRS phát biểu ràng buộc contract:
 \begin{itemize}[nosep]
   \item \textbf{Persisted fields} (10 rows in \texttt{default\_Settings}):
-      	exttt{volume}, \texttt{color0-6}, \texttt{storyId}, \texttt{chapterId}.
+      \texttt{volume}, \texttt{color0-6}, \texttt{storyId}, \texttt{chapterId}.
   \item \textbf{Runtime-only fields} (NOT persisted):
-      	exttt{nextBlockScore}, \texttt{nextBlockSpeed}, \texttt{tableMatrix} ---
+      \texttt{nextBlockScore}, \texttt{nextBlockSpeed}, \texttt{tableMatrix} ---
       set from Stories popup, forwarded to \texttt{runGameCore()}.
   \item Single \texttt{volume} field (no separate bgm/sfx split in V2).
   \item \texttt{SettingsConfig\&} is a \textbf{borrowed pointer} inside
-      	exttt{AppState::cfg} --- \texttt{runGameConsole()} does not own it.
+      \texttt{AppState::cfg} --- \texttt{runGameConsole()} does not own it.
 \end{itemize}
+
+\subsubsection{Cây tính năng Hệ thống (System Feature Tree)}
+\begin{center}
+\begin{tikzpicture}[
+    grow=right,
+    level 1/.style={sibling distance=3.2cm, level distance=4.5cm},
+    level 2/.style={sibling distance=1.0cm, level distance=4.0cm},
+    edge from parent fork right,
+    every node/.style={rectangle, draw=black, rounded corners, fill=gray!10,
+                       thick, align=center, font=\scriptsize, text width=2.4cm},
+    root/.style={fill=orange!20, font=\small\bfseries, text width=2.2cm}
 ]
 \node[root] {Module \\ gameConsole}
-    child { node[fill=red!10] {Cấu hình (V2/V3)}
-        child { node {Lưu/Đọc thiết lập} }
-        child { node {Chỉnh Âm lượng/Màu} }
-    }
-    child { node[fill=yellow!10] {Giao diện Pop-up}
-        child { node {Hướng dẫn (Guide)} }
-        child { node {Bảng điểm (Board)} }
-        child { node {Scrollbar tương tác} }
+    child { node[fill=blue!10] {Quản lý Phiên}
+        child { node {Màn hình Reload} }
+        child { node {Chuyển đổi Module} }
     }
     child { node[fill=green!10] {Điều hướng}
-        child { node {Hệ thống Focus nút} }
-        child { node {Phím tắt điều khiển} }
         child { node {Chuột \& Con lăn} }
+        child { node {Phím tắt điều khiển} }
+        child { node {Hệ thống Focus nút} }
     }
-    child { node[fill=blue!10] {Quản lý Phiên}
-        child { node {Chuyển đổi Module} }
-        child { node {Màn hình Reload} }
+    child { node[fill=yellow!10] {Giao diện Pop-up}
+        child { node {Scrollbar tương tác} }
+        child { node {Bảng điểm (Board)} }
+        child { node {Hướng dẫn (Guide)} }
+    }
+    child { node[fill=red!10] {Cấu hình (V2/V3)}
+        child { node {Chỉnh Âm lượng/Màu} }
+        child { node {Lưu/Đọc thiết lập} }
     };
 \end{tikzpicture}
 \end{center}
@@ -139,7 +150,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \hline
     Cấu hình người dùng & Không lưu trữ & \texttt{default\_Settings} (key–value), persist qua restart \\
     \hline
-    Số nút chính & 4 & 6 (thêm \textsc{Stories} + \textsc{Settings}) \\
+    Số nút chính & 4 & 6 (thêm \textbf{Stories} + \textbf{Settings}) \\
     \hline
     Tích hợp âm thanh & Stub log & \texttt{SDL\_AudioStream} + \texttt{SDL\_SetAudioStreamGain} \\
     \hline
@@ -154,7 +165,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 % ---- Sơ đồ Trạng thái mở rộng V2 ----
 \subsubsection{Sơ đồ Trạng thái V2 (State Machine — mở rộng)}
 
-\noindent V2 bổ sung hai trạng thái popup mới (\textsc{Settings\_Popup}, \textsc{Stories\_Popup}) và luồng khởi động có kiểm tra DB (\textsc{DB\_Guard}).
+\noindent V2 bổ sung hai trạng thái popup mới (\textbf{Settings\_Popup}, \textbf{Stories\_Popup}) và luồng khởi động có kiểm tra DB (\textbf{DB\_Guard}).
 
 \begin{center}
 \begin{tikzpicture}[
@@ -164,46 +175,39 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     guard/.style={diamond, draw=red!70, fill=red!5, thick,
                   minimum width=2.2cm, minimum height=1.1cm,
                   align=center, font=\scriptsize, aspect=2},
+    initstate/.style={rectangle, rounded corners, draw=orange!60, fill=orange!5, thick,
+                      minimum width=2.2cm, minimum height=0.8cm, align=center, font=\scriptsize},
     arrow/.style={-{Stealth[scale=1.1]}, thick},
     dashed arrow/.style={-{Stealth[scale=1.1]}, thick, dashed}
 ]
     \node[guard]  (dbg)     {DB\\Guard};
-    \node[state,  right=1.8cm of dbg]  (main)    {MAIN\\MENU};
-    \node[state,  above left=1.4cm and 1.6cm of main] (guide)  {GUIDE\\POPUP};
-    \node[state,  above right=1.4cm and 1.6cm of main] (board) {BOARD\\POPUP};
-    \node[state,  below left=1.4cm and 1.6cm of main] (set)   {SETTINGS\\POPUP};
-    \node[state,  below right=1.4cm and 1.6cm of main] (stor) {STORIES\\POPUP};
-    \node[state,  right=2.4cm of main] (reload) {RELOAD\\(WASM)};
+    \node[state,  right=2.8cm of dbg]  (main)    {MAIN\\MENU};
+    \node[initstate, above=1.5cm of dbg] (init) {gameStory\\init};
+    \node[state,  above left=1.8cm and 1.8cm of main] (guide)  {GUIDE\\POPUP};
+    \node[state,  above right=1.8cm and 1.8cm of main] (board) {BOARD\\POPUP};
+    \node[state,  below left=1.8cm and 1.8cm of main] (set)   {SETTINGS\\POPUP};
+    \node[state,  below right=1.8cm and 1.8cm of main] (stor) {STORIES\\POPUP};
+    \node[state,  right=2.8cm of main] (reload) {RELOAD\\(WASM)};
 
     % guard transitions
     \draw[dashed arrow] (dbg) -- node[above,font=\scriptsize]{DB ok} (main);
-    \draw[dashed arrow] (dbg.north) to[bend left=50]
-        node[above,font=\scriptsize]{missing→ret 3} ++(0,1.6)
-        node[font=\scriptsize,draw=orange!60,fill=orange!5,rounded corners]{gameStory\\init};
+    \draw[dashed arrow] (dbg) -- node[left,font=\scriptsize]{missing$\rightarrow$ret 3} (init);
 
-    % main ↔ popups
-    \draw[arrow] (main.150) to[bend left=15]
-        node[above left,font=\scriptsize]{GUIDE} (guide.330);
-    \draw[arrow] (guide.290) to[bend left=15]
-        node[below right,font=\scriptsize]{ESC/X} (main.130);
+    % main ↔ popups (đã xử lý không cắt chéo nhau)
+    \draw[arrow] (main) to[bend right=20] node[above right,font=\scriptsize]{GUIDE} (guide);
+    \draw[arrow] (guide) to[bend right=20] node[below left,font=\scriptsize]{ESC/X} (main);
 
-    \draw[arrow] (main.30) to[bend left=15]
-        node[above right,font=\scriptsize]{BOARD} (board.210);
-    \draw[arrow] (board.250) to[bend left=15]
-        node[below left,font=\scriptsize]{ESC/X} (main.50);
+    \draw[arrow] (main) to[bend right=20] node[above left,font=\scriptsize]{BOARD} (board);
+    \draw[arrow] (board) to[bend right=20] node[below right,font=\scriptsize]{ESC/X} (main);
 
-    \draw[arrow] (main.210) to[bend right=15]
-        node[below left,font=\scriptsize]{SETTINGS} (set.30);
-    \draw[arrow] (set.70) to[bend right=15]
-        node[above right,font=\scriptsize]{ESC/X\\+save} (main.230);
+    \draw[arrow] (main) to[bend right=20] node[below right,font=\scriptsize]{SETTINGS} (set);
+    \draw[arrow] (set) to[bend right=20] node[above left,font=\scriptsize,align=center]{ESC/X\\+save} (main);
 
-    \draw[arrow] (main.330) to[bend right=15]
-        node[below right,font=\scriptsize]{STORIES} (stor.150);
-    \draw[arrow] (stor.110) to[bend right=15]
-        node[above left,font=\scriptsize]{ESC/X} (main.310);
+    \draw[arrow] (main) to[bend right=20] node[below left,font=\scriptsize]{STORIES} (stor);
+    \draw[arrow] (stor) to[bend right=20] node[above right,font=\scriptsize]{ESC/X} (main);
 
     % QUIT
-    \draw[arrow] (main) -- node[above,font=\scriptsize]{QUIT\\(WASM)} (reload);
+    \draw[arrow] (main) -- node[above,font=\scriptsize,align=center]{QUIT\\(WASM)} (reload);
 \end{tikzpicture}
 \end{center}
 
@@ -246,7 +250,6 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \texttt{key} TEXT PRIMARY KEY\\
     \texttt{value} TEXT
 };
-
 % Group 2
 \node[tbl, right=1.6cm of rec] (sd) {
     \textbf{shared\_data} (Group 2)\\
@@ -273,7 +276,6 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \texttt{sha / updated\_at}\\
     \texttt{media\_base\_url}
 };
-
 % Group 3
 \node[tbl, right=1.6cm of sd] (sync) {
     \textbf{sync\_Records} (Group 3)\\
@@ -284,7 +286,6 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \texttt{endTS / idStory / idChapter}\\
     \textit{seed: 30 rows từ FALLBACK\_BOARD\_ROWS}
 };
-
 % Group boxes
 \begin{scope}[on background layer]
     \node[grp, fit=(rec)(stor)(sett), label=above:{\small\bfseries Group 1 — Per-user R/W}] {};
@@ -295,48 +296,68 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 % FK arrows
 \draw[arrow, blue!60] (stor.east) -- ++(0.3,0) |-
     node[pos=0.25, right, font=\tiny]{LEFT JOIN} (sd.west);
-\draw[arrow, green!50!black] (rec.north east) -- ++(0.5,0.3) --
-    node[above, font=\tiny]{leaderboard seed} (sync.south west);
+
+% Đã chỉnh luồng: Đi ra từ phía Tây của rec, vòng hẳn xuống dưới tất cả các bảng (y=-1.0 so với sett.south), kéo ngang qua, và đâm thẳng lên sync.south để tránh cắt ngang qua bất kỳ bảng nào.
+\draw[arrow, green!50!black] (rec.west) -- ++(-0.6, 0) |- 
+    node[pos=0.75, above, font=\scriptsize]{leaderboard seed} 
+    ($(sett.south) + (0, -1.0)$) -| (sync.south);
 \end{tikzpicture}
 \end{center}
 
 \vspace{4pt}
-\noindent\textbf{Persistence WASM:} Emscripten IDBFS mount tại \texttt{SDL\_GetPrefPath} → \texttt{FS.syncfs(true)} trước \texttt{sqlite3\_open} → \texttt{FS.syncfs(false)} sau mỗi write transaction. Không call \texttt{syncfs} trên native (no-op guard).
+\noindent\textbf{Persistence WASM:} Emscripten IDBFS mount tại \texttt{SDL\_GetPrefPath} $\rightarrow$ \texttt{FS.syncfs(true)} trước \texttt{sqlite3\_open} $\rightarrow$ \texttt{FS.syncfs(false)} sau mỗi write transaction. Không call \texttt{syncfs} trên native (no-op guard).
 
 % ---- SettingsConfig contract ----
 \subsubsection{Hợp đồng dữ liệu \texttt{SettingsConfig} (Cross-module Contract)}
 
-\noindent Struct được khai báo trong \texttt{gameConsole\_layout.h} và truyền qua tham chiếu giữa \texttt{runGameConsole()} và \texttt{runGameCore()}.
+\noindent Struct được khai báo trong \texttt{gameConsole\_layout.h} và truyền qua tham chiếu giữa \texttt{runGameConsole()} và \texttt{runGameCore()}. Đã vẽ lại theo chuẩn sơ đồ.
 
 \begin{center}
 \begin{tikzpicture}[
     every node/.style={font=\scriptsize},
-    mod/.style={rectangle, draw=black, fill=orange!10, thick,
-                minimum width=2.6cm, minimum height=1.0cm, align=center},
-    cfg/.style={rectangle, draw=blue!60, fill=blue!5, thick,
-                minimum width=3.2cm, align=left, inner sep=5pt},
-    arrow/.style={-{Stealth[scale=1.1]}, thick}
+    cfg/.style={rectangle, draw=black, fill=blue!5, thick,
+                minimum width=4.0cm, align=left, inner sep=5pt},
+    core/.style={rectangle, draw=black, fill=blue!5, thick,
+                 align=center, inner sep=5pt},
+    db/.style={rectangle, rounded corners, draw=black, fill=blue!5, thick,
+               align=center, inner sep=5pt},
+    arrow/.style={-{Stealth[scale=1.1]}, thick},
+    dashed arrow/.style={-{Stealth[scale=1.1]}, thick, dashed, draw=purple}
 ]
-    \node[mod] (cons) at (0,0) {\textbf{runGameConsole}\\{\tiny SettingsConfig\& cfgInOut}};
-    \node[cfg]  (cfg)  at (4.6,0) {
-        \textbf{SettingsConfig}\\
-        \rule{\linewidth}{0.4pt}\\
-        \texttt{float  volume}\\
-        \texttt{bool   colorEnabled[7]}\\
-        \texttt{int    storyId / chapterId}\\
-        \texttt{int    nextBlockScore}\\
-        \texttt{float  nextBlockSpeed}\\
-        \texttt{string tableMatrix}
+    % SettingsConfig box (Bên Trái)
+    \node[cfg] (cfg) at (0,0) {
+        \begin{tabular}{@{}l@{}}
+            \multicolumn{1}{c}{\textbf{SettingsConfig}} \\[2pt]
+            \hline \\[-6pt]
+            \texttt{public:} \\
+            \texttt{\hspace{4pt}float volume} \\
+            \texttt{\hspace{4pt}bool colorEnabled[7]} \\
+            \texttt{\hspace{4pt}int storyId / chapterId} \\
+            \texttt{\hspace{4pt}int nextBlockScore} \\
+            \texttt{\hspace{4pt}float nextBlockSpeed} \\
+            \texttt{\hspace{4pt}string tableMatrix}
+        \end{tabular}
     };
-    \node[mod]  (core) at (9.2,0) {\textbf{runGameCore}\\{\tiny const SettingsConfig\& cfg}};
 
-    \draw[arrow] (cons.east) -- node[above,font=\scriptsize]{mutate} (cfg.west);
-    \draw[arrow] (cfg.east)  -- node[above,font=\scriptsize]{read-only} (core.west);
+    % runGameCore box (Bên Phải)
+    \node[core, label={[font=\scriptsize]above:runGameCore(const SettingsConfig\& cfg)}] (core) at (6.5, 0.5) {
+        \texttt{const SettingsConfig\& cfg}
+    };
 
-    % DB persist arrow
-    \draw[arrow, dashed, blue!60] (cfg.south) -- ++(0,-0.8)
-        node[below,font=\tiny,draw=blue!30,fill=blue!5,rounded corners,inner sep=2pt]
-        {dbSaveSettings() / dbLoadSettings()};
+    % Database box (Bên Dưới)
+    \node[db] (db) at (0, -3.5) {
+        \begin{tabular}{@{}l@{}}
+            \texttt{dbSaveSettings} \\
+            \texttt{dbLoadSettings}
+        \end{tabular}
+    };
+
+    % Mũi tên từ hàm (Phải) chỉ sang cấu trúc (Trái), neo đúng cạnh phải của SettingsConfig
+    \draw[arrow] (core.west) -- (cfg.east |- core.west);
+    
+    % Mũi tên đứt đoạn từ cấu trúc (Trên) lưu xuống DB (Dưới)
+    \draw[dashed arrow] (cfg.south) -- (db.north);
+
 \end{tikzpicture}
 \end{center}
 
@@ -359,16 +380,14 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \node[dec,   below=0.5cm of s]   (chk)  {DB\\exists?};
     \node[proc,  below=0.5cm of chk] (idbfs){WASM: IDBFS mount\\+ syncfs(true)};
     \node[proc,  below=0.5cm of idbfs](open) {sqlite3\_open\\dbInitSchema()};
-    \node[proc,  below=0.5cm of open] (seed) {dbSeedSharedData()\\→ verify shared\_data rows};
+    \node[proc,  below=0.5cm of open] (seed) {dbSeedSharedData()\\$\rightarrow$ verify shared\_data rows};
     \node[dec,   below=0.5cm of seed] (hasD) {shared\_data\\has rows?};
     \node[proc,  below=0.5cm of hasD] (load) {dbLoadSettings()\\applyVolumeToStream()};
     \node[proc,  below=0.5cm of load] (unl)  {dbCheckAndUnlockStories()};
     \node[proc,  below=0.5cm of unl]  (brd)  {loadBoardWithFallback()\\applyBoardSort(SCORE\_DESC)};
     \node[term,  below=0.5cm of brd]  (loop) {main event loop};
-
     \node[term,  right=3.2cm of chk]  (ret3) {return 3\\(gameStory init)};
     \node[term,  right=3.2cm of hasD] (ret3b){return 3\\(shared\_data missing)};
-
     \draw[arrow] (s) -- (chk);
     \draw[arrow] (chk) -- node[left]{yes} (idbfs);
     \draw[arrow] (chk) -- node[above]{no} (ret3);
@@ -386,9 +405,9 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 % ---- Yêu cầu chức năng V2 ----
 \subsubsection{Yêu cầu Chức năng V2}
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Background SVG (2.1):} Lazy-rasterize 1 lần/session qua nanosvg → \texttt{SDL\_Texture}. Reset pointer khi exit để tránh leak khi re-entry. WASM: embed SVG dạng header C string, không cần \texttt{--preload-file}.
+    \item \textbf{Background SVG (2.1):} Lazy-rasterize 1 lần/session qua nanosvg $\rightarrow$ \texttt{SDL\_Texture}. Reset pointer khi exit để tránh leak khi re-entry. WASM: embed SVG dạng header C string, không cần \texttt{--preload-file}.
     \item \textbf{Popup Settings (2.3):} Volume slider drag (\texttt{SDL\_AudioStream} + \texttt{SDL\_SetAudioStreamGain}); phím LEFT/RIGHT ±5\%; 7 color swatches toggle multi-select với guard tối thiểu 1 màu. Đóng popup tự gọi \texttt{dbSaveSettings()}.
-    \item \textbf{Popup Stories (2.6):} 3 trạng thái hàng — \textsc{Locked} / \textsc{Active} / \textsc{Completed}; navigator chapter trái/phải; nút Play chuyển scene về gameStory preview (return 2). Click radio chọn story → \texttt{dbSelectStory()} + cập nhật \texttt{SettingsConfig}.
+    \item \textbf{Popup Stories (2.6):} 3 trạng thái hàng — \textbf{Locked} / \textbf{Active} / \textbf{Completed}; navigator chapter trái/phải; nút Play chuyển scene về gameStory preview (return 2). Click radio chọn story $\rightarrow$ \texttt{dbSelectStory()} + cập nhật \texttt{SettingsConfig}.
     \item \textbf{Leaderboard từ DB (2.7):} \texttt{sync\_Records} ORDER BY totalScore DESC; fallback \texttt{FALLBACK\_BOARD\_ROWS[]} khi rỗng; sort 4 chế độ qua \textit{Smart Sort Engine} (Insertion cho $n \leq 64$, Intro cho $n > 64$).
     \item \textbf{Unlock cascade (2.6):} \texttt{dbCheckAndUnlockStories()} mỗi lần vào Console: parse CSV \texttt{requiredStories}, so sánh với \texttt{lastMaxScore/Speed/Retries}, UPSERT \texttt{isActivated=1} nếu đủ điều kiện.
 \end{itemize}
@@ -405,12 +424,12 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 \begin{center}
 \begin{tikzpicture}[
     grow=right,
-    level 1/.style={sibling distance=2.8cm, level distance=4.8cm},
-    level 2/.style={sibling distance=1.0cm, level distance=4.6cm},
+    level 1/.style={sibling distance=4.0cm, level distance=4.5cm},
+    level 2/.style={sibling distance=1.4cm, level distance=4.0cm},
     edge from parent fork right,
     every node/.style={rectangle, draw=black, rounded corners,
-                       fill=gray!10, thick, align=center, font=\scriptsize},
-    root/.style={fill=orange!20, font=\small\bfseries}
+                       fill=gray!10, thick, align=center, font=\scriptsize, text width=1.8cm},
+    root/.style={fill=orange!20, font=\small\bfseries, text width=2.2cm}
 ]
 \node[root] {V2 Delta}
     child { node[fill=blue!10] {Persistence}
@@ -440,9 +459,9 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \hline
     \textbf{Kịch bản kiểm thử} & \textbf{Kết quả mong đợi} \\
     \hline
-    Set volume=0.3 → kill app → restart & Slider hiển thị đúng 30\%; \texttt{SDL\_AudioStream} gain = 0.3 \\
+    Set volume=0.3 $\rightarrow$ kill app $\rightarrow$ restart & Slider hiển thị đúng 30\%; \texttt{SDL\_AudioStream} gain = 0.3 \\
     \hline
-    Tắt 6 màu, giữ 1 màu → click tắt màu cuối & Swatch không tắt; log \texttt{"need >=1 color enabled"} \\
+    Tắt 6 màu, giữ 1 màu $\rightarrow$ click tắt màu cuối & Swatch không tắt; log \texttt{"need >=1 color enabled"} \\
     \hline
     Click Play trong Stories popup & \texttt{cfg.storyId/chapterId} cập nhật; return 2; gameStory chạy preview \\
     \hline
@@ -450,16 +469,20 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \hline
     Board click header SCORE / TIME & Danh sách resort; \texttt{boardScroll} reset 0; log algo name \\
     \hline
-    WASM: đóng tab → mở lại & sync\_Records và Settings còn nguyên từ IDBFS \\
+    WASM: đóng tab $\rightarrow$ mở lại & sync\_Records và Settings còn nguyên từ IDBFS \\
     \hline
 \end{tabularx}
 
+\IfFileExists{03-gameConsoleRequirements-v2-screenshot.png}{
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.55\textwidth]{03-gameConsoleRequirements-v2-screenshot}
     \\[6pt]
     \textit{\small Hình V2.1: Màn hình gameConsole V2 — 6 nút, SVG background, popup Settings với volume slider và color swatches.}
 \end{figure}
+}{
+\begin{center}\framebox[0.55\textwidth]{\rule{0pt}{8cm}[Screenshot: 03-gameConsoleRequirements]}\end{center}
+}
 
 % ============================================================
 % END PATCH V2
@@ -467,11 +490,11 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 
 \subsection{Yêu cầu Phiên bản V3: Tích hợp Đám mây \& Bảng xếp hạng Động}
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Mục tiêu cốt lõi:} Số hóa tính cạnh tranh bằng cách đồng bộ Bảng xếp hạng trực tuyến qua API MongoDB Atlas, hỗ trợ bộ lọc và sắp xếp (Sorting).
+    \item \textbf{Mục tiêu cốt lõi:} Số hóa tính cạnh tranh bằng cách đồng bộ Bảng xếp hạng trực tuyến qua API Cloudflare (D1 + Durable Objects), hỗ trợ bộ lọc và sắp xếp (Sorting).
     \item \textbf{Yêu cầu Chức năng:}
     \begin{itemize}[noitemsep]
         \item Đồng bộ trực tuyến: Gọi HTTP Request lấy dữ liệu Leaderboard thời gian thực.
-        \item Phân loại dữ liệu: Chức năng sắp xếp danh sách theo "Điểm cao" hoặc "Thời gian gần nhất".
+        \item Phân loại dữ liệu: Chức năng sắp xếp danh sách theo ``Điểm cao'' hoặc ``Thời gian gần nhất''.
         \item Trạng thái mạng: Hiển thị hiệu ứng Loading khi đang truy vấn dữ liệu từ Server.
     \end{itemize}
     \item \textbf{Yêu cầu Phi Chức năng:} Xử lý bất đồng bộ (Asynchronous) để không làm treo giao diện chính khi mạng yếu. Timeout tối đa 2 giây.

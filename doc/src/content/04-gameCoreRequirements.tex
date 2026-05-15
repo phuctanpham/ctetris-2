@@ -1,7 +1,7 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
-
+\PassOptionsToPackage{edges}{forest}
 \IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
 \IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
 \IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
@@ -34,7 +34,7 @@ Phân hệ \textbf{gameCore} là trái tim của ứng dụng \textit{cTetris}, 
 ]
 \node[system] (gamecore) {\textbf{gameCore}};
 \node[entity, left=3.5cm of gamecore] (player) {Người chơi};
-\node[entity, right=3.5cm of gamecore] (database) {MongoDB \\ (Cloud API)};
+\node[entity, right=3.5cm of gamecore] (database) {Cloudflare D1 / DO \\ (Cloud API)};
 \node[entity, above=1.5cm of gamecore] (gameconsole) {Module\\ gameConsole};
 
 \draw[arrow] ($(player.east)+(0,0.3)$) -- node[above, font=\scriptsize, align=center] {Thao tác (Phím/Vuốt)} ($(gamecore.west)+(0,0.3)$);
@@ -98,53 +98,70 @@ Mô tả luồng hoạt động chi tiết trong một vòng lặp trò chơi (G
 Mô tả các trạng thái vòng đời của module \texttt{gameCore}.
 \begin{center}
 \begin{tikzpicture}[
-    node distance=3cm,
-    state/.style={circle, draw=blue, fill=blue!5, thick, minimum size=2cm, align=center, font=\scriptsize},
+    node distance=3cm and 2cm,
+    state/.style={circle, draw=blue, fill=blue!5, thick, minimum size=2.2cm, align=center, font=\scriptsize},
     arrow/.style={-{Stealth[scale=1.2]}, thick}
 ]
     \node[state] (init) {INIT};
     \node[state, right=of init] (playing) {PLAYING};
     \node[state, below=1.5cm of playing] (paused) {PAUSED};
-    \node[state, right=of playing] (gameover) {GAME\_OVER};
+    \node[state, right=of playing] (gameover) {GAME\\OVER};
 
     \draw[arrow] (init) -- node[above, font=\scriptsize] {Khởi tạo xong} (playing);
     \draw[arrow] (playing.250) -- node[left, font=\scriptsize] {Nhấn PAUSE} (paused.110);
     \draw[arrow] (paused.70) -- node[right, font=\scriptsize] {Tiếp tục} (playing.290);
     \draw[arrow] (playing) -- node[above, font=\scriptsize] {Khối chạm đỉnh} (gameover);
-    \draw[arrow] (gameover) |- node[near start, below, font=\scriptsize] {Restart} (init);
-    \draw[arrow] (paused) -| node[near start, below, font=\scriptsize] {Quit} (gameover);
+    
+    % FIX: Định tuyến đường Restart vòng lên trên đỉnh để không cắt ngang các node khác
+    \draw[arrow] (gameover.north) -- ++(0,1.2) -| node[near start, above, font=\scriptsize] {Restart} (init.north);
+    
+    % FIX: Đường Quit đi thoáng đãng ở không gian phía dưới
+    \draw[arrow] (paused.east) -| node[near start, below, font=\scriptsize] {Quit} (gameover.south);
 \end{tikzpicture}
 \end{center}
 
 \subsubsection{Cây tính năng (Feature Tree)}
 Phân rã cấu trúc các nhóm tính năng cốt lõi của \texttt{gameCore}.
 \begin{center}
-\begin{tikzpicture}[
-    edge from parent fork down,
-    level 1/.style={sibling distance=3.5cm, level distance=1.5cm},
-    level 2/.style={sibling distance=1.8cm, level distance=1.5cm},
-    every node/.style={rectangle, draw=black, rounded corners, fill=gray!10, thick, align=center, font=\scriptsize},
-    root/.style={fill=orange!20, font=\small\bfseries, minimum height=0.8cm}
-]
-\node[root] {Module gameCore}
-    child { node[fill=blue!10] {Xử lý Khối}
-        child { node {Sinh khối ngẫu nhiên} }
-        child { node {Phát hiện va chạm} }
-    }
-    child { node[fill=green!10] {Điều khiển}
-        child { node {Bàn phím} }
-        child { node {Chuột (UI)} }
-        child { node {Cảm ứng (Vuốt)} }
-    }
-    child { node[fill=yellow!10] {Luật chơi}
-        child { node {Xóa dòng} }
-        child { node {Tính điểm \& Combo} }
-    }
-    child { node[fill=red!10] {Trạng thái \& UI}
-        child { node {Đồng hồ đếm} }
-        child { node {Popup Tạm dừng} }
-    };
-\end{tikzpicture}
+\begin{adjustbox}{max width=\linewidth}
+\begin{forest}
+  for tree={
+    draw=black,
+    thick,
+    rounded corners,
+    fill=gray!10,
+    align=center,
+    font=\scriptsize,
+    edge={thick},
+    l sep=1.2cm,
+    s sep=2mm,
+    % FIX: Ép thuật toán đường nối vuông góc chạy bọc ngoài, không đâm xuyên tâm
+    edge path={
+      \noexpand\path[\forestoption{edge}]
+        (!u.south) -- +(0,-6mm) -| (.north)\forestoption{edge label};
+    },
+  }
+  [Module gameCore, fill=orange!20, font=\small\bfseries, minimum height=0.8cm
+    [Xử lý Khối, fill=blue!10
+      [Sinh khối\\ngẫu nhiên]
+      [Phát hiện\\va chạm]
+    ]
+    [Điều khiển, fill=green!10
+      [Bàn phím]
+      [Chuột (UI)]
+      [Cảm ứng\\(Vuốt)]
+    ]
+    [Luật chơi, fill=yellow!10
+      [Xóa dòng]
+      [Tính điểm\\\& Combo]
+    ]
+    [Trạng thái \& UI, fill=red!10
+      [Đồng hồ\\đếm ngược]
+      [Popup\\Tạm dừng]
+    ]
+  ]
+\end{forest}
+\end{adjustbox}
 \end{center}
 
 \subsubsection{Câu chuyện người dùng (Storyboard)}
@@ -220,49 +237,57 @@ Mô tả trực quan quá trình trải nghiệm của người chơi từ lúc 
 % ---- Sơ đồ Trạng thái mở rộng V2 ----
 \subsubsection{Sơ đồ Trạng thái V2 (State Machine — mở rộng)}
 
-\noindent V2 bổ sung trạng thái \textsc{Flash\_Clear} (không thể interrupt) và luồng ghi DB (\textsc{Persist}) tại mỗi điểm thoát.
+\noindent V2 bổ sung trạng thái \textbf{Flash\_Clear} (không thể interrupt) và luồng ghi DB (\textbf{Persist}) tại mỗi điểm thoát.
 
 \begin{center}
 \begin{tikzpicture}[
     node distance=2.6cm,
     state/.style={circle, draw=blue!60, fill=blue!5, thick,
-                  minimum size=1.9cm, align=center, font=\scriptsize},
+                  minimum size=2.1cm, align=center, font=\scriptsize},
     persist/.style={rectangle, draw=green!60, fill=green!5, thick, rounded corners,
-                    minimum width=2.0cm, minimum height=0.7cm,
+                    minimum width=2.6cm, minimum height=0.7cm,
                     align=center, font=\scriptsize},
     arrow/.style={-{Stealth[scale=1.1]}, thick},
     darrow/.style={-{Stealth[scale=1.1]}, thick, dashed, gray}
 ]
-    \node[state] (init)     {INIT};
+    \node[state] (init)      {INIT};
     \node[state, right=of init]  (play)    {PLAYING};
-    \node[state, below=1.5cm of play]  (flash)   {FLASH\\CLEAR};
-    \node[state, above right=1.2cm and 2.0cm of play] (pause)   {PAUSED};
-    \node[state, below right=1.2cm and 2.0cm of play] (over)    {GAME\\OVER};
-    \node[state, right=3.0cm of over] (wasm)   {WASM\\RELOAD};
+    \node[state, below=2cm of play]  (flash)   {FLASH\\CLEAR};
+    \node[state, above right=1cm and 2.5cm of play] (pause)   {PAUSED};
+    \node[state, below right=1cm and 2.5cm of play] (over)    {GAME\\OVER};
+    \node[state, right=3.5cm of over] (wasm)   {WASM\\RELOAD};
 
-    \node[persist, below=0.9cm of flash] (db) {\texttt{dbInsert}\\\texttt{Record()}};
-    \node[persist, right=0.8cm of over]  (db2) {\texttt{dbUpsert}\\\texttt{Progress()}};
+    \node[persist, below=0.6cm of flash] (db) {\texttt{dbInsert}\\\texttt{Record()}};
+    \node[persist, below=0.8cm of over]  (db2) {\texttt{dbUpsert}\\\texttt{Progress()}};
 
     % transitions
     \draw[arrow] (init) -- node[above,font=\scriptsize]{entry} (play);
     \draw[arrow] (play.south) -- node[left,font=\scriptsize]{row full} (flash.north);
-    \draw[arrow] (flash.west) to[bend right=40]
-        node[left,font=\scriptsize]{6 frames\\done} (play.south west);
-    \draw[arrow] (play.north east) to[bend left=15]
-        node[above,font=\scriptsize]{PAUSE/ENTER} (pause.south west);
-    \draw[arrow] (pause.south) to[bend left=15]
-        node[below,font=\scriptsize]{resume} (play.north);
+    
+    \draw[arrow] (flash.west) to[bend left=40]
+        node[left,font=\scriptsize,align=center]{6 frames\\done} (play.west);
+        
+    % FIX 1: Dùng điểm neo theo góc (degrees) để rẽ lối 2 đường, tuyệt đối không đè nhau
+    \draw[arrow] (play.45) to[bend left=20]
+        node[above,font=\scriptsize,sloped,pos=0.5,yshift=2pt]{PAUSE/ENTER} (pause.225); 
+    \draw[arrow] (pause.250) to[bend left=20]
+        node[below,font=\scriptsize,sloped,pos=0.5,yshift=-2pt]{resume} (play.20);
+        
     \draw[arrow] (play.south east) to[bend right=15]
-        node[below,font=\scriptsize]{block at top} (over.north west);
-    \draw[arrow] (over) -- node[above,font=\scriptsize]{Quit\\(WASM)} (wasm);
-    \draw[arrow] (over.south) -- ++(0,-0.5) -| node[below,font=\scriptsize]{Restart} (init.south);
+        node[below left,font=\scriptsize,sloped]{block at top} (over.north west);
+        
+    \draw[arrow] (over) -- node[above,font=\scriptsize]{Quit (WASM)} (wasm); 
+    
+    % FIX 2: Tăng độ sâu xuống hẳn -5.5 để lọt qua bên dưới tất cả các node text
+    \draw[arrow] (over.south west) -- ++(0, -5.5) -| node[near start, above, font=\scriptsize]{Restart} (init.south);
+    
     \draw[arrow] (over.north east) -- ++(0.4,0.4)
         node[above right,font=\scriptsize,draw=blue!30,fill=white,rounded corners,inner sep=2pt]
         {ret 2 → Console};
 
     % DB persist edges
     \draw[darrow] (flash.south) -- (db.north);
-    \draw[darrow] (over.east) -- (db2.west);
+    \draw[darrow] (over.south) -- (db2.north); 
     \draw[darrow] (db2.south) -- ++(0,-0.4)
         node[below,font=\tiny]{\texttt{dbCheckAndUnlockStories()}};
 \end{tikzpicture}
@@ -317,28 +342,37 @@ SRS phát biểu ràng buộc hành vi:
 \begin{center}
 \begin{tikzpicture}[
     every node/.style={font=\scriptsize},
-    cond/.style={diamond, draw=black, fill=green!10, thick, aspect=2.5, align=center},
+    cond/.style={diamond, draw=black, fill=green!10, thick, aspect=3.5, align=center},
     slot/.style={rectangle, draw=black, fill=blue!10, thick,
                  minimum width=1.8cm, minimum height=0.6cm, align=center},
     arrow/.style={-{Stealth[scale=1.1]}, thick}
 ]
     \node[slot] (n1) at (0,0)    {NEXT-1\\(always)};
-    \node[cond] (c2) at (4,0)    {\texttt{cfg.nextBlock}\\\texttt{Score > 0}\\AND\\score $\geq$ threshold};
-    \node[slot] (n2) at (8,0)    {NEXT-2\\(unlocked)};
-    \node[cond] (c3) at (4,-2.0) {NEXT-2 open\\AND\\score $\geq$ threshold×2};
-    \node[slot] (n3) at (8,-2.0) {NEXT-3\\(unlocked)};
-    \node[slot, draw=gray, fill=gray!10] (n2h) at (8,-1.0) {NEXT-2\\(hidden)};
-    \node[slot, draw=gray, fill=gray!10] (n3h) at (8,-3.0) {NEXT-3\\(hidden)};
+    \node[cond] (c2) at (5.0,0)  {\texttt{cfg.nextBlockScore > 0}\\AND\\score $\geq$ threshold};
+    
+    % FIX: Đẩy tọa độ X sang 11.5, dãn tọa độ Y lên 1.0 và -1.0
+    \node[slot] (n2) at (11.5, 1.0)   {NEXT-2\\(unlocked)};
+    \node[slot, draw=gray, fill=gray!10] (n2h) at (11.5, -1.0) {NEXT-2\\(hidden)};
+    
+    % FIX: Đẩy cụm hình thoi 2 xuống sâu hơn (-3.2)
+    \node[cond] (c3) at (5.0,-3.2) {NEXT-2 open\\AND\\score $\geq$ threshold$\times$2};
+    
+    \node[slot] (n3) at (11.5,-2.2) {NEXT-3\\(unlocked)};
+    \node[slot, draw=gray, fill=gray!10] (n3h) at (11.5,-4.2) {NEXT-3\\(hidden)};
 
     \draw[arrow] (n1.east) -- (c2.west);
-    \draw[arrow] (c2.east) -- node[above]{yes} (n2.west);
-    \draw[arrow] (c2.south) -- node[right]{no} (n2h);
+    
+    % FIX: Thêm above=2pt và below=2pt để nhấc chữ cách ly khỏi nét vẽ
+    \draw[arrow] (c2.east) -- node[above=2pt, sloped] {yes} (n2.west);
+    \draw[arrow] (c2.east) -- node[below=2pt, sloped] {no} (n2h.west);
     \draw[arrow] (c2.south) -- (c3.north);
-    \draw[arrow] (c3.east) -- node[above]{yes} (n3.west);
-    \draw[arrow] (c3.south) -- node[right]{no} (n3h);
+    
+    \draw[arrow] (c3.east) -- node[above=2pt, sloped] {yes} (n3.west);
+    \draw[arrow] (c3.east) -- node[below=2pt, sloped] {no} (n3h.west);
 
+    % Dời khung TODO sang sát phải cho thẳng cột với NEXT-3
     \node[font=\tiny, draw=orange!40, fill=orange!5, rounded corners,
-          inner sep=2pt, below=0.3cm of n3]
+          inner sep=2pt, below=0.6cm of n3h]
         {TODO(V3): add \texttt{nextBlockScore3} field to SettingsConfig};
 \end{tikzpicture}
 \end{center}
@@ -360,7 +394,7 @@ SRS phát biểu ràng buộc hành vi:
 % ---- tableMatrix format ----
 \subsubsection{Định dạng \texttt{tableMatrix} (Board Pre-population)}
 
-\noindent Format chuẩn V2: \texttt{";"-separated rows (bottom-aligned), ","-separated colorID values (0=empty, 1-6=colors)}.
+\noindent Format chuẩn V2: \foreignlanguage{english}{\texttt{";"-separated rows (bottom-aligned), ","-separated colorID values (0=empty, 1-6=colors)}}.
 
 \begin{center}
 \begin{tikzpicture}[every node/.style={font=\scriptsize}]
@@ -423,9 +457,9 @@ SRS phát biểu ràng buộc hành vi:
     \hline
     Story có tableMatrix 2 dòng & Board bắt đầu với 2 dòng pre-filled; blank board nếu empty string \\
     \hline
-    Story 1 (nextBlockScore=50), score<50 & NEXT-2 ẩn; score≥50 → NEXT-2 hiện \\
+    Story 1 (nextBlockScore=50), score<50 & NEXT-2 ẩn; score$\geq$50 → NEXT-2 hiện \\
     \hline
-    Game over → query DB & \texttt{SELECT COUNT(*)} tăng 1; \texttt{endTS - startTS ≥ elapsedMs÷1000} \\
+    Game over → query DB & \texttt{SELECT COUNT(*)} tăng 1; \texttt{endTS - startTS }$\geq$\texttt{ elapsedMs÷1000} \\
     \hline
     Quit → Console → Board popup & sync\_Records có record mới; leaderboard refresh \\
     \hline
@@ -437,12 +471,14 @@ SRS phát biểu ràng buộc hành vi:
 \subsubsection*{\small Lưu ý hướng V3}
 \noindent V3 thay thế \texttt{nextBlockScore × 2} fallback bằng field \texttt{nextBlockScore3} riêng trong \texttt{SettingsConfig}. Lưu trữ thành tích chuyển từ write-local sang Cloudflare D1 (1-way sync qua Cloudflare Worker proxy); SQLite vẫn là nguồn \textit{source of truth} cục bộ — D1 là bản sao read-only phục vụ leaderboard toàn cầu.
 
+\IfFileExists{04-gameCoreRequirements-v2-screenshot.png}{%
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.55\textwidth]{04-gameCoreRequirements-v2-screenshot}
     \\[6pt]
     \textit{\small Hình V2.1: gameCore V2 — sidebar hiển thị S2-C1, NEXT-2 đã unlock, bàn cờ có tableMatrix pre-fill.}
 \end{figure}
+}{}
 
 % ============================================================
 % END PATCH V2 — 04-gameCoreRequirements.tex
@@ -454,13 +490,13 @@ SRS phát biểu ràng buộc hành vi:
     \item \textbf{Yêu cầu Chức năng:}
     \begin{itemize}[noitemsep]
         \item Bắt phím (Keyboard Event) để người dùng gõ tên trực tiếp trên màn hình Game Over.
-        \item Đóng gói Payload (Tên, Điểm, Thời gian) và gọi API đẩy dữ liệu lên cơ sở dữ liệu MongoDB Atlas.
+        \item Đóng gói Payload (Tên, Điểm, Thời gian) và gọi API đẩy dữ liệu lên cơ sở dữ liệu Cloudflare D1 + Durable Object (DO).
     \end{itemize}
     \item \textbf{Yêu cầu Phi Chức năng:} Tác vụ gọi mạng không được chặn vòng lặp chính của ứng dụng. Đảm bảo bảo mật chuỗi định dạng.
     \item \textbf{Yêu cầu Kỹ thuật \& Tiêu chí thành công:}
     \begin{itemize}[noitemsep]
         \item Kỹ thuật: C++ HTTP Request (\texttt{curl} cho Native, \texttt{emscripten\_fetch} cho Web).
-        \item \textbf{Tiêu chí thành công:} Dữ liệu xuất hiện chính xác trên MongoDB Atlas.
+        \item \textbf{Tiêu chí thành công:} Dữ liệu xuất hiện chính xác trên Cloudflare D1 + Durable Object (DO).
     \end{itemize}
 \end{itemize}
 

@@ -1,4 +1,4 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
@@ -83,7 +83,7 @@
 
 \subsecheading{2.4. Thảo luận khác}
 \begin{itemize}
-    \item Nhóm đã kiểm tra các kênh trao đổi trên Slack (\texttt{\#all-sii004f21}) để cập nhật thông báo từ giảng viên.
+    \item Nhóm đã kiểm tra các kênh trao đổi trên Slack (\texttt{\#all-SS004f21}) để cập nhật thông báo từ giảng viên.
     \item Thống nhất hạn chót hoàn thiện các phần còn lại là trước 20:00 cùng ngày.
 \end{itemize}
 
@@ -147,7 +147,7 @@
         \item \texttt{doc/}: Chứa file \texttt{appTree.md} (sơ đồ cây ứng dụng) và tài liệu \texttt{docTree.md}.
         \item \texttt{src/}: Chia nhỏ thành các module gameConsole, gameCore, gameStory, geometry.
     \end{itemize}
-    \item \textbf{Overleaf (LaTeX):} Nhóm đang soạn thảo báo cáo "Kỹ năng nghề nghiệp - SII004.F21.CNTT".
+    \item \textbf{Overleaf (LaTeX):} Nhóm đang soạn thảo báo cáo "Kỹ năng nghề nghiệp - SS004.F21.CNTT".
     \begin{itemize}
         \item Đã hoàn thiện trang bìa, mục lục và các phần nội dung kỹ thuật (SRS, SDS).
         \item Đã có trang chữ ký xác nhận của các thành viên trong nhóm.
@@ -180,7 +180,7 @@
 \end{itemize}
 
 % ====================================================
-% ===== BIÊN BẢN HỌP NGÀY ---/--- /2026 =================
+% ===== BIÊN BẢN HỌP NGÀY 06/05/2026 =================
 % ====================================================
 \newpage
 
@@ -188,14 +188,65 @@
     {\large\bfseries BIÊN BẢN CUỘC HỌP}
 \end{center}
 \begin{center}
-    \textbf{Ngày: --- / --- / 2026}
+    \textbf{Ngày: 06 / 05 / 2026}
 \end{center}
 \vspace{0.4em}
 
 % ===== SECTION 1 =====
 \textbf{1. Thông tin chung}
+\begin{itemize}
+    \item \textbf{Thời gian:} Thứ Sáu, ngày 06/05/2026.
+    \item \textbf{Địa điểm:} Họp trực tuyến qua Google Meet.
+    \item \textbf{Tổ chức cuộc họp:} Phạm Tấn Phúc.
+    \item \textbf{Thành phần tham dự:} Phạm Tấn Phúc, Nguyễn Trung Kiên, Đàm Gia Thái, Ngô Triều Vĩ, Tạ Minh Trường.
+    \item \textbf{Mục đích cuộc họp:}
+    \begin{itemize}
+        \item Họp tổng kết nhóm.
+        \item Cập nhật tiến độ công việc trên Trello cho các Tuần 1, 2 và 3.
+        \item Kiểm tra tình trạng Pull Request (PR) trên GitHub và phân công công việc giai đoạn cuối.
+    \end{itemize}
+\end{itemize}
 
-\textbf{bổ sung sau}
+% ===== SECTION 2 =====
+\vspace{4pt}
+\textbf{2. Nội dung thảo luận chính}
+
+\subsecheading{2.1. Báo cáo tiến độ trên Trello}
+\begin{itemize}
+    \item \textbf{Tuần 1:} Đã hoàn thành toàn bộ các công việc (Version 1).
+    \item \textbf{Tuần 2:} Các thành viên tiếp tục thực hiện task đã được phân công trên Trello. \textbf{Lưu ý quan trọng từ Giảng viên:} Yêu cầu toàn bộ code phải được viết trên một file duy nhất. Phạm Tấn Phúc đã tiến hành revert lại code để khớp với yêu cầu của tài liệu.
+    \item \textbf{Tuần 3:} Đã thiết lập xong các task trên Trello. Trọng tâm của tuần 3 là thực hành cố tình tạo ra các lỗi (size, conflict) để các thành viên trải nghiệm cách xử lý và giải quyết xung đột code.
+\end{itemize}
+
+\subsecheading{2.2. Quản lý mã nguồn trên GitHub}
+\begin{itemize}
+    \item Việc phân công theo từng nhánh (branch) cho các thành viên đã hoàn tất.
+    \item Tình trạng Pull Request (PR) tuần 2 (được Phạm Tấn Phúc kiểm tra trực tiếp trong cuộc họp):
+    \begin{itemize}
+        \item PR của Ngô Triều Vĩ: Đã Pass (Thành công).
+        \item PR của Nguyễn Trung Kiên: Đang gặp trạng thái Conflict (Xung đột).
+        \item PR của Phạm Tấn Phúc: Tạm dừng phát triển v3 cũng như sửa lỗi v2, chuyển codebase về lại 1 file main.cpp như gợi ý của thầy.
+    \end{itemize}
+\end{itemize}
+
+\subsecheading{2.3. Tài liệu đồ án}
+\begin{itemize}
+    \item Bước vào tuần cuối, các thành viên cần tập trung thời gian để hoàn thiện các phần tài liệu đồ án còn lại.
+\end{itemize}
+
+\subsecheading{2.4. Ý kiến các thành viên}
+\begin{itemize}
+    \item \textbf{Tạ Minh Trường:} Nhất trí thực hiện công việc theo đúng phân công trên Trello, không có câu hỏi thêm.
+    \item \textbf{Ngô Triều Vĩ:} Không có thắc mắc hay bổ sung gì thêm.
+\end{itemize}
+
+% ===== SECTION 3 =====
+\vspace{2pt}
+\textbf{3. Kết luận và Phân công tiếp theo:}
+\begin{itemize}
+    \item \textbf{Phạm Tấn Phúc:} Kiểm tra, giải quyết lỗi Conflict trong PR của Nguyễn Trung Kiên và thực hiện merge code.
+    \item \textbf{Toàn bộ thành viên:} Bám sát tiến độ và hoàn thành các task Tuần 2 \& Tuần 3 trên Trello. Viết và hoàn thiện tài liệu đồ án cho tuần cuối.
+\end{itemize}
 
 \label{LastPageMeetingMinute} 
 \end{document}

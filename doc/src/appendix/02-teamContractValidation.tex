@@ -1,11 +1,15 @@
 % !TEX TS-program = xelatex
 % !TEX encoding = UTF-8 Unicode
-\documentclass[12pt,a4paper]{article}
+\documentclass[11pt,a4paper]{article}
 
 \IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
 \IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
 \IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+
+\usepackage{geometry}
+\geometry{top=1.6cm, bottom=1.6cm, left=1.6cm, right=1.6cm}
 \usepackage{docmute}
+\usepackage{enumitem}
 \hypersetup{pdftitle={Bien ban danh gia hop dong lam viec nhom - ctetris}}
 
 \begin{document}
@@ -13,19 +17,20 @@
 \StandaloneSectionSetup{02-teamContractValidation.tex}{LastPageTeamContractValidation}
 
 \begin{center}
-    {\LARGE \textbf{BIÊN BẢN ĐÁNH GIÁ HỢP ĐỒNG LÀM VIỆC NHÓM}} \\[10pt]
+    {\Large \textbf{BIÊN BẢN ĐÁNH GIÁ HỢP ĐỒNG LÀM VIỆC NHÓM}} \\[2pt]
     {\large Dự án: ctetris}
 \end{center}
 
-\vspace{2pt} 
+\vspace{-6pt}
 \hrule
-\vspace{2pt} 
+\vspace{4pt}
 
 % --- THANG ĐÁNH GIÁ (BAR) ---
 \noindent
 \begin{table}[H]
 \centering
-\renewcommand{\arraystretch}{1.25}
+\renewcommand{\arraystretch}{1.1}
+\small
 \begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}p{1.5cm}|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
 \rowcolor{gray!10} \textbf{Mức độ} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} \\ \hline
@@ -33,88 +38,113 @@
 \end{tabularx}
 \end{table}
 
-\textit{\textbf{Chú thích:} Các ô đánh giá để trống để dùng cho việc điền điểm sau.}
+\vspace{-10pt}
+\noindent \textit{\textbf{\small Hướng dẫn:}} \footnotesize Metric (1-10) bổ trợ đánh giá định tính. Có thể chọn 1 Metric trọng tâm hoặc lấy trung bình để quy đổi sang thang (1-5). Điểm cuối cùng phản ánh sự giao thoa giữa số liệu và mức độ hài lòng thực tế.
 
+\vspace{-6pt}
+\section*{\small 1. Kết quả và Hiệu suất (Output)}
+\vspace{-8pt}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.0}
+\small
+\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\rowcolor{gray!15} \textbf{Người ĐG $\downarrow$} & \textbf{phucpt} & \textbf{vint} & \textbf{truongtm} & \textbf{thaidg} & \textbf{kiennt} \\ \hline
+\textbf{phucpt} & 3 & 4 & 4 & 4 & 4 \\ \hline
+\textbf{vint} & 4 & 3 & 4 & 4 & 4 \\ \hline
+\textbf{truongtm} & 4 & 4 & 3 & 4 & 4 \\ \hline
+\textbf{thaidg} & 4 & 4 & 4 & 3 & 4 \\ \hline
+\textbf{kiennt} & 4 & 4 & 4 & 4 & 3 \\ \hline
+\end{tabularx}
+\end{table}
+\vspace{-8pt}
+\noindent \footnotesize \textbf{Metric 1-Mức độ hoàn thành công việc:} [9-10đ]: 100\% Task được giao | [6-8đ]: 80-90\% | [4-5đ]: 50-70\% | [1-3đ]: < 50\%. \\
+\textbf{Metric 2-Chất lượng sản phẩm:} [9-10đ]: Code/Sản phẩm chuẩn, ít bug | [6-8đ]: Lỗi nhỏ | [4-5đ]: Lỗi logic | [1-3đ]: Phải làm lại hoàn toàn.
+
+\vspace{-6pt}
+\section*{\small 2. Trách nhiệm và Kỷ luật (Accountability)}
+\vspace{-8pt}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.0}
+\small
+\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\rowcolor{gray!15} \textbf{Người ĐG $\downarrow$} & \textbf{phucpt} & \textbf{vint} & \textbf{truongtm} & \textbf{thaidg} & \textbf{kiennt} \\ \hline
+\textbf{phucpt} & 3 & 4 & 4 & 4 & 4 \\ \hline
+\textbf{vint} & 4 & 3 & 4 & 4 & 4 \\ \hline
+\textbf{truongtm} & 4 & 4 & 3 & 4 & 4 \\ \hline
+\textbf{thaidg} & 4 & 4 & 4 & 3 & 4 \\ \hline
+\textbf{kiennt} & 4 & 4 & 4 & 4 & 3 \\ \hline
+\end{tabularx}
+\end{table}
+\vspace{-8pt}
+\noindent \footnotesize \textbf{Metric 1-Kỷ luật thời gian (Deadline + Họp):} Tổng số lần trễ hạn/vắng họp (Trễ là trễ). [9-10đ]: 0 lần | [6-8đ]: 1-2 lần | [4-5đ]: 3-4 lần | [1-3đ]: $\ge$ 5 lần. \\
+\textbf{Metric 2-Tính chủ động:} [9-10đ]: Tự giác nhận việc, gánh team | [6-8đ]: Sẵn sàng hỗ trợ | [4-5đ]: Chờ nhắc nhở | [1-3đ]: Đùn đẩy trách nhiệm.
+
+\vspace{-6pt}
+\section*{\small 3. Gắn kết và Sáng tạo (Team Dynamics)}
+\vspace{-8pt}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.0}
+\small
+\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\rowcolor{gray!15} \textbf{Người ĐG $\downarrow$} & \textbf{phucpt} & \textbf{vint} & \textbf{truongtm} & \textbf{thaidg} & \textbf{kiennt} \\ \hline
+\textbf{phucpt} & 3 & 4 & 4 & 4 & 4 \\ \hline
+\textbf{vint} & 4 & 3 & 4 & 4 & 4 \\ \hline
+\textbf{truongtm} & 4 & 4 & 3 & 4 & 4 \\ \hline
+\textbf{thaidg} & 4 & 4 & 4 & 3 & 4 \\ \hline
+\textbf{kiennt} & 4 & 4 & 4 & 4 & 3 \\ \hline
+\end{tabularx}
+\end{table}
+\vspace{-8pt}
+\noindent \footnotesize \textbf{Metric 1-Đóng góp giải pháp:} [9-10đ]: Ý tưởng đột phá cho dự án | [6-8đ]: Góp ý xây dựng | [4-5đ]: Thụ động theo số đông | [1-3đ]: Không đóng góp. \\
+\textbf{Metric 2-Thái độ làm việc:} [9-10đ]: Tích cực, truyền cảm hứng | [6-8đ]: Hòa đồng | [4-5đ]: Đôi khi gây áp lực | [1-3đ]: Toxic, gây mất đoàn kết.
+
+\vspace{-6pt}
+\section*{\small 4. Giao tiếp và Phản hồi (Communication)}
+\vspace{-8pt}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.0}
+\small
+\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\rowcolor{gray!15} \textbf{Người ĐG $\downarrow$} & \textbf{phucpt} & \textbf{vint} & \textbf{truongtm} & \textbf{thaidg} & \textbf{kiennt} \\ \hline
+\textbf{phucpt} & 3 & 4 & 4 & 4 & 4 \\ \hline
+\textbf{vint} & 4 & 3 & 4 & 4 & 4 \\ \hline
+\textbf{truongtm} & 4 & 4 & 3 & 4 & 4 \\ \hline
+\textbf{thaidg} & 4 & 4 & 4 & 3 & 4 \\ \hline
+\textbf{kiennt} & 4 & 4 & 4 & 4 & 3 \\ \hline
+\end{tabularx}
+\end{table}
+\vspace{-8pt}
+\noindent \footnotesize \textbf{Metric 1-Tốc độ tương tác:} [9-10đ]: Phản hồi ngay (<2h) | [6-8đ]: Trong ngày (2-12h) | [4-5đ]: Sau 24h | [1-3đ]: Thường xuyên bặt vô âm tín. \\
+\textbf{Metric 2-Kỹ năng lắng nghe:} [9-10đ]: Cầu thị, tư duy Win-Win | [6-8đ]: Biết lắng nghe | [4-5đ]: Bảo thủ | [1-3đ]: Cố chấp, không tiếp thu góp ý.
+
+\vspace{8pt}
+\hrule
 \vspace{4pt}
-
-\section*{Tiêu chí về Kết quả và Hiệu suất (Output)}
-\begin{itemize}[itemsep=0pt, parsep=0pt]
-    \item Hoàn thành mục tiêu chung đúng hạn và chất lượng sản phẩm tốt.
-    \item Khả năng phối hợp giải quyết vấn đề linh hoạt và hiệu quả.
-\end{itemize}
-
+\section*{\small BẢNG TỔNG HỢP KẾT QUẢ}
+\vspace{-8pt}
 \begin{table}[H]
 \centering
-\renewcommand{\arraystretch}{1.15}
-\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\renewcommand{\arraystretch}{1.2}
+\small
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}m{4cm}|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
-\rowcolor{gray!15} \textbf{Người ĐG $\downarrow$} & \textbf{phucpt} & \textbf{vint} & \textbf{truongtm} & \textbf{thaidg} & \textbf{kiennt} \\ \hline
-\textbf{phucpt} &  &  &  &  &  \\ \hline
-\textbf{vint} &  &  &  &  &  \\ \hline
-\textbf{truongtm} &  &  &  &  &  \\ \hline
-\textbf{thaidg} &  &  &  &  &  \\ \hline
-\textbf{kiennt} &  &  &  &  &  \\ \hline
+\rowcolor{gray!20} \textbf{Thành viên} & \textbf{phucpt} & \textbf{vint} & \textbf{truongtm} & \textbf{thaidg} & \textbf{kiennt} \\ \hline
+\textbf{Điểm TB Tổng hợp} & 3.8 & 3.8 & 3.8 & 3.8 & 3.8 \\ \hline
+\rowcolor{yellow!5} \textbf{Xếp loại danh định} & Khá & Khá & Khá & Khá & Khá \\ \hline
 \end{tabularx}
 \end{table}
+\vspace{-8pt}
+\begin{center}
+    \textit{\scriptsize *Điểm TB Tổng hợp = (Tổng điểm nhận được từ 4 bảng) / (Số người ĐG $\times$ 4 tiêu chí).}
+\end{center}
 
-\section*{Tiêu chí về Trách nhiệm và Đóng góp cá nhân (Accountability)}
-\begin{itemize}[itemsep=0pt, parsep=0pt]
-    \item Phân bổ công việc công bằng và mức độ cam kết hoàn thành nhiệm vụ cao.
-    \item Chủ động hỗ trợ lẫn nhau khi đồng đội gặp khó khăn hoặc quá tải.
-\end{itemize}
-
-\begin{table}[H]
-\centering
-\renewcommand{\arraystretch}{1.15}
-\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
-\hline
-\rowcolor{gray!15} \textbf{Người ĐG $\downarrow$} & \textbf{phucpt} & \textbf{vint} & \textbf{truongtm} & \textbf{thaidg} & \textbf{kiennt} \\ \hline
-\textbf{phucpt} &  &  &  &  &  \\ \hline
-\textbf{vint} &  &  &  &  &  \\ \hline
-\textbf{truongtm} &  &  &  &  &  \\ \hline
-\textbf{thaidg} &  &  &  &  &  \\ \hline
-\textbf{kiennt} &  &  &  &  &  \\ \hline
-\end{tabularx}
-\end{table}
-
-\section*{Tiêu chí về Sự gắn kết và Tinh thần nhóm (Team Dynamics)}
-\begin{itemize}[itemsep=0pt, parsep=0pt]
-    \item Sự tin tưởng vào năng lực và cam kết của các thành viên.
-    \item Môi trường làm việc cởi mở, an toàn để sáng tạo và bày tỏ quan điểm.
-\end{itemize}
-
-\begin{table}[H]
-\centering
-\renewcommand{\arraystretch}{1.15}
-\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
-\hline
-\rowcolor{gray!15} \textbf{Người ĐG $\downarrow$} & \textbf{phucpt} & \textbf{vint} & \textbf{truongtm} & \textbf{thaidg} & \textbf{kiennt} \\ \hline
-\textbf{phucpt} &  &  &  &  &  \\ \hline
-\textbf{vint} &  &  &  &  &  \\ \hline
-\textbf{truongtm} &  &  &  &  &  \\ \hline
-\textbf{thaidg} &  &  &  &  &  \\ \hline
-\textbf{kiennt} &  &  &  &  &  \\ \hline
-\end{tabularx}
-\end{table}
-
-\section*{Tiêu chí về Giao tiếp và Tương tác (Communication)}
-\begin{itemize}[itemsep=0pt, parsep=0pt]
-    \item Sự minh bạch trong thông tin và tôn trọng, lắng nghe ý kiến đồng đội.
-    \item Quản lý xung đột dựa trên tinh thần tìm giải pháp cho công việc chung.
-\end{itemize}
-
-\begin{table}[H]
-\centering
-\renewcommand{\arraystretch}{1.15}
-\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
-\hline
-\rowcolor{gray!15} \textbf{Người ĐG $\downarrow$} & \textbf{phucpt} & \textbf{vint} & \textbf{truongtm} & \textbf{thaidg} & \textbf{kiennt} \\ \hline
-\textbf{phucpt} &  &  &  &  &  \\ \hline
-\textbf{vint} &  &  &  &  &  \\ \hline
-\textbf{truongtm} &  &  &  &  &  \\ \hline
-\textbf{thaidg} &  &  &  &  &  \\ \hline
-\textbf{kiennt} &  &  &  &  &  \\ \hline
-\end{tabularx}
-\end{table}
 \label{LastPageTeamContractValidation}
 \end{document}
