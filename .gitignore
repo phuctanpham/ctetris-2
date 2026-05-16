@@ -81,5 +81,4 @@ bld/
 *.svclog
 *.scc
 **/build
-**/libs
-!\doc\src\libs
+app/src/libs
