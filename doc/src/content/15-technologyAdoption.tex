@@ -335,7 +335,7 @@ cTetris dùng ba lớp lưu trữ: \textbf{SQLite3 nhúng} (local, mọi phiên 
   \hline
   \textbf{Cloudflare D1}  & V3 / Edge    & Serverless SQLite trên Cloudflare edge; schema \texttt{sync\_Records}; 1-way sink từ local → D1 sau game-over; Board popup \texttt{GET /api/records} ORDER BY score DESC. \\
   \hline
-  \textbf{MongoDB Atlas}  & V3 / Optional& Dự phòng cho user profile store và session data nếu D1 Durable Objects không đủ; driver: C++ Driver via REST (không dùng native C++ SDK để tránh WASM incompatibility). \\
+  \textbf{Cloudflare D1 + Durable Objects}  & V3 / Optional& Dự phòng cho user profile store và session data nếu D1 Durable Objects không đủ; driver: C++ Driver via REST (không dùng native C++ SDK để tránh WASM incompatibility). \\
   \hline
 \end{tabularx}
 

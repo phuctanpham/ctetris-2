@@ -83,3 +83,12 @@ bld/
 *.scc
 **/build
 app/src/libs
+
+# API / Cloudflare
+**/node_modules/
+**/.wrangler/
+.env*
+!**/.env.example
+**/.dev.vars*
+!**/.dev.vars.example
+**/*.tsbuildinfo
