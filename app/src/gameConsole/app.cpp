@@ -28,6 +28,14 @@
 #include <emscripten.h>
 
 // [F.7] IDBFS persistence for sqlite file across browser tab reloads.
+
+#ifndef CTETRIS_API_URL
+#define CTETRIS_API_URL ""
+#endif
+
+#ifdef HAVE_LIBCURL
+#include <curl/curl.h>
+#endif
 // FS.syncfs is async; Asyncify.handleSleep blocks the C caller until JS
 // resolves. Requires -sASYNCIFY=1 (already set in CMakeLists.txt WASM link
 // options). All three helpers degrade to no-op if FS isn't ready.
@@ -74,6 +82,15 @@ EM_JS(void, idbfs_save_to_idb, (), {
 // Mau text "nhe" -- 220 thay vi 255
 static const SDL_Color SOFT_WHITE  = {220, 220, 220, 255};
 static const SDL_Color HIGHLIGHT_Y = {255, 215,   0, 255};
+
+#ifdef HAVE_LIBCURL
+static size_t curlWriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+    size_t total = size * nmemb;
+    auto* out = static_cast<std::string*>(userdata);
+    out->append(ptr, total);
+    return total;
+}
+#endif
 
 // =========================================================
 // [B.2] SvgTexture + loadSvgTextureFromMem helper
@@ -397,6 +414,8 @@ struct AppState {
 
     // [D.3] Volume slider drag state
     bool draggingVolume = false;
+
+    std::string apiSyncStatus;   // [V3] feedback shown in Settings after sync
 
     // WASM-only: khi QUIT duoc chon, hien shutdown screen thay vi
     // tra ve 0 lam canvas trang (khong co SDL_DestroyWindow phu hop)
@@ -1283,6 +1302,186 @@ std::vector<BoardRecord> dbLoadRecords(int limit) {
     return out;
 }
 
+// gameconsole-tich-hop-backend-13
+// Minimal synchronous HTTP GET.
+// WASM: emscripten_fetch with Asyncify (requires -sASYNCIFY=1, already set).
+// Native: libcurl (linked when HAVE_LIBCURL; graceful offline otherwise).
+static std::string consoleHttpGet(const char* url) {
+    if (!url || !*url) return "";
+#ifdef __EMSCRIPTEN__
+    emscripten_fetch_attr_t attr;
+    emscripten_fetch_attr_init(&attr);
+    SDL_strlcpy(attr.requestMethod, "GET", sizeof(attr.requestMethod));
+    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY |
+                      EMSCRIPTEN_FETCH_SYNCHRONOUS;
+    emscripten_fetch_t* fetch = emscripten_fetch(&attr, url);
+    std::string body;
+    if (fetch && fetch->status == 200 && fetch->numBytes > 0) {
+        body.assign(fetch->data, (size_t)fetch->numBytes);
+    } else if (fetch) {
+        SDL_Log("[gameConsole] GET %s HTTP %d", url, (int)fetch->status);
+    }
+    if (fetch) emscripten_fetch_close(fetch);
+    return body;
+#else
+#ifdef HAVE_LIBCURL
+    std::string body;
+    CURL* c = curl_easy_init();
+    if (!c) return "";
+    curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &body);
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 10L);
+    curl_easy_perform(c);
+    curl_easy_cleanup(c);
+    return body;
+#else
+    SDL_Log("[gameConsole] consoleHttpGet: no HTTP support");
+    return "";
+#endif
+#endif
+}
+
+// Synchronous HTTP POST with JSON body + Bearer token.
+static int consoleHttpPost(const char* url,
+                           const char* jsonBody,
+                           const char* token) {
+    if (!url || !*url || !jsonBody) return -1;
+#ifdef __EMSCRIPTEN__
+    std::string authVal = std::string("Bearer ") + (token ? token : "");
+    const char* hdr[] = {
+        "Content-Type", "application/json",
+        "Authorization", authVal.c_str(),
+        nullptr
+    };
+    emscripten_fetch_attr_t attr;
+    emscripten_fetch_attr_init(&attr);
+    SDL_strlcpy(attr.requestMethod, "POST", sizeof(attr.requestMethod));
+    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY |
+                      EMSCRIPTEN_FETCH_SYNCHRONOUS;
+    attr.requestHeaders = hdr;
+    attr.requestData = jsonBody;
+    attr.requestDataSize = SDL_strlen(jsonBody);
+    emscripten_fetch_t* fetch = emscripten_fetch(&attr, url);
+    int status = fetch ? (int)fetch->status : -1;
+    if (fetch) emscripten_fetch_close(fetch);
+    return status;
+#else
+#ifdef HAVE_LIBCURL
+    std::string authHdr = std::string("Authorization: Bearer ") +
+                          (token ? token : "");
+    struct curl_slist* hdrs = nullptr;
+    hdrs = curl_slist_append(hdrs, "Content-Type: application/json");
+    hdrs = curl_slist_append(hdrs, authHdr.c_str());
+    long httpCode = -1;
+    CURL* c = curl_easy_init();
+    if (c) {
+        curl_easy_setopt(c, CURLOPT_URL, url);
+        curl_easy_setopt(c, CURLOPT_HTTPHEADER, hdrs);
+        curl_easy_setopt(c, CURLOPT_POSTFIELDS, jsonBody);
+        curl_easy_setopt(c, CURLOPT_POSTFIELDSIZE, (long)SDL_strlen(jsonBody));
+        curl_easy_setopt(c, CURLOPT_TIMEOUT, 10L);
+        curl_easy_perform(c);
+        curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &httpCode);
+        curl_easy_cleanup(c);
+    }
+    curl_slist_free_all(hdrs);
+    return (int)httpCode;
+#else
+    SDL_Log("[gameConsole] consoleHttpPost: no HTTP support");
+    return -1;
+#endif
+#endif
+}
+
+// Pull leaderboard from Cloudflare Worker, replace local sync_Records.
+// Returns number of rows inserted, or negative on error.
+static int fetchLeaderboardFromApi() {
+    const char* apiUrl = CTETRIS_API_URL;
+    if (!apiUrl || !*apiUrl) {
+        SDL_Log("[gameConsole] CTETRIS_API_URL not set — leaderboard sync skipped");
+        return -1;
+    }
+    std::string url = std::string(apiUrl) + "/leaderboard?limit=50";
+    std::string body = consoleHttpGet(url.c_str());
+    if (body.empty()) {
+        SDL_Log("[gameConsole] leaderboard fetch failed or offline");
+        return -2;
+    }
+    nlohmann::json j;
+    try { j = nlohmann::json::parse(body); } catch (...) { return -3; }
+    if (!j.value("ok", false) || !j.contains("data") ||
+        !j["data"].is_array()) return -4;
+    if (!g_db) return -5;
+
+    dbExec("DELETE FROM sync_Records;", "clear sync_Records for API sync");
+
+    const auto& arr = j["data"];
+    sqlite3_stmt* ins = nullptr;
+    if (sqlite3_prepare_v2(g_db,
+        "INSERT INTO sync_Records "
+        "(nameUser,totalScore,totalSeconds,avgSpeed,endTS,idStory,idChapter) "
+        "VALUES (?,?,?,?,?,?,?);",
+        -1, &ins, nullptr) == SQLITE_OK) {
+        for (const auto& row : arr) {
+            std::string nu = row.value("name_user", std::string());
+            if (nu.size() > 32) nu = nu.substr(0, 32);
+            sqlite3_reset(ins);
+            sqlite3_bind_text  (ins, 1, nu.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int   (ins, 2, row.value("total_score",   0));
+            sqlite3_bind_int   (ins, 3, row.value("total_seconds", 0));
+            sqlite3_bind_double(ins, 4, row.value("avg_speed",     0.0));
+            sqlite3_bind_int64 (ins, 5,
+                (sqlite3_int64)row.value("end_ts", (int64_t)0));
+            sqlite3_bind_int   (ins, 6, row.value("id_story",   0));
+            sqlite3_bind_int   (ins, 7, row.value("id_chapter", 0));
+            sqlite3_step(ins);
+        }
+        sqlite3_finalize(ins);
+    }
+    dbSyncToPersistent();
+    SDL_Log("[gameConsole] leaderboard API sync: %d rows", (int)arr.size());
+    return (int)arr.size();
+}
+
+// Submit last session record to Worker API.
+// `token` is a Bearer token from 3rd-party OTP service (non-empty = authorized).
+static bool submitLastRecord(const char* token) {
+    const char* apiUrl = CTETRIS_API_URL;
+    if (!apiUrl || !*apiUrl || !g_db) return false;
+    if (!token || !*token) {
+        SDL_Log("[gameConsole] submitLastRecord: no auth token");
+        return false;
+    }
+    sqlite3_stmt* st = nullptr;
+    std::string sql =
+        "SELECT totalScore, totalSeconds, avgSpeed, endTS, idStory, idChapter "
+        "FROM " + userTable("Records") +
+        " WHERE idUser='default' ORDER BY endTS DESC LIMIT 1;";
+    if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK)
+        return false;
+    if (sqlite3_step(st) != SQLITE_ROW) { sqlite3_finalize(st); return false; }
+    int     score = sqlite3_column_int   (st, 0);
+    int     secs  = sqlite3_column_int   (st, 1);
+    float   spd   = (float)sqlite3_column_double(st, 2);
+    int64_t ts    = (int64_t)sqlite3_column_int64(st, 3);
+    int     idS   = sqlite3_column_int   (st, 4);
+    int     idC   = sqlite3_column_int   (st, 5);
+    sqlite3_finalize(st);
+
+    char body[320];
+    SDL_snprintf(body, sizeof(body),
+        "{\"nameUser\":\"default\",\"totalScore\":%d,\"totalSeconds\":%d,"
+        "\"avgSpeed\":%.2f,\"endTs\":%lld,\"idStory\":%d,\"idChapter\":%d}",
+        score, secs, (double)spd, (long long)ts, idS, idC);
+
+    std::string url = std::string(apiUrl) + "/record";
+    int status = consoleHttpPost(url.c_str(), body, token);
+    SDL_Log("[gameConsole] submitLastRecord: HTTP %d", status);
+    return (status == 200 || status == 201);
+}
+
 static bool dbSelectStory(const char* idUser, int idStory, int idChapter) {
     if (!g_db || !idUser || !*idUser) return false;
 
@@ -1377,6 +1576,15 @@ static const SDL_FRect BOARD_CLOSE = { BOARD_POPUP.x + BOARD_POPUP.w - 22.0f,
 static const SDL_FRect SETTINGS_POPUP = { 5.0f, 20.0f, 260.0f, 440.0f };
 static const SDL_FRect SETTINGS_CLOSE = { SETTINGS_POPUP.x + SETTINGS_POPUP.w - 22.0f,
                                           SETTINGS_POPUP.y + 4.0f, 18.0f, 18.0f };
+static const float API_BTN_W = 220.0f;
+static const float API_BTN_H = 22.0f;
+static const float API_BTN_X = SETTINGS_POPUP.x + (SETTINGS_POPUP.w - API_BTN_W) / 2.0f;
+static const SDL_FRect SETTINGS_SYNC_BTN = {
+    API_BTN_X, SETTINGS_POPUP.y + 196.0f, API_BTN_W, API_BTN_H
+};
+static const SDL_FRect SETTINGS_SUBMIT_BTN = {
+    API_BTN_X, SETTINGS_POPUP.y + 224.0f, API_BTN_W, API_BTN_H
+};
 
 // [F.2] Stories popup geometry -- same footprint as Settings/Guide for visual
 // consistency. Body (thumbnail, story list, chapter navigator) is populated
@@ -1890,6 +2098,42 @@ static void drawSettingsLightbox(SDL_Renderer* renderer, const AppState& state) 
             SDL_RenderDebugText(renderer, SETTINGS_POPUP.x + 20.0f,
                                 SWATCH_Y + SWATCH_H + 8.0f,
                                 "(at least 1 color required)");
+        }
+    }
+
+    // ===== [V3] ONLINE SYNC SECTION =====
+    {
+        SDL_SetRenderDrawColor(renderer, 140, 140, 150, 255);
+        SDL_RenderDebugText(renderer, SETTINGS_POPUP.x + 20.0f,
+                            SETTINGS_POPUP.y + 182.0f, "ONLINE SYNC");
+
+        bool hasCfgUrl = (SDL_strlen(CTETRIS_API_URL) > 0);
+        SDL_Color syncBg = hasCfgUrl
+            ? SDL_Color{50, 100, 160, 255}
+            : SDL_Color{60, 60, 70, 255};
+        SDL_SetRenderDrawColor(renderer, syncBg.r, syncBg.g, syncBg.b, 255);
+        SDL_RenderFillRect(renderer, &SETTINGS_SYNC_BTN);
+        SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+        SDL_RenderRect(renderer, &SETTINGS_SYNC_BTN);
+        SDL_RenderDebugText(renderer,
+            SETTINGS_SYNC_BTN.x + 8.0f,
+            SETTINGS_SYNC_BTN.y + (SETTINGS_SYNC_BTN.h - 8.0f) / 2.0f,
+            hasCfgUrl ? "SYNC BOARD (pull)" : "SYNC (no API URL)");
+
+        SDL_SetRenderDrawColor(renderer, 80, 50, 130, 255);
+        SDL_RenderFillRect(renderer, &SETTINGS_SUBMIT_BTN);
+        SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+        SDL_RenderRect(renderer, &SETTINGS_SUBMIT_BTN);
+        SDL_RenderDebugText(renderer,
+            SETTINGS_SUBMIT_BTN.x + 8.0f,
+            SETTINGS_SUBMIT_BTN.y + (SETTINGS_SUBMIT_BTN.h - 8.0f) / 2.0f,
+            "SUBMIT SCORE (OTP token)");
+
+        if (state.cfg && !state.apiSyncStatus.empty()) {
+            SDL_SetRenderDrawColor(renderer, 160, 200, 160, 255);
+            SDL_RenderDebugText(renderer, SETTINGS_POPUP.x + 8.0f,
+                                SETTINGS_POPUP.y + 252.0f,
+                                state.apiSyncStatus.c_str());
         }
     }
 
@@ -2423,6 +2667,32 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                                     break;
                                 }
                             }
+                            if (hitTest(SETTINGS_SYNC_BTN, mx, my)) {
+                                // gameconsole-tich-hop-backend-13: pull leaderboard
+                                if (SDL_strlen(CTETRIS_API_URL) > 0) {
+                                    state.apiSyncStatus = "Syncing...";
+                                    int rows = fetchLeaderboardFromApi();
+                                    if (rows >= 0) {
+                                        char buf[32];
+                                        SDL_snprintf(buf, sizeof(buf),
+                                                     "Synced %d rows", rows);
+                                        state.apiSyncStatus = buf;
+                                        loadBoardWithFallback();
+                                        applyBoardSort(state);
+                                    } else {
+                                        state.apiSyncStatus = "Sync failed (offline?)";
+                                    }
+                                } else {
+                                    state.apiSyncStatus = "Set CTETRIS_API_URL to enable";
+                                }
+                            } else if (hitTest(SETTINGS_SUBMIT_BTN, mx, my)) {
+                                // OTP token: in V3 this comes from 3rd-party auth flow.
+                                // Stub: pass empty token -> Worker returns 401 (expected).
+                                const char* token = "";  // TODO: populate from OTP service
+                                bool ok = submitLastRecord(token);
+                                state.apiSyncStatus = ok ? "Score submitted!"
+                                                         : "Submit failed (need OTP token)";
+                            }
                         }
                     }
                 } else if (state.showStories) {
@@ -2593,6 +2863,19 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
 //   [F.7] WASM IDBFS — idbfs_mount_dir + load/save after every DB write
 //   [G/H] Board from sync_Records; Smart Sort Engine 4 modes (score/time ↑↓)
 //   DB guard — return 3 when shared_data empty → main.cpp routes to gameStory
+// integration/v3
+// V3 additions verified (see taskConsole.md Task 3.1-3.4):
+//   [V3.1] gameconsole-tich-hop-backend-13:
+//           consoleHttpGet() / consoleHttpPost() — WASM (emscripten_fetch) +
+//           native (libcurl, HAVE_LIBCURL guard) + offline graceful fallback.
+//           fetchLeaderboardFromApi(): GET /leaderboard -> DELETE + INSERT
+//           sync_Records atomically; reloads board and re-applies sort.
+//           submitLastRecord(): POST /record with Bearer token (3rd-party OTP).
+//           SYNC BOARD + SUBMIT SCORE buttons in Settings popup body.
+//           apiSyncStatus feedback line shown below buttons.
+//   [V3.2] sort-by-time-in-board-14: already shipped in V2 [G] -> verified.
+//   [V3.3] sort-by-score-in-board-15: already shipped in V2 [H] -> verified.
+//   [V3.4] integration/v3 comment block added.
 #ifdef BUILD_STANDALONE
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;

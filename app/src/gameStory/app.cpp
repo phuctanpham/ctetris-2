@@ -492,6 +492,10 @@ static int findDialNodeIdx(const std::vector<DialogueNode>& nodes, int nodeId) {
 #define MANIFEST_GIST_URL ""
 #endif
 
+#ifndef CTETRIS_API_URL
+#define CTETRIS_API_URL ""
+#endif
+
 // Sync states for the intro screen state machine
 enum SyncState {
     SYNC_IDLE,          // not started yet
@@ -1559,6 +1563,20 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
     }
     return 0;
 }
+
+// integration/v3
+// V3 additions verified (see taskStory.md Task 3.1-3.3):
+//   [V3.1] gamestory-tich-hop-backend-07:
+//           buildDownloadQueue() collects all media URLs from shared_data +
+//           shared_dialogues via shared_meta.media_base_url JOIN.
+//           tickMediaDownload() downloads one file per render-loop tick;
+//           skips files already in SDL_GetPrefPath()/media/ cache.
+//           SDL_CreateDirectory() creates cache dir cross-platform (SDL3).
+//   [V3.2] gamestory-hieu-chinh-loading-bar-theo-download-speed-08:
+//           Bar fill = max(syncProgress, mediaProgress, timeProgress).
+//           Status line shows "Media X/Y  N.N KB/s" while downloading.
+//           Logo loop repeats until BOTH INTRO_DURATION elapsed AND dlDone.
+//   [V3.3] integration/v3 wired; dual-mode entry unchanged (storyId=0 vs >0).
 
 #ifdef BUILD_STANDALONE
 int main(int argc, char* argv[]) {

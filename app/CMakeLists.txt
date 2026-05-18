@@ -44,6 +44,27 @@ else()
     message(WARNING "MANIFEST_GIST_URL not set — gameStory sync will be offline-only")
 endif()
 
+# Read CTETRIS_API_URL from .env (fallback if not passed via -D)
+if(NOT DEFINED CTETRIS_API_URL OR CTETRIS_API_URL STREQUAL "")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.env")
+        file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/.env" _env_lines_api)
+        foreach(_line ${_env_lines_api})
+            if(_line MATCHES "^CTETRIS_API_URL=(.+)$")
+                set(CTETRIS_API_URL "${CMAKE_MATCH_1}")
+            endif()
+        endforeach()
+    endif()
+endif()
+if(CTETRIS_API_URL AND
+   NOT CTETRIS_API_URL STREQUAL "https://ctetris-api.OWNER.workers.dev")
+    target_compile_definitions(cTetris PRIVATE
+        "CTETRIS_API_URL=\"${CTETRIS_API_URL}\""
+    )
+    message(STATUS "CTETRIS_API_URL: ${CTETRIS_API_URL}")
+else()
+    message(WARNING "CTETRIS_API_URL not set — leaderboard API sync disabled")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

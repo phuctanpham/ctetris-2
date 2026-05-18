@@ -139,7 +139,7 @@ static void applyTableMatrix(GameState& state, const std::string& tm) {
 }
 
 // gamecore-save-record-22 / gamecore-update-story-progress-23
-static void onGameOver(const GameState& state, Uint32 elapsedMs) {
+static void onGameOver(GameState& state, Uint32 elapsedMs) {
     if (!s_cfg) return;
     const bool coreOpenedDb = !dbIsOpen();
     if (!dbOpen("default")) {
@@ -159,6 +159,21 @@ static void onGameOver(const GameState& state, Uint32 elapsedMs) {
         ? (float)rec.totalScore / (float)rec.totalSeconds : 0.0f;
     rec.retryNo      = state.retryCount;
     dbInsertRecord(rec);
+
+    // gamecore-game-over-screen-24: flag new record vs local leaderboard
+    {
+        sqlite3_stmt* chk = nullptr;
+        if (sqlite3_prepare_v2(g_db,
+                "SELECT MAX(totalScore) FROM sync_Records;",
+                -1, &chk, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(chk) == SQLITE_ROW &&
+                sqlite3_column_type(chk, 0) != SQLITE_NULL &&
+                rec.totalScore > sqlite3_column_int(chk, 0)) {
+                state.isNewRecord = true;
+            }
+            sqlite3_finalize(chk);
+        }
+    }
 
     if (s_cfg->storyId > 0) {
         dbUpsertStoryProgress("default", s_cfg->storyId, s_cfg->chapterId, true, true);
@@ -257,6 +272,7 @@ static void resetGame(GameState& state) {
     state.isGameOver = false;
     state.isPaused = false;
     state.showQuitPopup = false;
+    state.isNewRecord = false;
     state.softDrop = false;
     state.speedHeld = false;
     state.pendingClear  = false;
@@ -630,9 +646,14 @@ static void drawQuitPopup(SDL_Renderer* renderer, const GameState& state, Uint32
     SDL_RenderRect(renderer, &POPUP_CLOSE);
     SDL_RenderDebugText(renderer, POPUP_CLOSE.x + 5, POPUP_CLOSE.y + 5, "X");
 
-    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
-    SDL_RenderDebugText(renderer, POPUP_BG.x + 15, POPUP_BG.y + 30,
-                        state.isGameOver ? "GAME OVER" : "PAUSED");
+    // gamecore-game-over-screen-24: gold title on new record
+    {
+        bool newRec = state.isGameOver && state.isNewRecord;
+        SDL_Color tc = newRec ? HIGHLIGHT_YELLOW : SOFT_WHITE;
+        SDL_SetRenderDrawColor(renderer, tc.r, tc.g, tc.b, 255);
+        SDL_RenderDebugText(renderer, POPUP_BG.x + 15, POPUP_BG.y + 30,
+                            state.isGameOver ? "GAME OVER" : "PAUSED");
+    }
     drawWrappedText(renderer, "What do you want to do?",
                     POPUP_BG.x + 15, POPUP_BG.y + 60, 25, 2);
 
@@ -651,6 +672,13 @@ static void drawQuitPopup(SDL_Renderer* renderer, const GameState& state, Uint32
                  hours, mins, secs);
     drawWrappedText(renderer, timeLine,
                     POPUP_BG.x + 15, POPUP_BG.y + 110, 25, 2);
+
+    if (state.isGameOver && state.isNewRecord) {
+        SDL_SetRenderDrawColor(renderer, HIGHLIGHT_YELLOW.r,
+                               HIGHLIGHT_YELLOW.g, HIGHLIGHT_YELLOW.b, 255);
+        SDL_RenderDebugText(renderer, POPUP_BG.x + 15, POPUP_BG.y + 120,
+                            "* NEW RECORD! Sync via Board.");
+    }
 
     drawPopupButton(renderer, POPUP_RESTART, "Restart (new game)",     { 70, 130,  90, 255});
     drawPopupButton(renderer, POPUP_CONSOLE, "Console (back to menu)", { 70, 100, 160, 255});
@@ -1069,6 +1097,14 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
 //   Story label "S{id}-C{id}" overlay on sidebar NEXT-1 slot (slot 4)
 //   DB lifecycle: Core opens/closes per onGameOver() transaction only;
 //                 Console owns the persistent connection between sessions
+#if 1
+// integration/v3
+// V3 additions (see taskCore.md Task 3.1-3.2):
+//   [V3.1] gamecore-game-over-screen-24: new-record detection via sync_Records MAX query.
+//           Gold "GAME OVER" title + "* NEW RECORD! Sync via Board." hint in quit popup.
+//           isNewRecord reset on resetGame() so retry sessions start clean.
+//   [V3.2] integration/v3 comment block added.
+#endif
 #ifdef BUILD_STANDALONE
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
