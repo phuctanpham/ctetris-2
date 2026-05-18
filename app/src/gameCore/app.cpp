@@ -1097,14 +1097,12 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
 //   Story label "S{id}-C{id}" overlay on sidebar NEXT-1 slot (slot 4)
 //   DB lifecycle: Core opens/closes per onGameOver() transaction only;
 //                 Console owns the persistent connection between sessions
-#if 1
 // integration/v3
 // V3 additions (see taskCore.md Task 3.1-3.2):
 //   [V3.1] gamecore-game-over-screen-24: new-record detection via sync_Records MAX query.
 //           Gold "GAME OVER" title + "* NEW RECORD! Sync via Board." hint in quit popup.
 //           isNewRecord reset on resetGame() so retry sessions start clean.
 //   [V3.2] integration/v3 comment block added.
-#endif
 #ifdef BUILD_STANDALONE
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;

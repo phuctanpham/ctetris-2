@@ -82,7 +82,7 @@ bld/
 *.svclog
 *.scc
 **/build
-app/src/libs
+app/libs
 
 # API / Cloudflare
 **/node_modules/
