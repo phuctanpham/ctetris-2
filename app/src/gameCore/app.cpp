@@ -141,6 +141,7 @@ static void applyTableMatrix(GameState& state, const std::string& tm) {
 // gamecore-save-record-22 / gamecore-update-story-progress-23
 static void onGameOver(const GameState& state, Uint32 elapsedMs) {
     if (!s_cfg) return;
+    const bool coreOpenedDb = !dbIsOpen();
     if (!dbOpen("default")) {
         SDL_Log("[gameCore] onGameOver: dbOpen fail");
         return;
@@ -163,7 +164,7 @@ static void onGameOver(const GameState& state, Uint32 elapsedMs) {
         dbUpsertStoryProgress("default", s_cfg->storyId, s_cfg->chapterId, true, true);
         dbCheckAndUnlockStories("default");
     }
-    dbClose();
+    if (coreOpenedDb) dbClose();
     SDL_Log("[gameCore] onGameOver saved: score=%d story=%d retries=%d",
             state.score, s_cfg->storyId, state.retryCount);
 }
@@ -1053,6 +1054,21 @@ int runGameCore(SDL_Window* window, SDL_Renderer* renderer,
     return state.exitCode;
 }
 
+// integration/v2
+// V2 additions verified (see taskCore.md Task 2.10):
+//   [C1] BGM stub — SDL_AudioStream silent stream; cfg.volume gain applied on entry
+//   [C2] Dynamic fall speed — getFallInterval(score) 5-step 500→100ms
+//   [C3] 3-block queue (nextBlock/2/3); NEXT-2/3 gated by cfg.nextBlockScore
+//   [C4] Flash-clear — 6 ticks×80ms white/dark animation; fall blocked during flash
+//   [C5] n² combo scoring; cap 99999
+//   [C6] Color palette from cfg.colorEnabled[7] via PALETTE_TO_COLOR[7]
+//   [C7] tableMatrix pre-population via applyTableMatrix() inside resetGame()
+//   [C8] onGameOver(): dbInsertRecord → dbUpsertStoryProgress → cascade unlock
+//   [C9] DB ownership guard — coreOpenedDb = !dbIsOpen() (B3)
+//        Only calls dbClose() when Core opened the connection
+//   Story label "S{id}-C{id}" overlay on sidebar NEXT-1 slot (slot 4)
+//   DB lifecycle: Core opens/closes per onGameOver() transaction only;
+//                 Console owns the persistent connection between sessions
 #ifdef BUILD_STANDALONE
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;

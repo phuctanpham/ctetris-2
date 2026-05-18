@@ -81,6 +81,10 @@ bool dbOpen(const char* idUser);
 // Close current DB handle. Safe to call when no DB is open.
 void dbClose();
 
+// Returns true if a DB connection is currently open (g_db != nullptr).
+// Used by gameCore to track ownership before calling dbOpen/dbClose.
+bool dbIsOpen();
+
 // Create tables if they don't exist. Idempotent.
 bool dbInitSchema();
 

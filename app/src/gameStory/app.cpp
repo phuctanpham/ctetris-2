@@ -57,6 +57,13 @@ void storyDbClose() {
     }
 }
 
+// Mirror of gameConsole userTable() — construct "{idUser}_Stories".
+// gameConsole owns the CREATE TABLE; gameStory only reads/writes rows.
+// Centralised here so any future idUser change propagates automatically.
+static std::string storyUserTable(const char* idUser) {
+    return std::string(idUser && *idUser ? idUser : "default") + "_Stories";
+}
+
 std::vector<DialogueNode> storyDbLoadDialogue(int idStory, int idChapter) {
     std::vector<DialogueNode> out;
     if (!g_storyDb) return out;
@@ -912,17 +919,84 @@ static void syncFromGist(sqlite3* db) {
 // Called once after sync completes (storyId==0 intro path only).
 // Returns the storyId to run next (0 = no dialogue, just proceed to Console).
 // ---------------------------------------------------------------------------
+// [D2] Parse "requiredStories" CSV (e.g. "1,2,3") into a vector of idStory
+// integers. Trims whitespace around each token. Returns empty vector for
+// empty or null input so callers can branch on CSV-present vs absent.
+static std::vector<int> parseRequiredStories(const std::string& csv) {
+    std::vector<int> out;
+    if (csv.empty()) return out;
+    size_t pos = 0;
+    while (pos <= csv.size()) {
+        size_t comma = csv.find(',', pos);
+        if (comma == std::string::npos) comma = csv.size();
+        std::string tok = csv.substr(pos, comma - pos);
+        // trim leading/trailing whitespace
+        size_t a = 0, b = tok.size();
+        while (a < b && (tok[a] == ' ' || tok[a] == '\t')) ++a;
+        while (b > a && (tok[b-1] == ' ' || tok[b-1] == '\t')) --b;
+        tok = tok.substr(a, b - a);
+        if (!tok.empty()) {
+            int id = std::atoi(tok.c_str());
+            if (id > 0) out.push_back(id);
+        }
+        pos = comma + 1;
+    }
+    return out;
+}
+
+// [D2] For each parent idStory in `parents`, verify that the user's row in
+// default_Stories has isActivated=1 AND lastMaxScore >= minScore
+// AND lastMaxSpeed >= minSpeed (the child story's thresholds).
+// Returns true only when every parent qualifies; returns false on any DB error.
+static bool checkAllParentsQualify(sqlite3* db, const char* idUser,
+                                   const std::vector<int>& parents,
+                                   int minScore, float minSpeed) {
+    if (parents.empty()) return true;
+    std::string sql =
+        "SELECT isActivated, lastMaxScore, lastMaxSpeed "
+        "FROM " + storyUserTable(idUser) +
+        " WHERE idUser = ? AND idStory = ? LIMIT 1;";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK)
+        return false;
+    bool allPass = true;
+    for (int pid : parents) {
+        sqlite3_reset(st);
+        sqlite3_bind_text(st, 1, idUser, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int (st, 2, pid);
+        if (sqlite3_step(st) != SQLITE_ROW) {
+            SDL_Log("[gameStory] checkAllParents: story %d not found for user %s",
+                    pid, idUser);
+            allPass = false;
+            break;
+        }
+        int   activated = sqlite3_column_int   (st, 0);
+        int   pScore    = sqlite3_column_int   (st, 1);
+        float pSpeed    = (float)sqlite3_column_double(st, 2);
+        if (!activated || pScore < minScore || pSpeed < minSpeed) {
+            SDL_Log("[gameStory] checkAllParents: story %d fails "
+                    "(activated=%d score=%d/%d speed=%.1f/%.1f)",
+                    pid, activated, pScore, minScore, pSpeed, minSpeed);
+            allPass = false;
+            break;
+        }
+    }
+    sqlite3_finalize(st);
+    return allPass;
+}
+
 static int postSyncConditionCheck(sqlite3* db, const char* idUser) {
     if (!db || !idUser) return 0;
 
     // Get selected story
     sqlite3_stmt* st = nullptr;
-    if (sqlite3_prepare_v2(db,
+    std::string pscSQL =
         "SELECT us.idStory, us.idChapter, us.lastMaxScore, us.lastMaxSpeed, "
         "       sd.minScore, sd.minSpeed "
-        "FROM idUser_Stories us "
+        "FROM " + storyUserTable(idUser) + " us "
         "JOIN shared_data sd ON us.idStory = sd.idStory AND us.idChapter = sd.idChapter "
-        "WHERE us.idUser = ? AND us.isSelected = 1 LIMIT 1;",
+        "WHERE us.idUser = ? AND us.isSelected = 1 LIMIT 1;";
+    if (sqlite3_prepare_v2(db, pscSQL.c_str(),
         -1, &st, nullptr) != SQLITE_OK) return 0;
     sqlite3_bind_text(st, 1, idUser, -1, SQLITE_TRANSIENT);
 
@@ -954,7 +1028,7 @@ static int postSyncConditionCheck(sqlite3* db, const char* idUser) {
         if (sel.id == 0) return 0;
         // Mark as selected
         sqlite3_exec(db,
-            ("INSERT OR REPLACE INTO idUser_Stories "
+            ("INSERT OR REPLACE INTO " + storyUserTable(idUser) + " "
              "(idUser,idStory,idChapter,isActivated,isSelected) VALUES ('" +
              std::string(idUser) + "'," + std::to_string(sel.id) + "," +
              std::to_string(sel.ch) + ",1,1);").c_str(),
@@ -962,12 +1036,15 @@ static int postSyncConditionCheck(sqlite3* db, const char* idUser) {
         return sel.id;   // run first story unconditionally
     }
 
-    // Find next story in chapter flow (same chapter, next idStory, requiredStories satisfied)
+    // [D2] Find next story in chapter flow — enforce requiredStories CSV.
+    // Fetch requiredStories alongside score/speed thresholds so we can
+    // parse the CSV and check every listed parent in default_Stories.
     sqlite3_stmt* nx = nullptr;
     int nextStoryId = 0;
     std::string nextStoryName;
     if (sqlite3_prepare_v2(db,
-        "SELECT sd.idStory, sd.storyName, sd.minScore, sd.minSpeed "
+        "SELECT sd.idStory, sd.storyName, sd.minScore, sd.minSpeed, "
+        "       sd.requiredStories "
         "FROM shared_data sd "
         "WHERE sd.idChapter = ? AND sd.idStory > ? "
         "ORDER BY sd.idStory ASC LIMIT 1;",
@@ -977,12 +1054,37 @@ static int postSyncConditionCheck(sqlite3* db, const char* idUser) {
         if (sqlite3_step(nx) == SQLITE_ROW) {
             int nxtId      = sqlite3_column_int(nx, 0);
             const unsigned char* nxtName = sqlite3_column_text(nx, 1);
-            int nxtMinScore = sqlite3_column_int(nx, 2);
-            float nxtMinSpd = (float)sqlite3_column_double(nx, 3);
-            // Check if current story meets next story's unlock conditions
-            if (sel.maxScore >= nxtMinScore && sel.maxSpeed >= nxtMinSpd) {
+            int   nxtMinScore = sqlite3_column_int   (nx, 2);
+            float nxtMinSpd   = (float)sqlite3_column_double(nx, 3);
+            const unsigned char* reqRaw = sqlite3_column_text(nx, 4);
+            std::string reqCSV = reqRaw ? (const char*)reqRaw : "";
+
+            // Parse requiredStories CSV into parent IDs.
+            // Empty CSV → fallback: check current story's scores directly.
+            // Non-empty CSV → verify every listed parent in default_Stories.
+            std::vector<int> parents = parseRequiredStories(reqCSV);
+            bool prereqsMet;
+            if (parents.empty()) {
+                // Legacy single-parent check: current story must meet thresholds
+                prereqsMet = (sel.maxScore >= nxtMinScore &&
+                              sel.maxSpeed  >= nxtMinSpd);
+            } else {
+                // Each listed parent must be activated AND exceed thresholds
+                prereqsMet = checkAllParentsQualify(db, idUser, parents,
+                                                    nxtMinScore, nxtMinSpd);
+            }
+
+            if (prereqsMet) {
                 nextStoryId   = nxtId;
                 nextStoryName = nxtName ? (const char*)nxtName : "";
+                SDL_Log("[gameStory] postSync: next story %d '%s' prereqs met "
+                        "(CSV='%s' minScore=%d)",
+                        nxtId, nextStoryName.c_str(),
+                        reqCSV.c_str(), nxtMinScore);
+            } else {
+                SDL_Log("[gameStory] postSync: next story %d prereqs NOT met "
+                        "(CSV='%s' minScore=%d)",
+                        nxtId, reqCSV.c_str(), nxtMinScore);
             }
         }
         sqlite3_finalize(nx);
@@ -1205,7 +1307,6 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
     // --- Phase 2: Logo animation with real progress bar ---
     enum IntroPhase { PHASE_LOGO, PHASE_DONE };
     IntroPhase phase = PHASE_LOGO;
-    bool skipHoverI = false;
     SDL_Event event;
     Uint32 startTime = SDL_GetTicks();
 
@@ -1213,18 +1314,11 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_EVENT_QUIT) std::exit(0);
 
-            // Issue 2.6: Skip only active in PHASE_LOGO (sync is already done)
+            // Issue 2.6/2.12: Skip button is hidden during the logo phase.
+            // ESC still allows keyboard exit of the intro animation.
             if (phase == PHASE_LOGO) {
                 if (event.type == SDL_EVENT_KEY_DOWN &&
                     event.key.key == SDLK_ESCAPE) {
-                    phase = PHASE_DONE;
-                }
-                if (event.type == SDL_EVENT_MOUSE_MOTION)
-                    skipHoverI = diagHit(DIAG_SKIP_BTN,
-                                         event.motion.x, event.motion.y);
-                if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
-                    event.button.button == SDL_BUTTON_LEFT &&
-                    diagHit(DIAG_SKIP_BTN, event.button.x, event.button.y)) {
                     phase = PHASE_DONE;
                 }
             }
@@ -1285,23 +1379,7 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
             drawCorpCredit(renderer, elapsedTime, barBottomY);
         }
 
-        // Skip button — PHASE_LOGO only (Issue 2.6)
-        if (phase == PHASE_LOGO) {
-            SDL_Color skipBg = skipHoverI ? DIAG_SKIP_HOV : DIAG_SKIP_IDLE;
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer,
-                skipBg.r, skipBg.g, skipBg.b, skipBg.a);
-            SDL_RenderFillRect(renderer, &DIAG_SKIP_BTN);
-            SDL_SetRenderDrawColor(renderer, 200, 200, 200, 180);
-            SDL_RenderRect(renderer, &DIAG_SKIP_BTN);
-            const char* sl = "[ SKIP ]";
-            int sll = (int)SDL_strlen(sl);
-            SDL_SetRenderDrawColor(renderer, 180, 180, 180, 200);
-            SDL_RenderDebugText(renderer,
-                DIAG_SKIP_BTN.x + (DIAG_SKIP_BTN.w - sll * 8.0f) / 2.0f,
-                DIAG_SKIP_BTN.y + (DIAG_SKIP_BTN.h - 8.0f) / 2.0f, sl);
-        }
-
+        // [ SKIP ] is rendered only by drawDialoguePage() in dialRunLoop().
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
@@ -1322,9 +1400,9 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
     if (nextStory == 0 && g_storyDb) {
         // Check if any activated story exists — if so, show completion
         sqlite3_stmt* chk = nullptr;
-        if (sqlite3_prepare_v2(g_storyDb,
-            "SELECT COUNT(*) FROM idUser_Stories "
-            "WHERE idUser='default' AND isActivated=1;",
+        std::string chkSQL = "SELECT COUNT(*) FROM " + storyUserTable("default") +
+            " WHERE idUser='default' AND isActivated=1;";
+        if (sqlite3_prepare_v2(g_storyDb, chkSQL.c_str(),
             -1, &chk, nullptr) == SQLITE_OK) {
             if (sqlite3_step(chk) == SQLITE_ROW &&
                 sqlite3_column_int(chk, 0) > 0) {
@@ -1408,10 +1486,11 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
             // Update DB: set new story as selected, deselect old
             if (g_storyDb) {
                 sqlite3_exec(g_storyDb,
-                    ("UPDATE idUser_Stories SET isSelected=0 WHERE idUser='default';").c_str(),
+                    ("UPDATE " + storyUserTable("default") +
+                     " SET isSelected=0 WHERE idUser='default';").c_str(),
                     nullptr, nullptr, nullptr);
                 sqlite3_exec(g_storyDb,
-                    ("INSERT OR REPLACE INTO idUser_Stories "
+                    ("INSERT OR REPLACE INTO " + storyUserTable("default") + " "
                      "(idUser,idStory,idChapter,isActivated,isSelected) "
                      "SELECT 'default', idStory, idChapter, 1, 1 FROM shared_data "
                      "WHERE idStory=" + std::to_string(unlockId) + " LIMIT 1;").c_str(),
@@ -1427,10 +1506,11 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
             nextStory = (nextStory < 0) ? -nextStory : nextStory;
             // find and replay the currently selected story instead
             if (g_storyDb) {
+                std::string csSQL = "SELECT idStory, idChapter FROM " +
+                    storyUserTable("default") +
+                    " WHERE idUser='default' AND isSelected=1 LIMIT 1;";
                 sqlite3_stmt* cs = nullptr;
-                if (sqlite3_prepare_v2(g_storyDb,
-                    "SELECT idStory, idChapter FROM idUser_Stories "
-                    "WHERE idUser='default' AND isSelected=1 LIMIT 1;",
+                if (sqlite3_prepare_v2(g_storyDb, csSQL.c_str(),
                     -1, &cs, nullptr) == SQLITE_OK) {
                     if (sqlite3_step(cs) == SQLITE_ROW) {
                         nextStory = sqlite3_column_int(cs, 0);

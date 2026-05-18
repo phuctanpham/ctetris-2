@@ -697,6 +697,10 @@ void dbClose() {
     }
 }
 
+bool dbIsOpen() {
+    return g_db != nullptr;
+}
+
 bool dbInitSchema() {
     if (!g_db) {
         SDL_Log("[gameConsole_db] dbInitSchema: DB chua mo");
@@ -2013,20 +2017,31 @@ static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
             }
         }
 
-        // Story name (truncated to fit if needed; row width ~244, minus
-        // 26 left margin and 20 right margin = ~198px usable = ~24 chars).
+        // Story name.
+        // COMPLETED rows cap at 16 chars so the best-score label has room.
+        // LOCKED / ACTIVE rows keep the original 24-char cap.
         SDL_Color tc;
         if      (us == STORY_UI_LOCKED)    tc = SDL_Color{125, 115, 105, 255};
         else if (us == STORY_UI_COMPLETED) tc = SDL_Color{200, 240, 200, 255};
-        else                                tc = SOFT_WHITE;
+        else                               tc = SOFT_WHITE;
         SDL_SetRenderDrawColor(renderer, tc.r, tc.g, tc.b, 255);
 
         char buf[28];
+        int nameCap = (us == STORY_UI_COMPLETED) ? 16 : 24;
         int n = (int)sr.storyName.size();
-        if (n > 24) n = 24;
+        if (n > nameCap) n = nameCap;
         SDL_memcpy(buf, sr.storyName.c_str(), (size_t)n);
         buf[n] = '\0';
         SDL_RenderDebugText(renderer, row.x + 22.0f, row.y + 5.0f, buf);
+
+        if (us == STORY_UI_COMPLETED && sr.lastMaxScore > 0) {
+            char bestBuf[12];
+            SDL_snprintf(bestBuf, sizeof(bestBuf), "B:%d", sr.lastMaxScore);
+            int bestLen = (int)SDL_strlen(bestBuf);
+            float bestX = row.x + STORIES_ROW_W - 14.0f - 4.0f - 4.0f - (float)bestLen * 8.0f;
+            SDL_SetRenderDrawColor(renderer, 150, 220, 150, 255);
+            SDL_RenderDebugText(renderer, bestX, row.y + 5.0f, bestBuf);
+        }
 
         // Play button -- HIDDEN for locked rows (per task.md spec)
         if (us != STORY_UI_LOCKED) {
@@ -2562,6 +2577,22 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     return state.nextScene;
 }
 
+// integration/v2
+// V2 additions verified (see taskConsole.md Task 2.7):
+//   [A.1] SVG background lazy-rasterize via nanosvg; reset on exit/re-entry
+//   [D.2] Volume slider — SDL_AudioStream + SDL_SetAudioStreamGain(cfg.volume)
+//   [E.2] 7 color swatches — cfg.colorEnabled[7] forwarded to gameCore
+//   [F.1] SQLite 9-table schema:
+//           Group 1 default_*: Records, Stories, Settings
+//           Group 2 shared_*: data, dialogues, choices, meta
+//           Group 3 sync_Records (seeded 30 rows; Cloudflare D1 target V3)
+//   [F.2] Stories popup — 3-state rows, chapter navigator, dbSelectStory()
+//         D1: "B:N" best-score label on COMPLETED rows
+//   [F.5] Unlock cascade — dbCheckAndUnlockStories() on Console entry
+//   [F.6] Restore isSelected story → cfg.storyId/chapterId on re-entry
+//   [F.7] WASM IDBFS — idbfs_mount_dir + load/save after every DB write
+//   [G/H] Board from sync_Records; Smart Sort Engine 4 modes (score/time ↑↓)
+//   DB guard — return 3 when shared_data empty → main.cpp routes to gameStory
 #ifdef BUILD_STANDALONE
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
