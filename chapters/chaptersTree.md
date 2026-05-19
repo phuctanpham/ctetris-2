@@ -12,7 +12,16 @@ chapters/
 │  ├─ c001/
 │  │  ├─ c001.json
 │  │  └─ media/
-│  │     └─ (images, audio, other assets)
+│  │     ├─ THUMB_001_FALLING_SKY.png
+│  │     ├─ THUMB_002_ORDERCORP_TEMPLE.png
+│  │     ├─ THUMB_003_UNDERCITY_SLUM.png
+│  │     ├─ THUMB_004_SHADOW_ALLEY.png
+│  │     ├─ THUMB_005_HEAVEN_MATRIX.png
+│  │     ├─ THUMB_006_GLITCH_VIRUS.png
+│  │     ├─ THUMB_007_FROZEN_TIME.png
+│  │     ├─ THUMB_008_KILL_SCREEN.png
+│  │     ├─ THUMB_009_ENDLESS_LOOP.png
+│  │     └─ THUMB_010_GOLDEN_MAXOUT.png
 │  ├─ c002/
 │  │  └─ (same pattern as `c001`)
 │  └─ (more chapterID-driven folders will be added over time)
