@@ -65,6 +65,8 @@ jobs:
 
           echo "GIST_TOKEN OK — classic PAT with 'gist' scope confirmed"
 
+      # ── 1. Read config from app/.env ──────────────────────────────────────
+      - name: Read manifest Gist config
         id: cfg
         run: |
           set -euo pipefail
