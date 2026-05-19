@@ -24,32 +24,47 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
 
-      # ── 0. Validate GIST_TOKEN has 'gist' scope ───────────────────────────
-      # Fine-grained PATs do NOT support Gist API — must use classic PAT.
+      # ── 0. Validate GIST_TOKEN: must be classic PAT with 'gist' WRITE scope ─
+      # GET /gists returns 200 even without 'gist' scope (public endpoint).
+      # x-oauth-scopes header is the only reliable way to confirm write access.
       - name: Validate GIST_TOKEN
         run: |
           set -euo pipefail
           [ -z "$GIST_TOKEN" ] && {
             echo "::error::GIST_TOKEN secret is not set."
             echo "  Go to: Settings → Secrets and variables → Actions"
-            echo "  Create a classic PAT at: https://github.com/settings/tokens"
+            echo "  Create a classic PAT at: https://github.com/settings/tokens?type=classic"
             echo "  Required scope: gist"
             exit 1
           }
-          http=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-                 -H "Authorization: token $GIST_TOKEN" \
-                 "https://api.github.com/gists?per_page=1")
+
+          # Fetch response headers — x-oauth-scopes lists granted scopes
+          headers=$(curl -sI --max-time 10 \
+                    -H "Authorization: token $GIST_TOKEN" \
+                    "https://api.github.com/gists?per_page=1")
+
+          http=$(echo "$headers" | grep -i '^HTTP/' | tail -1 | awk '{print $2}')
+          scopes=$(echo "$headers" | grep -i '^x-oauth-scopes:' | cut -d':' -f2- | tr -d '[:space:]')
+
+          echo "HTTP status  : $http"
+          echo "OAuth scopes : $scopes"
+
           if [ "$http" != "200" ]; then
-            echo "::error::GIST_TOKEN cannot access Gist API (HTTP $http)."
-            echo "  Must be a CLASSIC Personal Access Token with 'gist' scope."
-            echo "  Fine-grained PATs do NOT support Gist API."
+            echo "::error::GIST_TOKEN rejected by GitHub API (HTTP $http)."
+            echo "  Must be a CLASSIC PAT — fine-grained PATs do NOT support Gist API."
             echo "  Create one at: https://github.com/settings/tokens?type=classic"
             exit 1
           fi
-          echo "GIST_TOKEN OK — Gist API accessible (HTTP $http)"
 
-      # ── 1. Read config from app/.env ──────────────────────────────────────
-      - name: Read manifest Gist config
+          if ! echo "$scopes" | grep -q 'gist'; then
+            echo "::error::GIST_TOKEN is missing 'gist' scope (found: '$scopes')."
+            echo "  Edit your classic PAT and enable the 'gist' checkbox."
+            echo "  https://github.com/settings/tokens?type=classic"
+            exit 1
+          fi
+
+          echo "GIST_TOKEN OK — classic PAT with 'gist' scope confirmed"
+
         id: cfg
         run: |
           set -euo pipefail
@@ -96,7 +111,7 @@ jobs:
           find_or_create() {
             local fname="$1"
             local content="$2"
-            local resp gid
+            local resp gid payload
 
             resp=$(curl -sf --max-time 15 \
                      -H "Authorization: token $GIST_TOKEN" \
@@ -108,25 +123,29 @@ jobs:
                   | head -1 || true)
 
             if [ -z "$gid" ]; then
-              resp=$(curl -sf --max-time 15 -X POST \
+              # Build payload separately — avoids exit-code-3 from jq inside curl -d "$()"
+              payload=$(jq -n --arg fn "$fname" --arg fc "$content" \
+                        '{"public":false,"files":{($fn):{"content":$fc}}}') || {
+                echo "::error::jq failed to build payload for $fname (jq exit $?)" >&2
+                exit 1
+              }
+              resp=$(curl -sf --max-time 30 -X POST \
                        -H "Authorization: token $GIST_TOKEN" \
                        -H "Accept: application/vnd.github.v3+json" \
-                       -d "$(jq -n --arg fn "$fname" --arg fc "$content" \
-                             '{"public":false,"files":{($fn):{"content":$fc}}}')" \
+                       -d "$payload" \
                        "https://api.github.com/gists") || {
-                echo "::error::POST /gists failed for $fname"
-                echo "  Check GIST_TOKEN is a classic PAT with 'gist' scope."
+                echo "::error::POST /gists failed for $fname" >&2
                 exit 1
               }
               gid=$(echo "$resp" | jq -r '.id' 2>/dev/null || true)
               if [ -z "$gid" ] || [ "$gid" = "null" ]; then
-                echo "::error::Gist creation returned no ID for $fname"
-                echo "  API response: $(echo "$resp" | head -c 300)"
+                echo "::error::Gist creation returned no ID for $fname" >&2
+                echo "  API response: $(echo "$resp" | head -c 300)" >&2
                 exit 1
               fi
-              echo "Created Gist for $fname: $gid"
+              echo "Created Gist for $fname: $gid" >&2   # stderr — not captured by $()
             fi
-            echo "$gid"
+            echo "$gid"   # stdout only — clean capture by gid=$(find_or_create ...)
           }
 
           for jsonfile in $(find chapters/src -maxdepth 2 -name "c*.json" \
@@ -136,11 +155,15 @@ jobs:
             content=$(cat "$jsonfile")
             gid=$(find_or_create "$fname" "$content")
 
-            http=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 15 -X PATCH \
+            # Build PATCH payload separately for same reason
+            patch_payload=$(jq -n --arg fn "$fname" --arg fc "$content" \
+                            '{"files":{($fn):{"content":$fc}}}') || {
+              echo "::error::jq failed building PATCH payload for $fname"; exit 1
+            }
+            http=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 30 -X PATCH \
                      -H "Authorization: token $GIST_TOKEN" \
                      -H "Accept: application/vnd.github.v3+json" \
-                     -d "$(jq -n --arg fn "$fname" --arg fc "$content" \
-                           '{"files":{($fn):{"content":$fc}}}')" \
+                     -d "$patch_payload" \
                      "https://api.github.com/gists/$gid")
             [ "$http" = "200" ] || { echo "::error::PATCH $fname HTTP $http"; exit 1; }
             echo "$gid" > "/tmp/gist_${chapter_id}.id"
