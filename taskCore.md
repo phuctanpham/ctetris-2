@@ -87,6 +87,12 @@
 
 ### V3
 [x] Issue 3.1: isNewRecord reset on resetGame() — verified.
+[x] Issue 3.2: g_db extern linkage fix — removed static from g_db declaration in
+               gameConsole/app.cpp (line 635), enabled external linkage to gameCore.
+               - Added extern sqlite3* g_db; in gameCore/app.cpp (line 15).
+               - Resolves LNK2019: unresolved external symbol for g_db usage at line 169.
+               - Allows gameCore onGameOver() to access sync_Records for record checking.
+               - Build: exit code 0, cross-module DB access working.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameCore/app.cpp) duy nhất để viết.

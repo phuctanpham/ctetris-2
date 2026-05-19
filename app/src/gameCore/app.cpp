@@ -11,6 +11,9 @@
 #include "gameConsole_db.h"
 #include "sqlite3.h"
 
+// g_db is defined in gameConsole/app.cpp; declare as extern for access
+extern sqlite3* g_db;
+
 // Tren WASM build, can goi window.location.reload() khi user click "Reload"
 // o man hinh shutdown. Su dung emscripten_run_script de chen JS.
 #ifdef __EMSCRIPTEN__

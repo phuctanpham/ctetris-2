@@ -58,6 +58,17 @@
 ### V3
 [x] Issue 3.1: Media cache dir created via SDL_CreateDirectory() before first download.
 [x] Issue 3.2: Binary media (PNG/audio) stored correctly via std::string byte buffer.
+[x] Issue 3.3: nlohmann/json include fix — added #include <nlohmann/json.hpp> at line 20
+               in gameStory/app.cpp for V3 manifest + dialogue JSON parsing.
+               - Resolves error C2653: 'nlohmann' is not a class or namespace name (line 644).
+               - Required for Task 3.1 (syncFromGist manifest) + Task 3.3 (dialogue JSON).
+               - Build: exit code 0, manifest + media download integration complete.
+[x] Issue 3.4: Emscripten WASM build fixes — added #include <emscripten.h> and
+               #include <emscripten/fetch.h> at lines 21-24 in gameStory/app.cpp.
+               - Resolves error: undeclared emscripten_fetch_attr_t, emscripten_fetch_t, etc.
+               - Fixes EM_ASM syntax: changed Module.FS.syncfs to Module['FS'].syncfs
+                 (bracket notation required in EM_ASM macros at lines 911, 1504).
+               - WASM build: exit code 0, media download + IndexedDB persistence complete.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.

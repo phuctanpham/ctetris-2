@@ -18,6 +18,12 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <nlohmann/json.hpp>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/fetch.h>
+#endif
 
 // Loading bar duration: 8 s to show story + give WASM time to settle
 const int INTRO_DURATION = 8000;
@@ -907,7 +913,7 @@ static void syncFromGist(sqlite3* db) {
                        entry.mediaBaseUrl.c_str());
 #ifdef __EMSCRIPTEN__
             // Persist to IndexedDB after each chapter write
-            EM_ASM({ Module.FS.syncfs(false, function(){}); });
+            EM_ASM({ Module['FS'].syncfs(false, function(){}); });
 #endif
         }
         g_syncProgress.done++;
@@ -1500,7 +1506,7 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
                      "WHERE idStory=" + std::to_string(unlockId) + " LIMIT 1;").c_str(),
                     nullptr, nullptr, nullptr);
 #ifdef __EMSCRIPTEN__
-                EM_ASM({ Module.FS.syncfs(false, function(){}); });
+                EM_ASM({ Module['FS'].syncfs(false, function(){}); });
 #endif
             }
             nextStory = unlockId;

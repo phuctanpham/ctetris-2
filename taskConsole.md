@@ -49,6 +49,16 @@
                prepared statement bind for all API-sourced values.
 [x] Issue 3.3: SYNC BOARD button disabled label when CTETRIS_API_URL empty —
                shows "SYNC (no API URL)" in muted colour.
+[x] Issue 3.4: CTETRIS_API_URL preprocessor scope fix — moved #ifndef CTETRIS_API_URL
+               block outside #ifdef __EMSCRIPTEN__ to global scope (line 26-29).
+               - Was nested inside platform guard, unavailable on native Windows build.
+               - Now accessible for fetchLeaderboardFromApi() + consoleHttpGet() calls.
+               - Build: exit code 0, leaderboard API integration complete.
+[x] Issue 3.5: emscripten/fetch.h include fix — added #include <emscripten/fetch.h> at line 33
+               in gameConsole/app.cpp inside #ifdef __EMSCRIPTEN__ block.
+               - Resolves error: undeclared emscripten_fetch_attr_t, emscripten_fetch_t, etc.
+               - Required for WASM consoleHttpGet() and consoleHttpPost() implementation.
+               - WASM build: exit code 0, HTTP API calls functional.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameConsole/app.cpp) duy nhất để viết.

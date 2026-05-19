@@ -24,14 +24,16 @@
 //        so our 30-row leaderboard runs near O(n).
 #include "gameConsole_sort.h"
 
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-
-// [F.7] IDBFS persistence for sqlite file across browser tab reloads.
-
+// Fallback for API URL if not provided by CMake
 #ifndef CTETRIS_API_URL
 #define CTETRIS_API_URL ""
 #endif
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/fetch.h>
+
+// [F.7] IDBFS persistence for sqlite file across browser tab reloads.
 
 #ifdef HAVE_LIBCURL
 #include <curl/curl.h>
@@ -631,7 +633,7 @@ static void applyBoardSort(AppState& state) {
 // Lifetime: opened on runGameConsole entry, closed on exit.
 // WASM IDBFS persistence wired in Step 2.6.12.
 // =========================================================
-static sqlite3*    g_db = nullptr;
+sqlite3*           g_db = nullptr;  // extern: accessed by gameCore for record checking
 static std::string g_dbCurrentUser;
 static std::string g_dbPath;
 
