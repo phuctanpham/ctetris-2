@@ -172,3 +172,19 @@ jobs:
           [ "$http" = "200" ] || { echo "::error::Manifest PATCH HTTP $http"; exit 1; }
           echo "OK manifest $new_ver"
           echo "$new_manifest" | jq .
+
+      # ── 4. Echo manifest Gist URL for copy-paste into app/.env ───────────
+      - name: Echo manifest Gist URL
+        if: always()
+        run: |
+          mid="${{ steps.cfg.outputs.manifest_id }}"
+          owner="${{ steps.cfg.outputs.owner }}"
+          url="https://gist.githubusercontent.com/${owner}/${mid}/raw/manifest.json"
+          echo ""
+          echo "=============================================="
+          echo "Copy this line into app/.env:"
+          echo ""
+          echo "MANIFEST_GIST_URL=${url}"
+          echo ""
+          echo "=============================================="
+          echo "::notice title=MANIFEST_GIST_URL::MANIFEST_GIST_URL=${url}"

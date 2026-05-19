@@ -1,0 +1,84 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - '.github/workflows/deploy-cloudflare.yml'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy ctetris-api to Cloudflare Workers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: api
+        run: npm ci
+
+      # ── Apply D1 migrations before deploying ──────────────────────────────
+      - name: Apply D1 migrations (remote)
+        working-directory: api
+        run: |
+          if [ -f "migrations/sync-board.sql" ]; then
+            echo "Applying sync-board.sql migration..."
+            npx wrangler d1 execute DB \
+              --remote \
+              --file migrations/sync-board.sql \
+              --yes 2>&1 || echo "Migration may already be applied — continuing"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      # ── Deploy Worker ──────────────────────────────────────────────────────
+      - name: Deploy to Cloudflare Workers
+        working-directory: api
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      # ── Echo configured Worker URL ─────────────────────────────────────────
+      - name: Echo Worker URL
+        run: |
+          url=$(grep '^CTETRIS_API_URL=' app/.env 2>/dev/null | cut -d'=' -f2- | tr -d '[:space:]' || true)
+          echo "=============================================="
+          echo "CTETRIS_API_URL = ${url:-<not set in app/.env>}"
+          echo "=============================================="
+          echo "::notice title=Cloudflare Worker URL::${url:-not configured in app/.env}"
+          echo ""
+          if [ -n "$url" ]; then
+            echo "Verifying deployed Worker health..."
+            http=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "$url/health" 2>/dev/null || echo "000")
+            if [ "$http" = "200" ]; then
+              echo "::notice title=Worker Health::OK — $url/health returned 200"
+              echo "Worker health: OK"
+            else
+              echo "::warning title=Worker Health::$url/health returned HTTP $http"
+              echo "Worker may still be propagating — check manually in ~30s"
+            fi
+          else
+            echo "Set CTETRIS_API_URL in app/.env for health verification."
+          fi
