@@ -25,6 +25,8 @@
 #include <emscripten/fetch.h>
 #endif
 
+#include "ctetris_debug.h"
+
 // Loading bar duration: 8 s to show story + give WASM time to settle
 const int INTRO_DURATION = 8000;
 
@@ -529,6 +531,8 @@ struct SyncProgress {
 static std::string httpGetSync(const char* url) {
     if (!url || url[0] == '\0') return "";
 
+    CTDBG_REQ("GET", url);
+
 #ifdef __EMSCRIPTEN__
     // Emscripten synchronous fetch via Asyncify
     emscripten_fetch_attr_t attr;
@@ -539,7 +543,11 @@ static std::string httpGetSync(const char* url) {
     std::string body;
     if (fetch && fetch->status == 200 && fetch->numBytes > 0) {
         body.assign(fetch->data, (size_t)fetch->numBytes);
+        CTDBG_RES("GET", url, 200, body.size());
+        CTDBG_BODY(body);
     } else if (fetch) {
+        CTDBG_RES("GET", url, fetch->status, 0);
+        CTDBG_ERR("emscripten_fetch: non-200 or empty");
         SDL_Log("[gameStory] httpGetSync WASM: HTTP %d for %s", (int)fetch->status, url);
     }
     if (fetch) emscripten_fetch_close(fetch);
@@ -559,20 +567,29 @@ static std::string httpGetSync(const char* url) {
     };
     CurlBuf buf;
     CURL* c = curl_easy_init();
-    if (!c) return "";
+    if (!c) {
+        CTDBG_ERR("httpGetSync: curl_easy_init() null");
+        return "";
+    }
     curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, (curl_write_callback)(writeCallback));
     curl_easy_setopt(c, CURLOPT_WRITEDATA, &buf);
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(c, CURLOPT_TIMEOUT, 10L);
     CURLcode res = curl_easy_perform(c);
+    long httpCode = 0;
+    curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(c);
     if (res != CURLE_OK) {
+        CTDBG_ERR(curl_easy_strerror(res));
         SDL_Log("[gameStory] httpGetSync curl fail: %s", curl_easy_strerror(res));
         return "";
     }
+    CTDBG_RES("GET", url, (int)httpCode, buf.data.size());
+    CTDBG_BODY(buf.data);
     return buf.data;
     #else
+    CTDBG_ERR("httpGetSync: built without libcurl, offline fallback");
     // libcurl not available — treat as offline
     SDL_Log("[gameStory] httpGetSync: built without libcurl, offline fallback");
     return "";

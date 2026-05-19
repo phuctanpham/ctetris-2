@@ -18,6 +18,7 @@
 // [F.1] SQLite database for Stories / Records / Catalogue
 #include "gameConsole_db.h"
 #include "sqlite3.h"
+#include "ctetris_debug.h"
 
 // [G/H] Smart Sorting Engine v2.0 -- powers sort-by-time + sort-by-score
 //        in the board popup. Router picks Insertion for n<=64 by default,
@@ -1310,6 +1311,9 @@ std::vector<BoardRecord> dbLoadRecords(int limit) {
 // Native: libcurl (linked when HAVE_LIBCURL; graceful offline otherwise).
 static std::string consoleHttpGet(const char* url) {
     if (!url || !*url) return "";
+
+    CTDBG_REQ("GET", url);
+
 #ifdef __EMSCRIPTEN__
     emscripten_fetch_attr_t attr;
     emscripten_fetch_attr_init(&attr);
@@ -1320,25 +1324,43 @@ static std::string consoleHttpGet(const char* url) {
     std::string body;
     if (fetch && fetch->status == 200 && fetch->numBytes > 0) {
         body.assign(fetch->data, (size_t)fetch->numBytes);
+        CTDBG_RES("GET", url, 200, body.size());
+        CTDBG_BODY(body);
     } else if (fetch) {
+        CTDBG_RES("GET", url, fetch->status, 0);
+        CTDBG_ERR("emscripten_fetch: non-200 or empty body");
         SDL_Log("[gameConsole] GET %s HTTP %d", url, (int)fetch->status);
     }
     if (fetch) emscripten_fetch_close(fetch);
     return body;
+
 #else
 #ifdef HAVE_LIBCURL
     std::string body;
     CURL* c = curl_easy_init();
-    if (!c) return "";
+    if (!c) {
+        CTDBG_ERR("curl_easy_init() returned null");
+        return "";
+    }
     curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, curlWriteCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, &body);
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(c, CURLOPT_TIMEOUT, 10L);
-    curl_easy_perform(c);
+    curl_easy_setopt(c, CURLOPT_VERBOSE, 0L);
+    CURLcode res = curl_easy_perform(c);
+    long httpCode = 0;
+    curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(c);
+    if (res == CURLE_OK) {
+        CTDBG_RES("GET", url, (int)httpCode, body.size());
+        CTDBG_BODY(body);
+    } else {
+        CTDBG_ERR(curl_easy_strerror(res));
+    }
     return body;
 #else
+    CTDBG_ERR("consoleHttpGet: no HTTP support (HAVE_LIBCURL not defined)");
     SDL_Log("[gameConsole] consoleHttpGet: no HTTP support");
     return "";
 #endif
@@ -1350,6 +1372,11 @@ static int consoleHttpPost(const char* url,
                            const char* jsonBody,
                            const char* token) {
     if (!url || !*url || !jsonBody) return -1;
+
+    CTDBG_REQ("POST", url);
+    CTDBG_INFO("token_set", (token && *token) ? "yes" : "no (empty)");
+    CTDBG_BODY(std::string(jsonBody));
+
 #ifdef __EMSCRIPTEN__
     std::string authVal = std::string("Bearer ") + (token ? token : "");
     const char* hdr[] = {
@@ -1367,8 +1394,10 @@ static int consoleHttpPost(const char* url,
     attr.requestDataSize = SDL_strlen(jsonBody);
     emscripten_fetch_t* fetch = emscripten_fetch(&attr, url);
     int status = fetch ? (int)fetch->status : -1;
+    CTDBG_RES("POST", url, status, fetch ? (size_t)fetch->numBytes : 0);
     if (fetch) emscripten_fetch_close(fetch);
     return status;
+
 #else
 #ifdef HAVE_LIBCURL
     std::string authHdr = std::string("Authorization: Bearer ") +
@@ -1377,6 +1406,7 @@ static int consoleHttpPost(const char* url,
     hdrs = curl_slist_append(hdrs, "Content-Type: application/json");
     hdrs = curl_slist_append(hdrs, authHdr.c_str());
     long httpCode = -1;
+    std::string responseBody;
     CURL* c = curl_easy_init();
     if (c) {
         curl_easy_setopt(c, CURLOPT_URL, url);
@@ -1384,13 +1414,22 @@ static int consoleHttpPost(const char* url,
         curl_easy_setopt(c, CURLOPT_POSTFIELDS, jsonBody);
         curl_easy_setopt(c, CURLOPT_POSTFIELDSIZE, (long)SDL_strlen(jsonBody));
         curl_easy_setopt(c, CURLOPT_TIMEOUT, 10L);
-        curl_easy_perform(c);
+        curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+        curl_easy_setopt(c, CURLOPT_WRITEDATA, &responseBody);
+        CURLcode res = curl_easy_perform(c);
         curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &httpCode);
+        if (res == CURLE_OK) {
+            CTDBG_RES("POST", url, (int)httpCode, responseBody.size());
+            CTDBG_BODY(responseBody);
+        } else {
+            CTDBG_ERR(curl_easy_strerror(res));
+        }
         curl_easy_cleanup(c);
     }
     curl_slist_free_all(hdrs);
     return (int)httpCode;
 #else
+    CTDBG_ERR("consoleHttpPost: no HTTP support (HAVE_LIBCURL not defined)");
     SDL_Log("[gameConsole] consoleHttpPost: no HTTP support");
     return -1;
 #endif

@@ -55,14 +55,27 @@ if(NOT DEFINED CTETRIS_API_URL OR CTETRIS_API_URL STREQUAL "")
         endforeach()
     endif()
 endif()
-if(CTETRIS_API_URL AND
-   NOT CTETRIS_API_URL STREQUAL "https://ctetris-api.OWNER.workers.dev")
-    target_compile_definitions(cTetris PRIVATE
-        "CTETRIS_API_URL=\"${CTETRIS_API_URL}\""
-    )
-    message(STATUS "CTETRIS_API_URL: ${CTETRIS_API_URL}")
+
+# ─── Read DEBUG flag from app/.env ────────────────────────────────────────────
+# When DEBUG=true, enables -DCTETRIS_DEBUG=1 for HTTP request/response logging
+set(CTETRIS_DEBUG_FLAG "false")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.env")
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/.env" _env_lines_debug)
+    foreach(_line ${_env_lines_debug})
+        if(_line MATCHES "^DEBUG=(.+)$")
+            set(CTETRIS_DEBUG_FLAG "${CMAKE_MATCH_1}")
+        endif()
+    endforeach()
+endif()
+
+string(TOLOWER "${CTETRIS_DEBUG_FLAG}" _debug_lc)
+if(_debug_lc STREQUAL "true" OR _debug_lc STREQUAL "1")
+    message(STATUS "[cTetris] DEBUG=true  ->  -DCTETRIS_DEBUG=1 enabled (HTTP debug log)")
+    # Note: cTetris target is created later; add definition then via target_compile_definitions
+    set(CTETRIS_DEBUG_ENABLED ON)
 else()
-    message(WARNING "CTETRIS_API_URL not set — leaderboard API sync disabled")
+    message(STATUS "[cTetris] DEBUG=${CTETRIS_DEBUG_FLAG}  ->  release build (no HTTP debug log)")
+    set(CTETRIS_DEBUG_ENABLED OFF)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -96,7 +109,22 @@ set(GAME_INCLUDE_DIRS
 # WIN32: an console window tren Windows, chi hien GUI (co hieu luc tren Windows only)
 # -----------------------------------------------------------------------------
 add_executable(cTetris WIN32 ${GAME_SOURCES})
+
+if(CTETRIS_API_URL AND
+   NOT CTETRIS_API_URL STREQUAL "https://ctetris-api.OWNER.workers.dev")
+    target_compile_definitions(cTetris PRIVATE
+        "CTETRIS_API_URL=\"${CTETRIS_API_URL}\""
+    )
+    message(STATUS "CTETRIS_API_URL: ${CTETRIS_API_URL}")
+else()
+    message(WARNING "CTETRIS_API_URL not set — leaderboard API sync disabled")
+endif()
 target_include_directories(cTetris PRIVATE ${GAME_INCLUDE_DIRS})
+
+# Apply DEBUG compile definition if enabled
+if(CTETRIS_DEBUG_ENABLED)
+    target_compile_definitions(cTetris PRIVATE CTETRIS_DEBUG=1)
+endif()
 
 # Inject MANIFEST_GIST_URL define
 if(MANIFEST_GIST_URL AND
@@ -399,3 +427,74 @@ endif()
 message(STATUS "[cTetris] CXX standard:  ${CMAKE_CXX_STANDARD}")
 message(STATUS "[cTetris] Build type:    ${CMAKE_BUILD_TYPE}")
 message(STATUS "[cTetris] Output target: cTetris")
+
+# ── Read all keys from app/.env ───────────────────────────────────────────────
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.env")
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/.env" _ENV_LINES
+         REGEX "^[A-Z_]+=.+")
+else()
+    message(WARNING "[cTetris] app/.env not found — API URL and debug flag not set")
+endif()
+
+# ── MANIFEST_GIST_URL ─────────────────────────────────────────────────────────
+set(MANIFEST_GIST_URL "")
+foreach(_line ${_ENV_LINES})
+    if(_line MATCHES "^MANIFEST_GIST_URL=(.+)$")
+        set(MANIFEST_GIST_URL "${CMAKE_MATCH_1}")
+    endif()
+endforeach()
+if(MANIFEST_GIST_URL AND NOT MANIFEST_GIST_URL MATCHES "GIST_ID")
+    target_compile_definitions(cTetris PRIVATE
+        "MANIFEST_GIST_URL=\"${MANIFEST_GIST_URL}\"")
+    message(STATUS "[cTetris] MANIFEST_GIST_URL set")
+else()
+    message(WARNING "[cTetris] MANIFEST_GIST_URL is placeholder — Gist sync disabled")
+endif()
+
+# ── CTETRIS_API_URL ───────────────────────────────────────────────────────────
+set(CTETRIS_API_URL "")
+foreach(_line ${_ENV_LINES})
+    if(_line MATCHES "^CTETRIS_API_URL=(.+)$")
+        set(CTETRIS_API_URL "${CMAKE_MATCH_1}")
+    endif()
+endforeach()
+if(CTETRIS_API_URL AND NOT CTETRIS_API_URL MATCHES "OWNER")
+    target_compile_definitions(cTetris PRIVATE
+        "CTETRIS_API_URL=\"${CTETRIS_API_URL}\"")
+    message(STATUS "[cTetris] CTETRIS_API_URL: ${CTETRIS_API_URL}")
+else()
+    message(WARNING "[cTetris] CTETRIS_API_URL not set — leaderboard API sync disabled")
+endif()
+
+# ── DEBUG flag ────────────────────────────────────────────────────────────────
+set(CTETRIS_DEBUG_FLAG "false")
+foreach(_line ${_ENV_LINES})
+    if(_line MATCHES "^DEBUG=(.+)$")
+        set(CTETRIS_DEBUG_FLAG "${CMAKE_MATCH_1}")
+    endif()
+endforeach()
+string(TOLOWER "${CTETRIS_DEBUG_FLAG}" _DEBUG_LC)
+if(_DEBUG_LC STREQUAL "true" OR _DEBUG_LC STREQUAL "1")
+    message(STATUS "[cTetris] DEBUG=true → -DCTETRIS_DEBUG=1")
+    target_compile_definitions(cTetris PRIVATE CTETRIS_DEBUG=1)
+else()
+    message(STATUS "[cTetris] DEBUG=${CTETRIS_DEBUG_FLAG} → release build")
+endif()
+
+# ── libcurl (native only; WASM uses emscripten_fetch) ────────────────────────
+if(NOT EMSCRIPTEN)
+    find_package(CURL QUIET)
+    if(CURL_FOUND)
+        message(STATUS "[cTetris] libcurl ${CURL_VERSION_STRING} → HAVE_LIBCURL=1")
+        target_link_libraries(cTetris PRIVATE CURL::libcurl)
+        target_compile_definitions(cTetris PRIVATE HAVE_LIBCURL=1)
+    else()
+        message(WARNING
+            "[cTetris] libcurl NOT found — HTTP sync disabled (offline fallback).\n"
+            "  macOS : brew install curl\n"
+            "  Ubuntu: sudo apt-get install libcurl4-openssl-dev\n"
+            "  Windows vcpkg: vcpkg install curl:x64-windows\n"
+            "         then set: -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake")
+    endif()
+endif()
+# WASM: emscripten_fetch is always available — HAVE_LIBCURL not needed.

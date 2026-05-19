@@ -75,9 +75,7 @@
     </div>
 
     <script>
-        // ==============================================================
-        // resizeCanvas: giu dung ti le 9:16, fill chieu cao viewport
-        // ==============================================================
+        // ── Canvas resize ──────────────────────────────────────────────────────
         var GAME_RATIO = 9 / 16;
 
         function resizeCanvas() {
@@ -87,25 +85,98 @@
             var availH = window.innerHeight;
             var targetW = availH * GAME_RATIO;
             var w, h;
-            if (targetW <= availW) {
-                h = availH; w = targetW;
-            } else {
-                w = availW; h = availW / GAME_RATIO;
-            }
+            if (targetW <= availW) { h = availH; w = targetW; }
+            else                   { w = availW; h = availW / GAME_RATIO; }
             canvas.style.width  = w + 'px';
             canvas.style.height = h + 'px';
             canvas.style.aspectRatio = 'unset';
         }
-
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
         window.addEventListener('orientationchange', function() {
             setTimeout(resizeCanvas, 100);
         });
 
-        // ==============================================================
-        // Emscripten Module config
-        // ==============================================================
+        // ── Debug log accumulator ──────────────────────────────────────────────
+        // Collects every line printed via SDL_Log (which maps to printErr).
+        // Lines tagged [HTTP_DEBUG] are highlighted but ALL lines are saved.
+        var _debugLines = [];
+        var _debugEnabled = false;   // flip to true for release shell.html
+
+        function _accumulateLine(text) {
+            var ts = new Date().toISOString().substring(11, 23);  // HH:MM:SS.mmm
+            _debugLines.push('[' + ts + '] ' + text);
+            // Mirror to DevTools as usual
+            if (text.indexOf('[HTTP_DEBUG]') !== -1) {
+                console.debug('%c' + text, 'color:#7ec8e3');   // teal = HTTP_DEBUG
+            } else {
+                console.error('[wasm]', text);
+            }
+        }
+
+        function _downloadLog() {
+            var blob = new Blob([_debugLines.join('\n')], { type: 'text/plain' });
+            var url  = URL.createObjectURL(blob);
+            var a    = document.createElement('a');
+            a.href   = url;
+            a.download = 'ctetris.log';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function _copyLog() {
+            var text = _debugLines.join('\n');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    console.log('[debug] log copied to clipboard');
+                });
+            }
+        }
+
+        // ── Floating debug toolbar (only when _debugEnabled) ──────────────────
+        if (_debugEnabled) {
+            document.addEventListener('DOMContentLoaded', function() {
+                var toolbar = document.createElement('div');
+                toolbar.id  = 'dbg-toolbar';
+                toolbar.style.cssText = [
+                    'position:fixed',
+                    'top:6px',
+                    'right:6px',
+                    'z-index:9999',
+                    'display:flex',
+                    'gap:4px',
+                    'font-family:monospace',
+                    'font-size:11px'
+                ].join(';');
+
+                // "Download Log" button
+                var btnDl = document.createElement('button');
+                btnDl.textContent = '⬇ ctetris.log';
+                btnDl.style.cssText = 'background:#1a3a4a;color:#7ec8e3;border:1px solid #7ec8e3;padding:3px 7px;cursor:pointer;border-radius:3px';
+                btnDl.addEventListener('click', _downloadLog);
+
+                // "Copy Log" button
+                var btnCp = document.createElement('button');
+                btnCp.textContent = '⎘ Copy';
+                btnCp.style.cssText = 'background:#1a3a4a;color:#b0d0a0;border:1px solid #b0d0a0;padding:3px 7px;cursor:pointer;border-radius:3px';
+                btnCp.addEventListener('click', _copyLog);
+
+                // "Clear" button
+                var btnCl = document.createElement('button');
+                btnCl.textContent = '✕ Clear';
+                btnCl.style.cssText = 'background:#1a3a4a;color:#d08080;border:1px solid #d08080;padding:3px 7px;cursor:pointer;border-radius:3px';
+                btnCl.addEventListener('click', function() { _debugLines = []; });
+
+                toolbar.appendChild(btnDl);
+                toolbar.appendChild(btnCp);
+                toolbar.appendChild(btnCl);
+                document.body.appendChild(toolbar);
+            });
+        }
+
+        // ── Emscripten Module config ───────────────────────────────────────────
         var Module = {
             canvas: (function() {
                 var canvas = document.getElementById('canvas');
@@ -115,36 +186,32 @@
                 }, false);
                 return canvas;
             })(),
-            print:    function(text) { console.log('[wasm]', text); },
-            printErr: function(text) { console.error('[wasm]', text); },
+
+            print: function(text) {
+                if (_debugEnabled) _accumulateLine(text);
+                else console.log('[wasm]', text);
+            },
+
+            // SDL_Log() → printErr → this handler
+            printErr: function(text) {
+                if (_debugEnabled) _accumulateLine(text);
+                else console.error('[wasm]', text);
+            },
+
             onRuntimeInitialized: function() {
                 var loading = document.getElementById('loading');
                 if (loading) loading.style.display = 'none';
                 resizeCanvas();
                 requestAnimationFrame(resizeCanvas);
+                if (_debugEnabled)
+                    _accumulateLine('[SHELL] cTetris WASM runtime ready');
             }
         };
 
-        // ==============================================================
-        // PWA: Service Worker registration
-        //
-        // updateViaCache: 'none'
-        //   -> browser LUON fetch sw.js tu network, KHONG dung HTTP cache
-        //      cho file sw.js. Ket qua: khi deploy sw.js moi (doi
-        //      CACHE_VERSION), moi browser se phat hien ra ngay lan mo
-        //      tab tiep theo ma khong can xoa cache tay.
-        //
-        // reg.update()
-        //   -> sau khi register, kick off 1 ky kiem tra update ngay lap
-        //      tuc (thay vi doi den lan visit tiep theo). Gop 2 cai nay
-        //      voi skipWaiting()+clients.claim() ben sw.js: returning
-        //      user nhan SW moi ngay lan dau tien mo lai trang.
-        // ==============================================================
+        // ── PWA Service Worker ─────────────────────────────────────────────────
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('sw.js', {
-                    updateViaCache: 'none'
-                })
+                navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
                 .then(function(reg) {
                     console.log('[PWA] SW registered:', reg.scope);
                     reg.update();

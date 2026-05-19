@@ -18,6 +18,7 @@
 #include <SDL3/SDL.h>
 #include "gameConsole_layout.h"   // [D.6] SettingsConfig contract
 #include "logger.h"               // File logging system
+#include "ctetris_debug.h"        // HTTP debug logging
 
 extern int runGameStory  (SDL_Window* window, SDL_Renderer* renderer,
                           int storyId = 0, int chapterId = 0);
@@ -28,6 +29,8 @@ extern int runGameCore   (SDL_Window* window, SDL_Renderer* renderer,
 
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
+
+    CTDBG_INIT();   // Initialize HTTP debug log (ctetris.log on native, no-op on WASM)
     
     Logger& logger = Logger::getInstance();
     logger.log("=== cTetris Application Started ===");
