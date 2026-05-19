@@ -403,7 +403,7 @@ function Validate-Endpoints {
 
     $envFile = Join-Path $AppDir '.env'
     if (-not (Test-Path $envFile)) {
-        Write-Err ".env not found at $envFile — create it with MANIFEST_GIST_URL and CTETRIS_API_URL"
+        Write-Err ".env not found at $envFile - create it with MANIFEST_GIST_URL and CTETRIS_API_URL"
         throw "Missing app/.env"
     }
 
@@ -475,7 +475,7 @@ function Validate-Endpoints {
         $chapterId = $jsonFile.Directory.Name
         $mediaBase = 'https://raw.githubusercontent.com/' + $owner + '/' + $repo + '/main/chapters/src/' + $chapterId + '/media/'
         $content = Get-Content $jsonFile.FullName -Raw
-        $pattern = '"(?:thumbnailPath|imageUrl)"\s*:\s*"([^"]+\.(png|jpg|jpeg|gif|webp|svg))"'
+        $pattern = '\x22(?:thumbnailPath|imageUrl)\x22\s*:\s*\x22(.+?\.(?:png|jpg|jpeg|gif|webp|svg))\x22'
 
         [regex]::Matches($content, $pattern) | ForEach-Object {
             $fn = $_.Groups[1].Value
@@ -557,9 +557,11 @@ function Import-EmsdkEnv {
         return
     }
     Write-Info "Source emsdk env tu $bat..."
-    cmd /c "call `"$bat`" > nul 2>&1 && set" | ForEach-Object {
-        if ($_ -match '^([^=]+)=(.*)$') {
-            [System.Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+    $cmd = 'call "' + $bat + '" > nul 2>&1 & set'
+    cmd /c $cmd | ForEach-Object {
+        $parts = $_.Split('=', 2)
+        if ($parts.Count -eq 2) {
+            [System.Environment]::SetEnvironmentVariable($parts[0], $parts[1], 'Process')
         }
     }
 }
@@ -578,13 +580,16 @@ function Initialize-Emsdk {
 
     # Priority 1: em++ tren PATH
     if (Get-Command em++ -ErrorAction SilentlyContinue) {
-        $cur = (em++ --version 2>$null | Select-Object -First 1) `
-                -replace '.*?(\d+\.\d+\.\d+).*','$1'
+        $cur = $null
+        $versionLine = & em++ --version 2>$null | Select-Object -First 1
+        if ($versionLine -match '(\d+\.\d+\.\d+)') {
+            $cur = $Matches[1]
+        }
         if ((Test-VersionGE $cur $EmsdkVersion)) {
             Write-Ok "em++ tren PATH version $cur >= $EmsdkVersion (skip)"
             return
         }
-        Write-Warn "em++ tren PATH version $cur < $EmsdkVersion"
+        Write-Warn ('em++ tren PATH version ' + $cur + ' < ' + $EmsdkVersion)
     }
 
     # Priority 2: ~/emsdk
@@ -594,13 +599,16 @@ function Initialize-Emsdk {
         Write-Info "Phat hien $userEmsdk -- dung emsdk cua user"
         Import-EmsdkEnv $userEmsdk
         if (Get-Command em++ -ErrorAction SilentlyContinue) {
-            $cur = (em++ --version 2>$null | Select-Object -First 1) `
-                    -replace '.*?(\d+\.\d+\.\d+).*','$1'
+            $cur = $null
+            $versionLine = & em++ --version 2>$null | Select-Object -First 1
+            if ($versionLine -match '(\d+\.\d+\.\d+)') {
+                $cur = $Matches[1]
+            }
             if (Test-VersionGE $cur $EmsdkVersion) {
-                Write-Ok "~/emsdk version $cur >= $EmsdkVersion (skip)"
+                Write-Ok ('~/emsdk version ' + $cur + ' >= ' + $EmsdkVersion + ' (skip)')
                 return
             }
-            Write-Info "Update ~/emsdk len $EmsdkVersion..."
+            Write-Info ('Update ~/emsdk len ' + $EmsdkVersion + '...')
             Push-Location $userEmsdk
             try {
                 & .\emsdk.bat install $EmsdkVersion
@@ -627,10 +635,13 @@ function Initialize-Emsdk {
         Write-Info "Phat hien managed emsdk tai $managed"
         Import-EmsdkEnv $managed
         if (Get-Command em++ -ErrorAction SilentlyContinue) {
-            $cur = (em++ --version 2>$null | Select-Object -First 1) `
-                    -replace '.*?(\d+\.\d+\.\d+).*','$1'
+            $cur = $null
+            $versionLine = & em++ --version 2>$null | Select-Object -First 1
+            if ($versionLine -match '(\d+\.\d+\.\d+)') {
+                $cur = $Matches[1]
+            }
             if (Test-VersionGE $cur $EmsdkVersion) {
-                Write-Ok "managed emsdk version $cur >= $EmsdkVersion (skip)"
+                Write-Ok ('managed emsdk version ' + $cur + ' >= ' + $EmsdkVersion + ' (skip)')
                 return
             }
         }
@@ -672,7 +683,7 @@ function Initialize-Emsdk {
     if (-not (Get-Command emcmake -ErrorAction SilentlyContinue)) {
         throw "emcmake not available after emsdk activation. emsdk may not be properly installed."
     }
-    Write-Ok "emsdk active: $(em++ --version | Select-Object -First 1)"
+    Write-Ok ('emsdk active: ' + ((& em++ --version | Select-Object -First 1)))
 }
 
 # =============================================================================
@@ -1115,7 +1126,6 @@ function Sign-WindowsBinary {
 # Build entry points
 # =============================================================================
 function Build-Native {
-    Validate-Endpoints
     Write-Info "Build NATIVE -> $BuildNativeDir"
     Test-Sources
     Validate-WindowsFixes
@@ -1179,7 +1189,6 @@ function Build-Native {
 }
 
 function Build-Wasm {
-    Validate-Endpoints
     Write-Info "Build WASM -> $BuildWasmDir"
     Test-Sources
     Validate-LoggerIntegration
@@ -1213,7 +1222,7 @@ function Build-Wasm {
         }
     }
     if (-not $sdlDir) {
-        Write-Err "Khong tim thay SDL3Config.cmake trong $sdlInstall\lib*\cmake\SDL3\"
+        Write-Err ('Khong tim thay SDL3Config.cmake trong ' + $sdlInstall + '\lib*\cmake\SDL3\')
         throw 'SDL3 WASM build incomplete'
     }
     Write-Info "SDL3_DIR = $sdlDir"
@@ -1276,7 +1285,7 @@ switch ($Mode) {
         Write-Info 'Don dep build/ (giu lai libs/ cache)...'
         $b = Join-Path $AppDir 'build'
         if (Test-Path $b) { Remove-Item -Recurse -Force $b }
-        Write-Ok "Da xoa build/ (libs\$OS_NAME\downloads\ van con)"
+        Write-Ok ('Da xoa build/ (libs\' + $OS_NAME + '\downloads\ van con)')
     }
     'deepclean' {
         Write-Info 'Don dep TOAN BO (build/ + libs/)...'
