@@ -1,4 +1,4 @@
-name: Sync chapters to Gist
+name: Sync chapters to Gist manifest
 
 on:
   push:
