@@ -13,6 +13,11 @@
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{array}
+
+% Define a left-aligned, wrappable X column to prevent overfull \hbox in tables
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
 
 \hypersetup{pdftitle={Sơ đồ Gantt dự án cTetris}}
 
@@ -32,17 +37,13 @@
 
 % ── Lightweight Gantt bar macro ───────────────────────────────────
 % \gbar{color}{start}{end}{totalweeks}{barwidth_cm}{y}
-% Draws a filled rectangle from week start to end within totalweeks
 \newcommand{\gbar}[6]{%
-  % #1=color #2=start_week #3=end_week #4=total_weeks #5=bar_total_width_cm #6=y_cm
   \fill[#1!75, draw=#1, rounded corners=1.5pt]
     ({(#2-1)/#4*#5}, #6) rectangle ({#3/#4*#5}, {#6+0.35});
 }
 
-% ── Gantt row label + bars environment ───────────────────────────
-% Full-width TikZ gantt: \totalW cm wide, each row 0.45cm tall
 \newcommand{\totalW}{13.5}
-\newcommand{\totalWks}{28}
+\newcommand{\totalWks}{14}
 
 \begin{document}
 \providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
@@ -54,7 +55,7 @@
 % ══════════════════════════════════════════════════════════════════
 
 Dự án cTetris được phát triển qua \textbf{3 phiên bản song song} trên 3 module
-trong vòng \textbf{28 tuần} ($\approx$7 tháng). Sơ đồ thể hiện lịch trình theo pha
+trong vòng \textbf{14 tuần} ($\approx$3{,}5 tháng). Sơ đồ thể hiện lịch trình theo pha
 phát triển cho từng module và lịch tích hợp toàn hệ thống.
 
 % ── Legend ───────────────────────────────────────────────────────
@@ -75,168 +76,152 @@ phát triển cho từng module và lịch tích hợp toàn hệ thống.
 \end{center}
 
 % ══════════════════════════════════════════════════════════════════
-\subsection{Sơ đồ Gantt tổng quan (28 tuần)}
+\subsection{Sơ đồ Gantt tổng quan (14 tuần)}
 % ══════════════════════════════════════════════════════════════════
 
 \begin{center}
+\makebox[\linewidth][c]{% Forces bounding box to strictly align with margins
+\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[x=1cm, y=1cm, font=\scriptsize]
-  % ── week axis ──────────────────────────────────────────────────
   \def\W{\totalW}  % total width cm
-  \def\T{28}       % total weeks
+  \def\T{14}       % total weeks
 
-  % Background grid (every 4 weeks)
-  \foreach \w in {1,5,9,13,17,21,25}{
+  % Background grid (every 2 weeks)
+  \foreach \w in {1,3,5,7,9,11,13}{
     \draw[gray!20, thin] ({(\w-1)/\T*\W}, -0.1) -- ({(\w-1)/\T*\W}, 9.8);
   }
 
   % Week tick labels
-  \foreach \w in {1,4,7,10,13,16,19,22,25,28}{
+  \foreach \w in {1,3,5,7,9,11,13,14}{
     \node[font=\tiny, gray] at ({(\w-0.5)/\T*\W}, -0.25) {W\w};
   }
 
-  % ── Row labels (right-aligned in a fixed 3.2cm column) ─────────
-  % We shift the chart 3.4cm right and draw labels at x=-0.1
   \begin{scope}[xshift=3.4cm]
 
   % Grid lines repeated after shift
-  \foreach \w in {1,5,9,13,17,21,25}{
+  \foreach \w in {1,3,5,7,9,11,13}{
     \draw[gray!15, thin] ({(\w-1)/\T*\W}, -0.1) -- ({(\w-1)/\T*\W}, 9.8);
   }
-  \foreach \w in {1,4,7,10,13,16,19,22,25,28}{
+  \foreach \w in {1,3,5,7,9,11,13,14}{
     \node[font=\tiny, gray] at ({(\w-0.5)/\T*\W}, -0.28) {W\w};
   }
   \draw[gray!40] (0,-0.1) -- (\W,-0.1);
 
   % ── gameStory ──────────────────────────────────────────────────
   \node[font=\small\bfseries, v1green, anchor=east] at (-0.15, 9.3) {gameStory};
-
-  % V1 group
-  \fill[v1green!15, rounded corners=2pt] (0,8.75) rectangle ({\W*8/28}, 9.55);
-  \node[font=\tiny\bfseries, v1green, anchor=west] at (0.05, 9.15) {V1 (W1--W8)};
-
+  % V1 group W1--W4
+  \fill[v1green!15, rounded corners=2pt] (0,8.75) rectangle ({\W*4/14}, 9.55);
+  \node[font=\tiny\bfseries, v1green, anchor=west] at (0.05, 9.15) {V1 (W1--W4)};
   \gbar{pConceptualize}{1}{1}{\T}{\W}{8.6}
   \gbar{pDesign}{2}{2}{\T}{\W}{8.15}
-  \gbar{pImpl}{2}{6}{\T}{\W}{7.70}
-  \gbar{pTest}{6}{7}{\T}{\W}{7.25}
-  \gbar{pInteg}{7}{8}{\T}{\W}{6.80}
+  \gbar{pImpl}{2}{3}{\T}{\W}{7.70}
+  \gbar{pTest}{3}{4}{\T}{\W}{7.25}
+  \gbar{pInteg}{4}{4}{\T}{\W}{6.80}
 
   % V1 milestone diamond
-  \fill[v1green] ({\W*8/28}, 7.0) -- ({(\W*8/28)+0.12}, 7.15)
-                 -- ({\W*8/28}, 7.30) -- ({(\W*8/28)-0.12}, 7.15) -- cycle;
-
-  % V2 group
-  \fill[v2amber!15, rounded corners=2pt] ({\W*9/28},8.75) rectangle ({\W*20/28}, 9.55);
-  \node[font=\tiny\bfseries, v2amber, anchor=west] at ({0.05+\W*9/28}, 9.15) {V2 (W9--W20)};
-
-  \gbar{pDesign}{9}{9}{\T}{\W}{8.15}
-  \gbar{pImpl}{9}{18}{\T}{\W}{7.70}
-  \gbar{pFix}{17}{19}{\T}{\W}{7.25}
-  \gbar{pTest}{18}{19}{\T}{\W}{6.80}
-  \gbar{pInteg}{19}{20}{\T}{\W}{6.35}
+  \fill[v1green] ({\W*4/14}, 7.0) -- ({(\W*4/14)+0.12}, 7.15)
+                 -- ({\W*4/14}, 7.30) -- ({(\W*4/14)-0.12}, 7.15) -- cycle;
+  % V2 group W5--W10
+  \fill[v2amber!15, rounded corners=2pt] ({\W*5/14},8.75) rectangle ({\W*10/14}, 9.55);
+  \node[font=\tiny\bfseries, v2amber, anchor=west] at ({0.05+\W*5/14}, 9.15) {V2 (W5--W10)};
+  \gbar{pDesign}{5}{5}{\T}{\W}{8.15}
+  \gbar{pImpl}{5}{8}{\T}{\W}{7.70}
+  \gbar{pFix}{7}{9}{\T}{\W}{7.25}
+  \gbar{pTest}{8}{9}{\T}{\W}{6.80}
+  \gbar{pInteg}{9}{10}{\T}{\W}{6.35}
 
   % V2 milestone
-  \fill[v2amber] ({\W*20/28}, 6.1) -- ({(\W*20/28)+0.12}, 6.25)
-                 -- ({\W*20/28}, 6.40) -- ({(\W*20/28)-0.12}, 6.25) -- cycle;
-
-  % V3 group
-  \fill[v3red!15, rounded corners=2pt] ({\W*21/28},8.75) rectangle ({\W*24/28}, 9.55);
-  \node[font=\tiny\bfseries, v3red, anchor=west] at ({0.05+\W*21/28}, 9.15) {V3 (W21--W24)};
-
-  \gbar{pDesign}{21}{21}{\T}{\W}{8.15}
-  \gbar{pImpl}{21}{23}{\T}{\W}{7.70}
-  \gbar{pInteg}{23}{24}{\T}{\W}{7.25}
+  \fill[v2amber] ({\W*10/14}, 6.1) -- ({(\W*10/14)+0.12}, 6.25)
+                 -- ({\W*10/14}, 6.40) -- ({(\W*10/14)-0.12}, 6.25) -- cycle;
+  % V3 group W11--W12
+  \fill[v3red!15, rounded corners=2pt] ({\W*11/14},8.75) rectangle ({\W*12/14}, 9.55);
+  \node[font=\tiny\bfseries, v3red, anchor=west] at ({0.05+\W*11/14}, 9.15) {V3 (W11--W12)};
+  \gbar{pDesign}{11}{11}{\T}{\W}{8.15}
+  \gbar{pImpl}{11}{12}{\T}{\W}{7.70}
+  \gbar{pInteg}{12}{12}{\T}{\W}{7.25}
 
   % V3 milestone
-  \fill[v3red] ({\W*24/28}, 7.0) -- ({(\W*24/28)+0.12}, 7.15)
-               -- ({\W*24/28}, 7.30) -- ({(\W*24/28)-0.12}, 7.15) -- cycle;
-
+  \fill[v3red] ({\W*12/14}, 7.0) -- ({(\W*12/14)+0.12}, 7.15)
+               -- ({\W*12/14}, 7.30) -- ({(\W*12/14)-0.12}, 7.15) -- cycle;
   % separator
   \draw[gray!30, dashed] (0, 6.1) -- (\W, 6.1);
-
   % ── gameConsole ────────────────────────────────────────────────
   \node[font=\small\bfseries, v1green!80!black, anchor=east] at (-0.15, 5.6) {gameConsole};
-
-  \fill[v1green!15, rounded corners=2pt] (0,5.1) rectangle ({\W*10/28}, 5.9);
-  \node[font=\tiny\bfseries, v1green, anchor=west] at (0.05, 5.5) {V1 (W1--W10)};
-
+  % V1 group W1--W5
+  \fill[v1green!15, rounded corners=2pt] (0,5.1) rectangle ({\W*5/14}, 5.9);
+  \node[font=\tiny\bfseries, v1green, anchor=west] at (0.05, 5.5) {V1 (W1--W5)};
   \gbar{pConceptualize}{1}{1}{\T}{\W}{4.95}
   \gbar{pDesign}{2}{2}{\T}{\W}{4.50}
-  \gbar{pImpl}{2}{9}{\T}{\W}{4.05}
-  \gbar{pTest}{8}{9}{\T}{\W}{3.60}
-  \gbar{pInteg}{9}{10}{\T}{\W}{3.15}
+  \gbar{pImpl}{2}{4}{\T}{\W}{4.05}
+  \gbar{pTest}{4}{5}{\T}{\W}{3.60}
+  \gbar{pInteg}{5}{5}{\T}{\W}{3.15}
 
-  \fill[v1green] ({\W*10/28}, 2.9) -- ({(\W*10/28)+0.12}, 3.05)
-                 -- ({\W*10/28}, 3.20) -- ({(\W*10/28)-0.12}, 3.05) -- cycle;
+  \fill[v1green] ({\W*5/14}, 2.9) -- ({(\W*5/14)+0.12}, 3.05)
+                 -- ({\W*5/14}, 3.20) -- ({(\W*5/14)-0.12}, 3.05) -- cycle;
+  % V2 group W6--W11
+  \fill[v2amber!15, rounded corners=2pt] ({\W*6/14},5.1) rectangle ({\W*11/14}, 5.9);
+  \node[font=\tiny\bfseries, v2amber, anchor=west] at ({0.05+\W*6/14}, 5.5) {V2 (W6--W11)};
+  \gbar{pDesign}{6}{6}{\T}{\W}{4.50}
+  \gbar{pImpl}{6}{9}{\T}{\W}{4.05}
+  \gbar{pFix}{9}{10}{\T}{\W}{3.60}
+  \gbar{pTest}{10}{11}{\T}{\W}{3.15}
+  \gbar{pInteg}{11}{11}{\T}{\W}{2.70}
 
-  \fill[v2amber!15, rounded corners=2pt] ({\W*11/28},5.1) rectangle ({\W*22/28}, 5.9);
-  \node[font=\tiny\bfseries, v2amber, anchor=west] at ({0.05+\W*11/28}, 5.5) {V2 (W11--W22)};
+  \fill[v2amber] ({\W*11/14}, 2.5) -- ({(\W*11/14)+0.12}, 2.65)
+                 -- ({\W*11/14}, 2.80) -- ({(\W*11/14)-0.12}, 2.65) -- cycle;
+  % V3 group W12--W14
+  \fill[v3red!15, rounded corners=2pt] ({\W*12/14},5.1) rectangle ({\W}, 5.9);
+  \node[font=\tiny\bfseries, v3red, anchor=west] at ({0.05+\W*12/14}, 5.5) {V3 (W12--W14)};
+  \gbar{pDesign}{12}{12}{\T}{\W}{4.50}
+  \gbar{pImpl}{12}{13}{\T}{\W}{4.05}
+  \gbar{pInteg}{13}{14}{\T}{\W}{3.60}
 
-  \gbar{pDesign}{11}{11}{\T}{\W}{4.50}
-  \gbar{pImpl}{11}{19}{\T}{\W}{4.05}
-  \gbar{pFix}{19}{20}{\T}{\W}{3.60}
-  \gbar{pTest}{20}{21}{\T}{\W}{3.15}
-  \gbar{pInteg}{21}{22}{\T}{\W}{2.70}
-
-  \fill[v2amber] ({\W*22/28}, 2.5) -- ({(\W*22/28)+0.12}, 2.65)
-                 -- ({\W*22/28}, 2.80) -- ({(\W*22/28)-0.12}, 2.65) -- cycle;
-
-  \fill[v3red!15, rounded corners=2pt] ({\W*23/28},5.1) rectangle ({\W*27/28}, 5.9);
-  \node[font=\tiny\bfseries, v3red, anchor=west] at ({0.05+\W*23/28}, 5.5) {V3 (W23--W27)};
-
-  \gbar{pDesign}{23}{23}{\T}{\W}{4.50}
-  \gbar{pImpl}{23}{26}{\T}{\W}{4.05}
-  \gbar{pInteg}{26}{27}{\T}{\W}{3.60}
-
-  \fill[v3red] ({\W*27/28}, 3.35) -- ({(\W*27/28)+0.12}, 3.50)
-               -- ({\W*27/28}, 3.65) -- ({(\W*27/28)-0.12}, 3.50) -- cycle;
-
+  \fill[v3red] ({\W}, 3.35) -- ({(\W)+0.12}, 3.50)
+               -- ({\W}, 3.65) -- ({(\W)-0.12}, 3.50) -- cycle;
   % separator
   \draw[gray!30, dashed] (0, 2.4) -- (\W, 2.4);
-
   % ── gameCore ───────────────────────────────────────────────────
   \node[font=\small\bfseries, v1green!60!black, anchor=east] at (-0.15, 2.0) {gameCore};
-
-  \fill[v1green!15, rounded corners=2pt] (0,1.45) rectangle ({\W*9/28}, 2.25);
-  \node[font=\tiny\bfseries, v1green, anchor=west] at (0.05, 1.85) {V1 (W1--W9)};
-
+  % V1 group W1--W4
+  \fill[v1green!15, rounded corners=2pt] (0,1.45) rectangle ({\W*4/14}, 2.25);
+  \node[font=\tiny\bfseries, v1green, anchor=west] at (0.05, 1.85) {V1 (W1--W4)};
   \gbar{pConceptualize}{1}{1}{\T}{\W}{1.30}
   \gbar{pDesign}{2}{2}{\T}{\W}{0.85}
-  \gbar{pImpl}{3}{7}{\T}{\W}{0.40}
-  \gbar{pTest}{7}{8}{\T}{\W}{-0.05}
-  \gbar{pInteg}{8}{9}{\T}{\W}{-0.50}
+  \gbar{pImpl}{2}{3}{\T}{\W}{0.40}
+  \gbar{pTest}{3}{4}{\T}{\W}{-0.05}
+  \gbar{pInteg}{4}{4}{\T}{\W}{-0.50}
 
-  \fill[v1green] ({\W*9/28}, -0.75) -- ({(\W*9/28)+0.12}, -0.60)
-                 -- ({\W*9/28}, -0.45) -- ({(\W*9/28)-0.12}, -0.60) -- cycle;
+  \fill[v1green] ({\W*4/14}, -0.75) -- ({(\W*4/14)+0.12}, -0.60)
+                 -- ({\W*4/14}, -0.45) -- ({(\W*4/14)-0.12}, -0.60) -- cycle;
+  % V2 group W5--W11
+  \fill[v2amber!15, rounded corners=2pt] ({\W*5/14},1.45) rectangle ({\W*11/14}, 2.25);
+  \node[font=\tiny\bfseries, v2amber, anchor=west] at ({0.05+\W*5/14}, 1.85) {V2 (W5--W11)};
+  \gbar{pDesign}{5}{5}{\T}{\W}{0.85}
+  \gbar{pImpl}{5}{9}{\T}{\W}{0.40}
+  \gbar{pFix}{9}{10}{\T}{\W}{-0.05}
+  \gbar{pTest}{10}{10}{\T}{\W}{-0.50}
+  \gbar{pInteg}{10}{11}{\T}{\W}{-0.95}
 
-  \fill[v2amber!15, rounded corners=2pt] ({\W*10/28},1.45) rectangle ({\W*21/28}, 2.25);
-  \node[font=\tiny\bfseries, v2amber, anchor=west] at ({0.05+\W*10/28}, 1.85) {V2 (W10--W21)};
+  \fill[v2amber] ({\W*11/14}, -1.2) -- ({(\W*11/14)+0.12}, -1.05)
+                 -- ({\W*11/14}, -0.90) -- ({(\W*11/14)-0.12}, -1.05) -- cycle;
+  % V3 group W12--W13
+  \fill[v3red!15, rounded corners=2pt] ({\W*12/14},1.45) rectangle ({\W*13/14}, 2.25);
+  \node[font=\tiny\bfseries, v3red, anchor=west] at ({0.05+\W*12/14}, 1.85) {V3 (W12--W13)};
+  \gbar{pDesign}{12}{12}{\T}{\W}{0.85}
+  \gbar{pImpl}{12}{12}{\T}{\W}{0.40}
+  \gbar{pInteg}{12}{13}{\T}{\W}{-0.05}
 
-  \gbar{pDesign}{10}{11}{\T}{\W}{0.85}
-  \gbar{pImpl}{11}{18}{\T}{\W}{0.40}
-  \gbar{pFix}{18}{19}{\T}{\W}{-0.05}
-  \gbar{pTest}{19}{20}{\T}{\W}{-0.50}
-  \gbar{pInteg}{20}{21}{\T}{\W}{-0.95}
-
-  \fill[v2amber] ({\W*21/28}, -1.2) -- ({(\W*21/28)+0.12}, -1.05)
-                 -- ({\W*21/28}, -0.90) -- ({(\W*21/28)-0.12}, -1.05) -- cycle;
-
-  \fill[v3red!15, rounded corners=2pt] ({\W*22/28},1.45) rectangle ({\W*25/28}, 2.25);
-  \node[font=\tiny\bfseries, v3red, anchor=west] at ({0.05+\W*22/28}, 1.85) {V3 (W22--W25)};
-
-  \gbar{pDesign}{22}{22}{\T}{\W}{0.85}
-  \gbar{pImpl}{22}{23}{\T}{\W}{0.40}
-  \gbar{pInteg}{23}{25}{\T}{\W}{-0.05}
-
-  \fill[v3red] ({\W*25/28}, -0.3) -- ({(\W*25/28)+0.12}, -0.15)
-               -- ({\W*25/28}, 0.0) -- ({(\W*25/28)-0.12}, -0.15) -- cycle;
-
+  \fill[v3red] ({\W*13/14}, -0.3) -- ({(\W*13/14)+0.12}, -0.15)
+               -- ({\W*13/14}, 0.0) -- ({(\W*13/14)-0.12}, -0.15) -- cycle;
   % ── Border ─────────────────────────────────────────────────────
   \draw[gray!50] (0,-1.3) rectangle (\W, 9.65);
-
   \end{scope} % end xshift
 
-\end{tikzpicture}
+\end{tikzpicture}%
+}} % End of \makebox and \resizebox
 \end{center}
+
+\newpage % <--- Ensures Table 1 gets its own page safely
 
 % ══════════════════════════════════════════════════════════════════
 \subsection{Lịch trình chi tiết theo module}
@@ -244,7 +229,8 @@ phát triển cho từng module và lịch tích hợp toàn hệ thống.
 
 \subsubsection{Module \texttt{gameStory} --- Tính năng Cốt truyện}
 
-\begin{tabularx}{\linewidth}{|l|c|X|l|}
+{\small % <--- Added \small to prevent column crushing
+\begin{tabularx}{\linewidth}{|l|c|L|l|}
 \hline
 \rowcolor{gray!20}
 \textbf{Pha} & \textbf{Tuần} & \textbf{Nội dung chính} & \textbf{Version} \\
@@ -253,42 +239,46 @@ Conceptualize & W1 & Kiến trúc intro, SRS module gameStory & V1 \\
 \hline
 Design & W2 & Layout 9:16, SVG architecture, nanosvg pipeline & V1 \\
 \hline
-Implement & W2--W6 & SVG engine + lazy cache, intro animation, loading bar, corp credit, platform integration (cmake/WASM/CI) & V1 \\
+Implement & W2--W3 & SVG engine + lazy cache, intro animation, loading bar, corp credit, platform integration (cmake/ WASM/ CI) & V1 \\
 \hline
-Test + Fix & W6--W7 & 5 issues: font thinning, copyright UTF-8, S-block, duration 8s, logo swap & V1 \\
+Test + Fix & W3 & 5 issues: font thinning, copyright UTF-8, S-block, duration 8s, logo swap & V1 \\
 \hline
-Integrate & W7--W8 & Kết nối vào \texttt{main.cpp} flow & V1 \\
+Integrate & W3--W4 & Kết nối vào \texttt{main.cpp} flow & V1 \\
 \hline
 \rowcolor{v1green!10}
-\textbf{Milestone V1} & \textbf{W8} & \textbf{Intro 8 giây, SVG logo, loading bar hoạt động} & \textbf{V1} \\
+\textbf{Milestone V1} & \textbf{W4} & \textbf{Intro 8 giây, SVG logo, loading bar hoạt động} & \textbf{V1} \\
 \hline
-Design & W9 & chapters/ structure, JSON schema, Gist manifest & V2 \\
+Design & W5 & chapters/ structure, JSON schema, Gist manifest & V2 \\
 \hline
-Implement & W9--W18 & Directory restructure, CI/CD pipeline, Remote DB Sync (manifest/SHA/sqlite), Dialogue Engine (nodes/choices/BGM/image), Skip Button & V2 \\
+Implement & W5--W8 & Directory restructure, CI/CD pipeline, Remote DB Sync (manifest/ SHA/ sqlite), Dialogue Engine (nodes/ choices/ BGM/ image), Skip Button & V2 \\
 \hline
-Fix & W17--W19 & 9 issues: DB prefix, SHA diff, GH Action, stream image, progress bar, skip visibility & V2 \\
+Fix & W7--W9 & 9 issues: DB prefix, SHA diff, GH Action, stream image, progress bar, skip visibility & V2 \\
 \hline
-Test & W18--W19 & Dialogue branching, sync offline, WASM IDBFS & V2 \\
+Test & W8--W9 & Dialogue branching, sync offline, WASM IDBFS & V2 \\
 \hline
-Integrate & W19--W20 & main.cpp dual-mode entry, IDBFS syncfs & V2 \\
+Integrate & W9--W10 & main.cpp dual-mode entry, IDBFS syncfs & V2 \\
 \hline
 \rowcolor{v2amber!10}
-\textbf{Milestone V2} & \textbf{W20} & \textbf{Dialogue engine, Gist SHA-diff sync, post-sync condition check} & \textbf{V2} \\
+\textbf{Milestone V2} & \textbf{W10} & \textbf{Dialogue engine, Gist SHA-diff sync, post-sync condition check} & \textbf{V2} \\
 \hline
-Design & W21 & Cache strategy, URL schema & V3 \\
+Design & W11 & Cache strategy, URL schema & V3 \\
 \hline
-Implement & W21--W23 & Per-file media cache (libcurl), download progress bar, logo repeat loop & V3 \\
+Implement & W11--W12 & Per-file media cache (libcurl), download progress bar, logo repeat loop & V3 \\
 \hline
-Integrate & W23--W24 & E2E media flow verify & V3 \\
+Integrate & W12 & E2E media flow verify & V3 \\
 \hline
 \rowcolor{v3red!10}
-\textbf{Milestone V3} & \textbf{W24} & \textbf{Media download cache, real-time progress bar} & \textbf{V3} \\
+\textbf{Milestone V3} & \textbf{W12} & \textbf{Media download cache, real-time progress bar} & \textbf{V3} \\
 \hline
 \end{tabularx}
+}
+
+\newpage % <--- Forces Table 2 to its own page
 
 \subsubsection{Module \texttt{gameConsole} --- Tính năng Cấu hình}
 
-\begin{tabularx}{\linewidth}{|l|c|X|l|}
+{\small
+\begin{tabularx}{\linewidth}{|l|c|L|l|}
 \hline
 \rowcolor{gray!20}
 \textbf{Pha} & \textbf{Tuần} & \textbf{Nội dung chính} & \textbf{Version} \\
@@ -297,42 +287,46 @@ Conceptualize & W1 & Kiến trúc hub screen, SRS module gameConsole & V1 \\
 \hline
 Design & W2 & Layout 9:16, UI architecture, button system & V1 \\
 \hline
-Implement & W2--W9 & UI Foundation, Interactive Scrollbar (drag/thumb/arrow/auto-repeat), Word Wrap Engine, Guide Popup, Board Popup, BGM Stub, Navigation (WASD/TAB/focus), Platform Integration & V1 \\
+Implement & W2--W4 & UI Foundation, Interactive Scrollbar (drag/ thumb/ arrow/ auto-repeat), Word Wrap Engine, Guide Popup, Board Popup, BGM Stub, Navigation (WASD/ TAB/ focus), Platform Integration & V1 \\
 \hline
-Test + Fix & W8--W9 & 4 issues: SOFT\_WHITE font, copyright UTF-8, speed x5 guide, HIGHLIGHT\_Y & V1 \\
+Test + Fix & W4--W5 & 4 issues: SOFT\_WHITE font, copyright UTF-8, speed x5 guide, HIGHLIGHT\_Y & V1 \\
 \hline
-Integrate + Deploy & W9--W10 & Kết nối main.cpp, WASM deploy & V1 \\
+Integrate + Deploy & W5 & Kết nối main.cpp, WASM deploy & V1 \\
 \hline
 \rowcolor{v1green!10}
-\textbf{Milestone V1} & \textbf{W10} & \textbf{4 nút, scrollbar, popup Guide/Board hoạt động} & \textbf{V1} \\
+\textbf{Milestone V1} & \textbf{W5} & \textbf{4 nút, scrollbar, popup Guide/Board hoạt động} & \textbf{V1} \\
 \hline
-Design & W11 & SettingsConfig struct, SQLite 8-table schema (3 groups) & V2 \\
+Design & W6 & SettingsConfig struct, SQLite 8-table schema (3 groups) & V2 \\
 \hline
-Implement & W11--W19 & SVG Background, JSON Leaderboard, Settings Popup, Volume Slider, Color Customization (7 swatches), Stories Popup + SQLite IDBFS WASM, V2 Integration & V2 \\
+Implement & W6--W9 & SVG Background, JSON Leaderboard, Settings Popup, Volume Slider, Color Customization (7 swatches), Stories Popup + SQLite IDBFS WASM, V2 Integration & V2 \\
 \hline
-Fix & W19--W20 & 10 issues: DB entry check, settings load/save, thumbnail, Play btn, isSelected sync, Board from DB, table naming & V2 \\
+Fix & W9--W10 & 10 issues: DB entry check, settings load/save, thumbnail, Play btn, isSelected sync, Board from DB, table naming & V2 \\
 \hline
-Test & W20--W21 & IDBFS persistence, story unlock cascade, sort modes & V2 \\
+Test & W10--W11 & IDBFS persistence, story unlock cascade, sort modes & V2 \\
 \hline
-Integrate & W21--W22 & DB lifecycle + main.cpp flow verify & V2 \\
+Integrate & W11 & DB lifecycle + main.cpp flow verify & V2 \\
 \hline
 \rowcolor{v2amber!10}
-\textbf{Milestone V2} & \textbf{W22} & \textbf{SQLite 8-table, Settings, Stories popup, 4-mode sort} & \textbf{V2} \\
+\textbf{Milestone V2} & \textbf{W11} & \textbf{SQLite 8-table, Settings, Stories popup, 4-mode sort} & \textbf{V2} \\
 \hline
-Design & W23 & HTTP abstraction, OTP schema, Cloudflare D1 API & V3 \\
+Design & W12 & HTTP abstraction, OTP schema, Cloudflare D1 API & V3 \\
 \hline
-Implement & W23--W26 & Cloudflare D1 API + OTP Auth (load/save), Sort by Time, Sort by Score & V3 \\
+Implement & W12--W13 & Cloudflare D1 API + OTP Auth (load/save), Sort by Time, Sort by Score & V3 \\
 \hline
-Integrate & W26--W27 & D1 sync, offline fallback, E2E verification & V3 \\
+Integrate & W13--W14 & D1 sync, offline fallback, E2E verification & V3 \\
 \hline
 \rowcolor{v3red!10}
-\textbf{Milestone V3} & \textbf{W27} & \textbf{Cloudflare D1 leaderboard, OTP auth, cloud sort} & \textbf{V3} \\
+\textbf{Milestone V3} & \textbf{W14} & \textbf{Cloudflare D1 leaderboard, OTP auth, cloud sort} & \textbf{V3} \\
 \hline
 \end{tabularx}
+}
+
+\newpage % <--- Forces Table 3 to its own page
 
 \subsubsection{Module \texttt{gameCore} --- Tính năng Chính}
 
-\begin{tabularx}{\linewidth}{|l|c|X|l|}
+{\small
+\begin{tabularx}{\linewidth}{|l|c|L|l|}
 \hline
 \rowcolor{gray!20}
 \textbf{Pha} & \textbf{Tuần} & \textbf{Nội dung chính} & \textbf{Version} \\
@@ -341,110 +335,121 @@ Conceptualize & W1 & Kiến trúc physics engine, SRS module gameCore & V1 \\
 \hline
 Design & W2 & Data structures (Point, Tetromino, GameState), board 240×480, sidebar & V1 \\
 \hline
-Implement & W3--W7 & Block System (6 shapes + mirror flip), Physics Engine (gravity, collision, keyboard), Game Logic (line clear, score, 5-digit cap), Sidebar UI (12 slots, procedural icons), Gameplay Features (soft drop, play timer, next-block preview), Game State (pause/resume, quit lightbox) & V1 \\
+Implement & W2--W3 & Block System (6 shapes + mirror flip), Physics Engine (gravity, collision, keyboard), Game Logic (line clear, score, 5-digit cap), Sidebar UI (12 slots, procedural icons), Gameplay Features (soft drop, play timer, next-block preview), Game State (pause/ resume, quit lightbox) & V1 \\
 \hline
-Test + Fix & W7--W8 & 6 issues: WASM reload, remove S-block, 5-digit cap, total time popup, font/stroke, swipe gesture & V1 \\
+Test + Fix & W3--W4 & 6 issues: WASM reload, remove S-block, 5-digit cap, total time popup, font/stroke, swipe gesture & V1 \\
 \hline
-Integrate & W8--W9 & Module wiring với main.cpp & V1 \\
+Integrate & W4 & Module wiring với main.cpp & V1 \\
 \hline
 \rowcolor{v1green!10}
-\textbf{Milestone V1} & \textbf{W9} & \textbf{Physics engine, 3 kênh điều khiển, pause/quit hoạt động} & \textbf{V1} \\
+\textbf{Milestone V1} & \textbf{W4} & \textbf{Physics engine, 3 kênh điều khiển, pause/quit hoạt động} & \textbf{V1} \\
 \hline
-Design & W10--W11 & SettingsConfig expand, prerequisites P1--P4, DB write schema & V2 \\
+Design & W5 & SettingsConfig expand, prerequisites P1--P4, DB write schema & V2 \\
 \hline
-Implement & W11--W18 & BGM Stream + Volume, Dynamic Fall Speed (5-step), 3-Block Queue + Unlock, Flash Clear Effect (6×80ms), Combo Score ($n^2$), Color Palette from cfg, TableMatrix pre-populate, DB Write on GameOver & V2 \\
+Implement & W5--W9 & BGM Stream + Volume, Dynamic Fall Speed (5-step), 3-Block Queue + Unlock, Flash Clear Effect (6×80ms), Combo Score ($n^2$), Color Palette from cfg, TableMatrix pre-populate, DB Write on GameOver & V2 \\
 \hline
-Fix & W18--W19 & 8 issues: colorEnabled spawn, dynamic fast-drop, double-open guard, tableMatrix format, DB on Quit/Restart & V2 \\
+Fix & W9--W10 & 8 issues: colorEnabled spawn, dynamic fast-drop, double-open guard, tableMatrix format, DB on Quit/Restart & V2 \\
 \hline
-Test & W19--W20 & DB write, flash effect, NEXT-2/3 unlock, WASM IDBFS & V2 \\
+Test & W10 & DB write, flash effect, NEXT-2/3 unlock, WASM IDBFS & V2 \\
 \hline
-Integrate & W20--W21 & SettingsConfig flow, DB lifecycle verify & V2 \\
+Integrate & W10--W11 & SettingsConfig flow, DB lifecycle verify & V2 \\
 \hline
 \rowcolor{v2amber!10}
-\textbf{Milestone V2} & \textbf{W21} & \textbf{Dynamic speed, $n^2$ combo, flash effect, DB write on game-over} & \textbf{V2} \\
+\textbf{Milestone V2} & \textbf{W11} & \textbf{Dynamic speed, $n^2$ combo, flash effect, DB write on game-over} & \textbf{V2} \\
 \hline
-Design & W22 & Auto-save record schema, RecordID format & V3 \\
+Design & W12 & Auto-save record schema, RecordID format & V3 \\
 \hline
-Implement & W22--W23 & Auto-Save (YY-MM-DD-HH-MM-SS recordID) & V3 \\
+Implement & W12 & Auto-Save (YY-MM-DD-HH-MM-SS recordID) & V3 \\
 \hline
-Integrate & W23--W25 & GameOver→SQLite auto flow verify & V3 \\
+Integrate & W12--W13 & GameOver→SQLite auto flow verify & V3 \\
 \hline
 \rowcolor{v3red!10}
-\textbf{Milestone V3} & \textbf{W25} & \textbf{Auto-save, cloud push sau game-over} & \textbf{V3} \\
+\textbf{Milestone V3} & \textbf{W13} & \textbf{Auto-save, cloud push sau game-over} & \textbf{V3} \\
 \hline
 \end{tabularx}
+}
+
+\newpage % <--- Forces Table 4 to its own page
 
 % ══════════════════════════════════════════════════════════════════
 \subsection{Lịch trình tích hợp và triển khai}
 % ══════════════════════════════════════════════════════════════════
 
-\begin{tabularx}{\linewidth}{|l|c|r|r|X|}
+{\small
+% Custom p{} column fixed the exactly 46pt \hbox overflow
+\begin{tabularx}{\linewidth}{|>{\raggedright\arraybackslash}p{3.8cm}|c|c|c|L|}
 \hline
 \rowcolor{gray!20}
 \textbf{Giai đoạn tích hợp} & \textbf{Tuần} & \textbf{MD tích lũy} & \textbf{Functions} & \textbf{Nội dung} \\
 \hline
-Cross-module Test V1 & W8--W9 & 192 & 69 & Ba module kết nối; smoke test E2E gameplay flow \\
+Cross-module Test V1 & W4--W5 & 96 & 69 & Ba module kết nối; smoke test E2E gameplay flow \\
 \hline
-System Integration Test V1 & W9--W10 & 212 & 69 & SettingsConfig, DB lifecycle, standalone mode \\
+System Integration Test V1 & W5 & 106 & 69 & SettingsConfig, DB lifecycle, standalone mode \\
 \hline
-WASM Build + Deploy V1 & W10--W11 & 237 & 69 & GitHub Pages; bundle .html+.js+.wasm \\
+WASM Build + Deploy V1 & W5--W6 & 118.5 & 69 & GitHub Pages; bundle .html+.js+.wasm \\
 \hline
 \rowcolor{v1green!10}
-\textbf{V1 Public Release} & \textbf{W11} & \textbf{237} & \textbf{69} & \textbf{PoC: Desktop + WASM, 3 modules} \\
+\textbf{V1 Public Release} & \textbf{W6} & \textbf{118.5} & \textbf{69} & \textbf{PoC: Desktop + WASM, 3 modules} \\
 \hline
-DB Lifecycle Verify V2 & W21--W22 & 497 & 139 & Console+Core không double-open; IDBFS flush \\
+DB Lifecycle Verify V2 & W11 & 248.5 & 139 & Console+Core không double-open; IDBFS flush \\
 \hline
-SettingsConfig E2E & W21--W22 & 510 & 143 & Console→gameStory→Core; story unlock cascade \\
+SettingsConfig E2E & W11 & 255 & 143 & Console→gameStory→Core; story unlock cascade \\
 \hline
-System Test V2 & W22--W23 & 520 & 147 & IDBFS persistence, sort modes, offline fallback \\
+System Test V2 & W11--W12 & 260 & 147 & IDBFS persistence, sort modes, offline fallback \\
 \hline
-WASM Build + Deploy V2 & W22--W23 & 525 & 147 & Deploy bản V2 lên GitHub Pages \\
+WASM Build + Deploy V2 & W11--W12 & 262.5 & 147 & Deploy bản V2 lên GitHub Pages \\
 \hline
 \rowcolor{v2amber!10}
-\textbf{V2 Public Release} & \textbf{W23} & \textbf{525} & \textbf{147} & \textbf{Feature-rich: SQLite, Settings, Stories, Leaderboard} \\
+\textbf{V2 Public Release} & \textbf{W12} & \textbf{262.5} & \textbf{147} & \textbf{Feature-rich: SQLite, Settings, Stories, Leaderboard} \\
 \hline
-Cloud Integration Test V3 & W26--W27 & 590 & 170 & Cloudflare D1 push/pull, OTP auth, offline mode \\
+Cloud Integration Test V3 & W13 & 295 & 170 & Cloudflare D1 push/pull, OTP auth, offline mode \\
 \hline
-E2E Test V3 & W26--W27 & 595 & 173 & Media cache, download progress, auto-save \\
+E2E Test V3 & W13 & 297.5 & 173 & Media cache, download progress, auto-save \\
 \hline
-Final WASM Deploy & W27--W28 & 603 & 173 & Production CI/CD; GitHub Pages V3 \\
+Final WASM Deploy & W13--W14 & 301.5 & 173 & Production CI/CD; GitHub Pages V3 \\
 \hline
 \rowcolor{v3red!10}
-\textbf{V3 Public Release} & \textbf{W28} & \textbf{603} & \textbf{173} & \textbf{Cloud-connected: global leaderboard, OTP, streaming} \\
+\textbf{V3 Public Release} & \textbf{W14} & \textbf{301.5} & \textbf{173} & \textbf{Cloud-connected: global leaderboard, OTP, streaming} \\
 \hline
 \end{tabularx}
+}
+
+\newpage % <--- Forces Table 5 to its own page
 
 % ══════════════════════════════════════════════════════════════════
 \subsection{Tóm tắt tiến độ theo giai đoạn phát triển}
 % ══════════════════════════════════════════════════════════════════
 
-\begin{tabularx}{\linewidth}{|c|l|r|r|X|}
+{\small
+% Custom p{} column fixed the exactly 46pt \hbox overflow
+\begin{tabularx}{\linewidth}{|c|>{\raggedright\arraybackslash}p{4cm}|c|c|L|}
 \hline
 \rowcolor{headerGray!25}
 \textbf{Giai đoạn} & \textbf{Pha chính} & \textbf{Tuần} & \textbf{MD} & \textbf{Nội dung chính} \\
 \hline
 \rowcolor{v1green!10}
 \multirow{2}{*}{\textbf{Phase I}} &
-Conceptualize + Design V1 & W1--W2 & $\sim$44 & Kiến trúc tổng thể, SRS/SDS, module API design, layout \\
+Conceptualize + Design V1 & W1 & $\sim$22 & Kiến trúc tổng thể, SRS/SDS, module API design, layout \\
 \cline{2-5}
 \rowcolor{v1green!10}
-& Implement + Test + Deploy V1 & W3--W11 & \textbf{237} & Physics, scrollbar, SVG, sidebar, 15 issues resolved \\
+& Implement + Test + Deploy V1 & W2--W6 & \textbf{118.5} & Physics, scrollbar, SVG, sidebar, 15 issues resolved \\
 \hline
 \rowcolor{v2amber!10}
 \multirow{2}{*}{\textbf{Phase II}} &
-Design V2 & W10--W11 & $\sim$39 & SettingsConfig contract, 8-table SQLite schema, CI/CD chapters \\
+Design V2 & W5--W6 & $\sim$19.5 & SettingsConfig contract, 8-table SQLite schema, CI/CD chapters \\
 \cline{2-5}
 \rowcolor{v2amber!10}
-& Implement + Test + Deploy V2 & W11--W23 & \textbf{525} & SQLite, Stories, dialogue engine, flash effect, 27 issues resolved \\
+& Implement + Test + Deploy V2 & W6--W12 & \textbf{262.5} & SQLite, Stories, dialogue engine, flash effect, 27 issues resolved \\
 \hline
 \rowcolor{v3red!10}
 \multirow{2}{*}{\textbf{Phase III}} &
-Design + Implement V3 & W21--W26 & $\sim$55 & Cloudflare API, OTP, media cache, auto-save \\
+Design + Implement V3 & W11--W13 & $\sim$27.5 & Cloudflare API, OTP, media cache, auto-save \\
 \cline{2-5}
 \rowcolor{v3red!10}
-& Test + Deploy V3 & W26--W28 & \textbf{603} & Cloud E2E, offline fallback, production release \\
+& Test + Deploy V3 & W13--W14 & \textbf{301.5} & Cloud E2E, offline fallback, production release \\
 \hline
 \end{tabularx}
+}
 
 \label{LastPageProjectGanttChart}
 \end{document}

@@ -12,6 +12,26 @@ chapters/
 │  ├─ c001/
 │  │  ├─ c001.json
 │  │  └─ media/
+│  │     ├─ BGM_001_FALLING_SKY.mp3
+│  │     ├─ BGM_002_ORDERCORP_TEMPLE.mp3
+│  │     ├─ BGM_003_UNDERCITY_SLUM.mp3
+│  │     ├─ BGM_004_SHADOW_ALLEY.mp3
+│  │     ├─ BGM_005_HEAVEN_MATRIX.mp3
+│  │     ├─ BGM_006_GLITCH_VIRUS.mp3
+│  │     ├─ BGM_007_FROZEN_TIME.mp3
+│  │     ├─ BGM_008_KILL_SCREEN.mp3
+│  │     ├─ BGM_009_ENDLESS_LOOP.mp3
+│  │     ├─ GM_010_GOLDEN_MAXOUT.mp3
+│  │     ├─ SFX_001_BLOCK_DROP.mp3
+│  │     ├─ SFX_002_HOLY_CHIME.mp3
+│  │     ├─ SFX_003_ORC_LAUGH.mp3
+│  │     ├─ SFX_004_GLITCH_WARP.mp3
+│  │     ├─ SFX_005_ASCEND_BURST.mp3
+│  │     ├─ SFX_006_VIRUS_CRASH.mp3
+│  │     ├─ SFX_007_TIME_FREEZE.mp3
+│  │     ├─ SFX_008_DEAD_STATIC.mp3
+│  │     ├─ SFX_009_FLOW_PULSE.mp3
+│  │     ├─ SFX_010_MAXOUT_FANFARE.mp3
 │  │     ├─ THUMB_001_FALLING_SKY.png
 │  │     ├─ THUMB_002_ORDERCORP_TEMPLE.png
 │  │     ├─ THUMB_003_UNDERCITY_SLUM.png

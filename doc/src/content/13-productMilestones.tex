@@ -54,7 +54,7 @@ Dự án \textbf{cTetris} áp dụng mô hình phân rã ba tầng để định
      \quad\footnotesize Nhóm nhiều Small Tasks + Integration Task};
 \node[tier,fill=v1green!10,draw=v1green,below=0.4cm of t2](t1)
     {\textbf{Tầng 1 — Hàm / Tính năng (Small Task / Function)}
-     \quad\footnotesize Design 0.5\,MD + Handle 1\,MD + Self-test 0.5\,MD = \textbf{2\,MD}};
+     \quad\footnotesize Design 0.25\,MD + Handle 0.5\,MD + Self-test 0.25\,MD = \textbf{1\,MD}};
 \draw[arrow](t3.south)--(t2.north);
   \draw[arrow](t2.south)--(t1.north);
   \node[label,right=0.3cm of t3]{Tầng Module};
@@ -72,14 +72,14 @@ Dự án \textbf{cTetris} áp dụng mô hình phân rã ba tầng để định
 \rowcolor{headerGray!20}
 \textbf{Đơn vị} & \textbf{Cách Tính} & \textbf{Hệ số} \\
 \hline
-\textbf{Small Task} (1 hàm) & Design\,(0.5) + Handle\,(1.0) + Self-test\,(0.5) & \textbf{2\,MD} \\
+\textbf{Small Task} (1 hàm) & Design\,(0.25) + Handle\,(0.5) + Self-test\,(0.25) & \textbf{1\,MD} \\
 \hline
-\textbf{Integration Task} & Mỗi small task trong Big Task đóng góp & \textbf{1\,MD/func} \\
+\textbf{Integration Task} & Mỗi small task trong Big Task đóng góp & \textbf{0.5\,MD/func} \\
 \hline
-\textbf{Big Task} ($n$ hàm) & $n \times 2\,\text{MD (tasks)} + n \times 1\,\text{MD (integration)}$ & \textbf{$n \times 3$\,MD} \\
+\textbf{Big Task} ($n$ hàm) & $n \times 1\,\text{MD (tasks)} + n \times 0.5\,\text{MD (integration)}$ & \textbf{$n \times 1.5$\,MD} \\
 \hline
 \textbf{Fix / Issue} (độc lập) & Không tích hợp;
-áp dụng 2\,MD/issue & \textbf{2\,MD} \\
+áp dụng 1\,MD/issue & \textbf{1\,MD} \\
 \hline
 \textbf{Module Version} & $\sum\text{Big Tasks} + \sum\text{Fixes}$ & \textbf{Tổng hợp} \\
 \hline
@@ -92,7 +92,7 @@ Thời gian họp, review, và overhead quản lý không được tính trong �
 \subsection{Module \texttt{gameStory} — Tính năng Cốt truyện}
 % ══════════════════════════════════════════════════════════════════
 
-\subsubsection{V1 — Màn hình Mở đầu và Loading (70 MD)}
+\subsubsection{V1 — Màn hình Mở đầu và Loading (35 MD)}
 
 \begin{tabularx}{\linewidth}{|X|c|r|r|r|}
 \hline
@@ -100,27 +100,27 @@ Thời gian họp, review, và overhead quản lý không được tính trong �
 \textbf{Big Task / Component} & \textbf{\# Func} & \textbf{Task\,MD} & \textbf{Intg\,MD} & \textbf{Total\,MD} \\
 \hline
 \rowcolor{rowLight}
-UI Foundation (layout 9:16, window, BUILD\_STANDALONE) & 2 & 4 & 2 & \textbf{6} \\
-SVG Engine \& Lazy Cache (nanosvg, rasterize, cache) & 3 & 6 & 3 & \textbf{9} \\
+UI Foundation (layout 9:16, window, BUILD\_STANDALONE) & 2 & 2 & 1 & \textbf{3} \\
+SVG Engine \& Lazy Cache (nanosvg, rasterize, cache) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \rowcolor{rowLight}
-Intro Animation (logo render, fade-in, title text, audio stub) & 4 & 8 & 4 & \textbf{12} \\
-Loading Progress Bar (progress fill, timing sync) & 2 & 4 & 2 & \textbf{6} \\
+Intro Animation (logo render, fade-in, title text, audio stub) & 4 & 4 & 2 & \textbf{6} \\
+Loading Progress Bar (progress fill, timing sync) & 2 & 2 & 1 & \textbf{3} \\
 \rowcolor{rowLight}
-Corp Credit Display (credit text, logo) & 1 & 
-2 & 1 & \textbf{3} \\
-Platform Integration V1 (cmake, build.sh/ps1, SDL3, WASM, CI/CD, brand, flow, docs) & 8 & 16 & 8 & \textbf{24} \\
+Corp Credit Display (credit text, logo) & 1 &
+1 & 0.5 & \textbf{1.5} \\
+Platform Integration V1 (cmake, build.sh/ps1, SDL3, WASM, CI/CD, brand, flow, docs) & 8 & 8 & 4 & \textbf{12} \\
 \hline
 \rowcolor{storyBlue!12}
-\textbf{Subtotal Components} & \textbf{20} & \textbf{40} & \textbf{20} & \textbf{60} \\
+\textbf{Subtotal Components} & \textbf{20} & \textbf{20} & \textbf{10} & \textbf{30} \\
 \hline
-\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V1 Independent Fixes (5 issues $\times$ 2\,MD): font thinning, copyright UTF-8, S-block removal, duration 8s, logo/corp swap}} & \textbf{10} \\
+\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V1 Independent Fixes (5 issues $\times$ 1\,MD): font thinning, copyright UTF-8, S-block removal, duration 8s, logo/corp swap}} & \textbf{5} \\
 \hline
 \rowcolor{v1green!15}
-\multicolumn{4}{|l|}{\textbf{V1 Grand Total}} & \textbf{70\,MD} \\
+\multicolumn{4}{|l|}{\textbf{V1 Grand Total}} & \textbf{35\,MD} \\
 \hline
 \end{tabularx}
 
-\subsubsection{V2 — Đồng bộ CSDL và Dialogue Engine (96 MD)}
+\subsubsection{V2 — Đồng bộ CSDL và Dialogue Engine (48 MD)}
 
 \begin{tabularx}{\linewidth}{|X|c|r|r|r|}
 \hline
@@ -128,27 +128,27 @@ Platform Integration V1 (cmake, build.sh/ps1, SDL3, WASM, CI/CD, brand, flow, do
 \textbf{Big Task / Component} & \textbf{\# Func} & \textbf{Task\,MD} & \textbf{Intg\,MD} & \textbf{Total\,MD} \\
 \hline
 \rowcolor{rowLight}
-Directory Reorganization (chapters/, path updates, cmake) & 3 & 6 & 3 & \textbf{9} \\
-CI/CD Pipeline (parse.py, manifest.py, sync-chapters.yml, schema) & 
-4 & 8 & 4 & \textbf{12} \\
+Directory Reorganization (chapters/, path updates, cmake) & 3 & 3 & 1.5 & \textbf{4.5} \\
+CI/CD Pipeline (parse.py, manifest.py, sync-chapters.yml, schema) &
+4 & 4 & 2 & \textbf{6} \\
 \rowcolor{rowLight}
-Remote DB Sync (manifest fetch, SHA diff, download, sqlite exec, meta update, WASM path, offline fallback) & 7 & 14 & 7 & \textbf{21} \\
-Dialogue Engine (loader, node renderer, scene image, BGM player, input handler, branch logic, terminal) & 7 & 14 & 7 & \textbf{21} \\
+Remote DB Sync (manifest fetch, SHA diff, download, sqlite exec, meta update, WASM path, offline fallback) & 7 & 7 & 3.5 & \textbf{10.5} \\
+Dialogue Engine (loader, node renderer, scene image, BGM player, input handler, branch logic, terminal) & 7 & 7 & 3.5 & \textbf{10.5} \\
 \rowcolor{rowLight}
-Skip Button (button render, skip transition) & 2 & 4 & 2 & \textbf{6} \\
-V2 Integration (main.cpp flow, DB lifecycle, WASM syncfs) & 3 & 6 & 3 & \textbf{9} \\
+Skip Button (button render, skip transition) & 2 & 2 & 1 & \textbf{3} \\
+V2 Integration (main.cpp flow, DB lifecycle, WASM syncfs) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \hline
 \rowcolor{storyBlue!12}
-\textbf{Subtotal Components} & \textbf{26} & \textbf{52} & \textbf{26} & \textbf{78} \\
+\textbf{Subtotal Components} & \textbf{26} & \textbf{26} & \textbf{13} & \textbf{39} \\
 \hline
-\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V2 Independent Fixes (9 issues $\times$ 2\,MD): DB prefix, SHA diff, GH Action no-commit, stream image, progress bar, skip visibility, chapter flow, post-sync check, DB update}} & \textbf{18} \\
+\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V2 Independent Fixes (9 issues $\times$ 1\,MD): DB prefix, SHA diff, GH Action no-commit, stream image, progress bar, skip visibility, chapter flow, post-sync check, DB update}} & \textbf{9} \\
 \hline
 \rowcolor{v2amber!15}
-\multicolumn{4}{|l|}{\textbf{V2 Grand Total}} & \textbf{96\,MD} \\
+\multicolumn{4}{|l|}{\textbf{V2 Grand Total}} & \textbf{48\,MD} \\
 \hline
 \end{tabularx}
 
-\subsubsection{V3 — Tải Media Động và Download Tracker (27 MD)}
+\subsubsection{V3 — Tải Media Động và Download Tracker (13.5 MD)}
 
 \begin{tabularx}{\linewidth}{|X|c|r|r|r|}
 \hline
@@ -156,14 +156,14 @@ V2 Integration (main.cpp flow, DB lifecycle, WASM syncfs) & 3 & 6 & 3 & \textbf{
 \textbf{Big Task / Component} & \textbf{\# Func} & \textbf{Task\,MD} & \textbf{Intg\,MD} & \textbf{Total\,MD} \\
 \hline
 \rowcolor{rowLight}
-Per-file Media Cache (URL extractor, file downloader, cache checker, path substitutor) & 4 & 8 & 4 & \textbf{12} \\
-Download Progress Bar (download tracker, speed calculator, logo repeat, progress display) & 4 & 8 & 4 & \textbf{12} \\
+Per-file Media Cache (URL extractor, file downloader, cache checker, path substitutor) & 4 & 4 & 2 & \textbf{6} \\
+Download Progress Bar (download tracker, speed calculator, logo repeat, progress display) & 4 & 4 & 2 & \textbf{6} \\
 \rowcolor{rowLight}
-V3 Integration (flow verification, V3 E2E) & 1 & 2 & 1 & \textbf{3} \\
+V3 Integration (flow verification, V3 E2E) & 1 & 1 & 0.5 & \textbf{1.5} \\
 \hline
 \rowcolor{v3red!15}
-\textbf{V3 
-Grand Total} & \textbf{9} & \textbf{18} & \textbf{9} & \textbf{27\,MD} \\
+\textbf{V3
+Grand Total} & \textbf{9} & \textbf{9} & \textbf{4.5} & \textbf{13.5\,MD} \\
 \hline
 \end{tabularx}
 
@@ -177,12 +177,12 @@ Grand Total} & \textbf{9} & \textbf{18} & \textbf{9} & \textbf{27\,MD} \\
 \rowcolor{rowLight}
 \textbf{Phiên Bản} & \textbf{Components MD} & \textbf{Fixes MD} & \textbf{Total MD} & \textbf{Tỷ lệ} \\
 \hline
-V1 & 60 & 10 & \textbf{70} & 36.3\% \\
-V2 & 78 & 18 & \textbf{96} & 49.7\% \\
-V3 & 27 & 0  & \textbf{27} & 14.0\% \\
+V1 & 30 & 5 & \textbf{35} & 36.3\% \\
+V2 & 39 & 9 & \textbf{48} & 49.7\% \\
+V3 & 13.5 & 0  & \textbf{13.5} & 14.0\% \\
 \hline
 \rowcolor{storyBlue!15}
-\textbf{Tổng} & \textbf{165} & \textbf{28} & \textbf{193} & 100\% \\
+\textbf{Tổng} & \textbf{82.5} & \textbf{14} & \textbf{96.5} & 100\% \\
 \hline
 \end{tabularx}
 \end{center}
@@ -191,7 +191,7 @@ V3 & 27 & 0  & \textbf{27} & 14.0\% \\
 \subsection{Module \texttt{gameConsole} — Tính năng Cấu hình}
 % ══════════════════════════════════════════════════════════════════
 
-\subsubsection{V1 — Hub Screen và Lightbox UI (92 MD)}
+\subsubsection{V1 — Hub Screen và Lightbox UI (46 MD)}
 
 \begin{tabularx}{\linewidth}{|X|c|r|r|r|}
 \hline
@@ -199,33 +199,33 @@ V3 & 27 & 0  & \textbf{27} & 14.0\% \\
 \textbf{Big Task / Component} & \textbf{\# Func} & \textbf{Task\,MD} & \textbf{Intg\,MD} & \textbf{Total\,MD} \\
 \hline
 \rowcolor{rowLight}
-UI Foundation (layout 9:16, 
-window, BUILD\_STANDALONE) & 3 & 6 & 3 & \textbf{9} \\
-Basic Background (solid fill \#282C34) & 1 & 2 & 1 & \textbf{3} \\
+UI Foundation (layout 9:16,
+window, BUILD\_STANDALONE) & 3 & 3 & 1.5 & \textbf{4.5} \\
+Basic Background (solid fill \#282C34) & 1 & 1 & 0.5 & \textbf{1.5} \\
 \rowcolor{rowLight}
-Interactive Scrollbar (drag/thumb, click-track, arrows, auto-repeat) & 4 & 8 & 4 & \textbf{12} \\
-Word Wrap Engine (28-char auto line-break) & 1 & 2 & 1 & \textbf{3} \\
+Interactive Scrollbar (drag/thumb, click-track, arrows, auto-repeat) & 4 & 4 & 2 & \textbf{6} \\
+Word Wrap Engine (28-char auto line-break) & 1 & 1 & 0.5 & \textbf{1.5} \\
 \rowcolor{rowLight}
-Guide Popup / Lightbox (button, overlay 70\%, content scroll, close) & 4 & 8 & 4 & \textbf{12} \\
-Board Popup / Leaderboard (button, lightbox, hardcoded data) & 3 & 6 & 3 & \textbf{9} \\
+Guide Popup / Lightbox (button, overlay 70\%, content scroll, close) & 4 & 4 & 2 & \textbf{6} \\
+Board Popup / Leaderboard (button, lightbox, hardcoded data) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \rowcolor{rowLight}
-BGM Stub (log-based music placeholder) & 1 & 2 & 1 & \textbf{3} \\
-Navigation \& 
-Keyboard (WASD/TAB/focus, mouse wheel, quit button) & 4 & 8 & 4 & \textbf{12} \\
+BGM Stub (log-based music placeholder) & 1 & 1 & 0.5 & \textbf{1.5} \\
+Navigation \&
+Keyboard (WASD/TAB/focus, mouse wheel, quit button) & 4 & 4 & 2 & \textbf{6} \\
 \rowcolor{rowLight}
-Platform Integration V1 (cmake, SDL3 port, WASM, CI/CD, brand, README) & 7 & 14 & 7 & \textbf{21} \\
+Platform Integration V1 (cmake, SDL3 port, WASM, CI/CD, brand, README) & 7 & 7 & 3.5 & \textbf{10.5} \\
 \hline
 \rowcolor{consoleOrange!12}
-\textbf{Subtotal Components} & \textbf{28} & \textbf{56} & \textbf{28} & \textbf{84} \\
+\textbf{Subtotal Components} & \textbf{28} & \textbf{28} & \textbf{14} & \textbf{42} \\
 \hline
-\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V1 Independent Fixes (4 issues $\times$ 2\,MD): SOFT\_WHITE font, copyright UTF-8, speed x5 guide, HIGHLIGHT\_Y standard}} & \textbf{8} \\
+\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V1 Independent Fixes (4 issues $\times$ 1\,MD): SOFT\_WHITE font, copyright UTF-8, speed x5 guide, HIGHLIGHT\_Y standard}} & \textbf{4} \\
 \hline
 \rowcolor{v1green!15}
-\multicolumn{4}{|l|}{\textbf{V1 Grand Total}} & \textbf{92\,MD} \\
+\multicolumn{4}{|l|}{\textbf{V1 Grand Total}} & \textbf{46\,MD} \\
 \hline
 \end{tabularx}
 
-\subsubsection{V2 — Cá nhân hóa, SQLite và Stories Popup (104 MD)}
+\subsubsection{V2 — Cá nhân hóa, SQLite và Stories Popup (52 MD)}
 
 \begin{tabularx}{\linewidth}{|X|c|r|r|r|}
 \hline
@@ -233,30 +233,30 @@ Platform Integration V1 (cmake, SDL3 port, WASM, CI/CD, brand, README) & 7 & 14 
 \textbf{Big Task / Component} & \textbf{\# Func} & \textbf{Task\,MD} & \textbf{Intg\,MD} & \textbf{Total\,MD} \\
 \hline
 \rowcolor{rowLight}
-SVG Background Full-Fit (nanosvg load, lazy-init, letterbox, WASM embed, cleanup) & 5 & 
-10 & 5 & \textbf{15} \\
-JSON Leaderboard Data (json loader, timestamp parser, board display, fallback) & 4 & 8 & 4 & \textbf{12} \\
+SVG Background Full-Fit (nanosvg load, lazy-init, letterbox, WASM embed, cleanup) & 5 &
+5 & 2.5 & \textbf{7.5} \\
+JSON Leaderboard Data (json loader, timestamp parser, board display, fallback) & 4 & 4 & 2 & \textbf{6} \\
 \rowcolor{rowLight}
-Settings Popup Container (button, popup shell, SettingsConfig struct, close) & 4 & 8 & 4 & \textbf{12} \\
-Volume Control Slider (slider drag, SDL\_AudioStream gain, keyboard ±5\%) & 3 & 6 & 3 & \textbf{9} \\
+Settings Popup Container (button, popup shell, SettingsConfig struct, close) & 4 & 4 & 2 & \textbf{6} \\
+Volume Control Slider (slider drag, SDL\_AudioStream gain, keyboard ±5\%) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \rowcolor{rowLight}
-Block Color Customization (7 swatches, multi-select, min-1 guard) & 2 & 4 & 2 & \textbf{6} \\
-Stories Popup + SQLite DB (schema 3 groups, IDBFS WASM, stories UI, thumbnail, 3-state rows, chapter nav, unlock cascade, SettingsConfig pass) & 8 & 16 & 8 
-& \textbf{24} \\
+Block Color Customization (7 swatches, multi-select, min-1 guard) & 2 & 2 & 1 & \textbf{3} \\
+Stories Popup + SQLite DB (schema 3 groups, IDBFS WASM, stories UI, thumbnail, 3-state rows, chapter nav, unlock cascade, SettingsConfig pass) & 8 & 8 & 4
+& \textbf{12} \\
 \rowcolor{rowLight}
-V2 Integration (main.cpp flow, DB lifecycle verify) & 2 & 4 & 2 & \textbf{6} \\
+V2 Integration (main.cpp flow, DB lifecycle verify) & 2 & 2 & 1 & \textbf{3} \\
 \hline
 \rowcolor{consoleOrange!12}
-\textbf{Subtotal Components} & \textbf{28} & \textbf{56} & \textbf{28} & \textbf{84} \\
+\textbf{Subtotal Components} & \textbf{28} & \textbf{28} & \textbf{14} & \textbf{42} \\
 \hline
-\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V2 Independent Fixes (10 issues $\times$ 2\,MD): DB entry check, settings load/save, thumbnail fade, Play btn, isSelected sync, Board from DB, table naming, 9-table schema, seed data}} & \textbf{20} \\
+\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V2 Independent Fixes (10 issues $\times$ 1\,MD): DB entry check, settings load/save, thumbnail fade, Play btn, isSelected sync, Board from DB, table naming, 9-table schema, seed data}} & \textbf{10} \\
 \hline
 \rowcolor{v2amber!15}
-\multicolumn{4}{|l|}{\textbf{V2 Grand Total}} & \textbf{104\,MD} \\
+\multicolumn{4}{|l|}{\textbf{V2 Grand Total}} & \textbf{52\,MD} \\
 \hline
 \end{tabularx}
 
-\subsubsection{V3 — Tích hợp Cloud và Sắp xếp (42 MD)}
+\subsubsection{V3 — Tích hợp Cloud và Sắp xếp (21 MD)}
 
 \begin{tabularx}{\linewidth}{|X|c|r|r|r|}
 \hline
@@ -264,15 +264,15 @@ V2 Integration (main.cpp flow, DB lifecycle verify) & 2 & 4 & 2 & \textbf{6} \\
 \textbf{Big Task / Component} & \textbf{\# Func} & \textbf{Task\,MD} & \textbf{Intg\,MD} & \textbf{Total\,MD} \\
 \hline
 \rowcolor{rowLight}
-Cloudflare D1 + Duration Objects API + OTP Auth (http abstraction, load/save buttons, text input, OTP save, OTP load, story sync, 
-API key, offline fallback) & 8 & 16 & 8 & \textbf{24} \\
-Sort by Time (sort enum, time sort logic, toggle UI) & 3 & 6 & 3 & \textbf{9} \\
+Cloudflare D1 + Duration Objects API + OTP Auth (http abstraction, load/save buttons, text input, OTP save, OTP load, story sync,
+API key, offline fallback) & 8 & 8 & 4 & \textbf{12} \\
+Sort by Time (sort enum, time sort logic, toggle UI) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \rowcolor{rowLight}
-Sort by Score (score sort, rank renumber) & 2 & 4 & 2 & \textbf{6} \\
-V3 Integration (E2E verification, API flow) & 1 & 2 & 1 & \textbf{3} \\
+Sort by Score (score sort, rank renumber) & 2 & 2 & 1 & \textbf{3} \\
+V3 Integration (E2E verification, API flow) & 1 & 1 & 0.5 & \textbf{1.5} \\
 \hline
 \rowcolor{v3red!15}
-\textbf{V3 Grand Total} & \textbf{14} & \textbf{28} & \textbf{14} & \textbf{42\,MD} \\
+\textbf{V3 Grand Total} & \textbf{14} & \textbf{14} & \textbf{7} & \textbf{21\,MD} \\
 \hline
 \end{tabularx}
 
@@ -286,13 +286,13 @@ V3 Integration (E2E verification, API flow) & 1 & 2 & 1 & \textbf{3} \\
 \rowcolor{rowLight}
 \textbf{Phiên Bản} & \textbf{Components MD} & \textbf{Fixes MD} & \textbf{Total MD} & \textbf{Tỷ lệ} \\
 \hline
-V1 & 84 & 8  & \textbf{92}  
+V1 & 42 & 4  & \textbf{46}
 & 38.7\% \\
-V2 & 84 & 20 & \textbf{104} & 43.7\% \\
-V3 & 42 & 0  & \textbf{42}  & 17.6\% \\
+V2 & 42 & 10 & \textbf{52} & 43.7\% \\
+V3 & 21 & 0  & \textbf{21}  & 17.6\% \\
 \hline
 \rowcolor{consoleOrange!15}
-\textbf{Tổng} & \textbf{210} & \textbf{28} & \textbf{238} & 100\% \\
+\textbf{Tổng} & \textbf{105} & \textbf{14} & \textbf{119} & 100\% \\
 \hline
 \end{tabularx}
 \end{center}
@@ -301,7 +301,7 @@ V3 & 42 & 0  & \textbf{42}  & 17.6\% \\
 \subsection{Module \texttt{gameCore} — Tính năng Chính}
 % ══════════════════════════════════════════════════════════════════
 
-\subsubsection{V1 — Physics Engine và Core Gameplay (75 MD)}
+\subsubsection{V1 — Physics Engine và Core Gameplay (37.5 MD)}
 
 \begin{tabularx}{\linewidth}{|X|c|r|r|r|}
 \hline
@@ -309,31 +309,31 @@ V3 & 42 & 0  & \textbf{42}  & 17.6\% \\
 \textbf{Big Task / Component} & \textbf{\# Func} & \textbf{Task\,MD} & \textbf{Intg\,MD} & \textbf{Total\,MD} \\
 \hline
 \rowcolor{rowLight}
-Data Structures \& Layout (Point, Tetromino, GameState, board 240×480, sidebar 30×480) & 3 & 6 & 3 & \textbf{9} \\
-Block System (6 shapes LITZO + mirror flip, random color 6 palette) & 3 & 6 & 3 & \textbf{9} \\
+Data Structures \& Layout (Point, Tetromino, GameState, board 240×480, sidebar 30×480) & 3 & 3 & 1.5 & \textbf{4.5} \\
+Block System (6 shapes LITZO + mirror flip, random color 6 palette) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \rowcolor{rowLight}
-Physics Engine (gravity 
-fall, keyboard/WASD, collision detection) & 3 & 6 & 3 & \textbf{9} \\
-Game Logic (line clear, score calc format 5-digit, cap 99999) & 3 & 6 & 3 & \textbf{9} \\
+Physics Engine (gravity
+fall, keyboard/WASD, collision detection) & 3 & 3 & 1.5 & \textbf{4.5} \\
+Game Logic (line clear, score calc format 5-digit, cap 99999) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \rowcolor{rowLight}
-Sidebar UI \& Mouse (12 slots, procedural icons, click-hold interaction) & 3 & 6 & 3 & \textbf{9} \\
-Gameplay Features (soft drop ×5, play timer HH:MM, next-block preview) & 3 & 6 & 3 & \textbf{9} \\
+Sidebar UI \& Mouse (12 slots, procedural icons, click-hold interaction) & 3 & 3 & 1.5 & \textbf{4.5} \\
+Gameplay Features (soft drop ×5, play timer HH:MM, next-block preview) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \rowcolor{rowLight}
-Game State Management (pause/resume icon, quit-game-over lightbox 4 buttons) & 2 & 4 & 2 & \textbf{6} \\
-V1 Integration (module wiring) & 1 & 2 & 1 & \textbf{3} \\
+Game State Management (pause/resume icon, quit-game-over lightbox 4 buttons) & 2 & 2 & 1 & \textbf{3} \\
+V1 Integration (module wiring) & 1 & 1 & 0.5 & \textbf{1.5} \\
 \hline
 \rowcolor{coreViolet!12}
-\textbf{Subtotal Components} & \textbf{21} & 
-\textbf{42} & \textbf{21} & \textbf{63} \\
+\textbf{Subtotal Components} & \textbf{21} &
+\textbf{21} & \textbf{10.5} & \textbf{31.5} \\
 \hline
-\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V1 Independent Fixes (6 issues $\times$ 2\,MD): WASM reload, remove S-block/mirror, 5-digit cap, total time popup, font/stroke, swipe gesture}} & \textbf{12} \\
+\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V1 Independent Fixes (6 issues $\times$ 1\,MD): WASM reload, remove S-block/mirror, 5-digit cap, total time popup, font/stroke, swipe gesture}} & \textbf{6} \\
 \hline
 \rowcolor{v1green!15}
-\multicolumn{4}{|l|}{\textbf{V1 Grand Total}} & \textbf{75\,MD} \\
+\multicolumn{4}{|l|}{\textbf{V1 Grand Total}} & \textbf{37.5\,MD} \\
 \hline
 \end{tabularx}
 
-\subsubsection{V2 — Tích hợp Dữ liệu và Gameplay Depth (88 MD)}
+\subsubsection{V2 — Tích hợp Dữ liệu và Gameplay Depth (44 MD)}
 
 \begin{tabularx}{\linewidth}{|X|c|r|r|r|}
 \hline
@@ -341,34 +341,34 @@ V1 Integration (module wiring) & 1 & 2 & 1 & \textbf{3} \\
 \textbf{Big Task / Component} & \textbf{\# Func} & \textbf{Task\,MD} & \textbf{Intg\,MD} & \textbf{Total\,MD} \\
 \hline
 \rowcolor{rowLight}
-\textit{[P1--P4] Prerequisite Setup} (SettingsConfig expand, dbInsertRecord, dbUpsertStoryProgress, cfg populate) & 4 & 8 & 4 & \textbf{12} \\
-BGM Stream + Volume (SDL\_AudioStream init, gain apply, stream cleanup) & 3 & 6 & 3 & \textbf{9} \\
+\textit{[P1--P4] Prerequisite Setup} (SettingsConfig expand, dbInsertRecord, dbUpsertStoryProgress, cfg populate) & 4 & 4 & 2 & \textbf{6} \\
+BGM Stream + Volume (SDL\_AudioStream init, gain apply, stream cleanup) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \rowcolor{rowLight}
-Dynamic Fall Speed (getFallInterval 5-step, soft-drop ratio /5) & 2 & 4 
-& 2 & \textbf{6} \\
-3-Block Queue + Unlock (nextBlock2/3, queue maintain, NEXT-2/3 unlock logic, preview render) & 3 & 6 & 3 & \textbf{9} \\
+Dynamic Fall Speed (getFallInterval 5-step, soft-drop ratio /5) & 2 & 2
+& 1 & \textbf{3} \\
+3-Block Queue + Unlock (nextBlock2/3, queue maintain, NEXT-2/3 unlock logic, preview render) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \rowcolor{rowLight}
-Flash Clear Effect (flash state machine 6×80ms, fall-blocked render) & 2 & 4 & 2 & \textbf{6} \\
-Combo Score Formula ($\Delta\text{score} = n^2$, cap 99999) & 1 & 2 & 1 & \textbf{3} \\
+Flash Clear Effect (flash state machine 6×80ms, fall-blocked render) & 2 & 2 & 1 & \textbf{3} \\
+Combo Score Formula ($\Delta\text{score} = n^2$, cap 99999) & 1 & 1 & 0.5 & \textbf{1.5} \\
 \rowcolor{rowLight}
-Color Palette from Config (cfg.colorEnabled[7] → spawnBlock) & 1 & 2 & 1 & \textbf{3} \\
-TableMatrix Board Pre-populate (parser, bottom-align fill) & 2 & 4 & 2 & \textbf{6} \\
+Color Palette from Config (cfg.colorEnabled[7] → spawnBlock) & 1 & 1 & 0.5 & \textbf{1.5} \\
+TableMatrix Board Pre-populate (parser, bottom-align fill) & 2 & 2 & 1 & \textbf{3} \\
 \rowcolor{rowLight}
-DB Write on Game Over (dbInsertRecord, dbUpsertStoryProgress, dbCheckAndUnlockStories) & 3 & 6 & 3 
-& \textbf{9} \\
-V2 Integration (SettingsConfig flow, DB lifecycle, cmake sqlite3.c) & 3 & 6 & 3 & \textbf{9} \\
+DB Write on Game Over (dbInsertRecord, dbUpsertStoryProgress, dbCheckAndUnlockStories) & 3 & 3 & 1.5
+& \textbf{4.5} \\
+V2 Integration (SettingsConfig flow, DB lifecycle, cmake sqlite3.c) & 3 & 3 & 1.5 & \textbf{4.5} \\
 \hline
 \rowcolor{coreViolet!12}
-\textbf{Subtotal Components} & \textbf{24} & \textbf{48} & \textbf{24} & \textbf{72} \\
+\textbf{Subtotal Components} & \textbf{24} & \textbf{24} & \textbf{12} & \textbf{36} \\
 \hline
-\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V2 Independent Fixes (8 issues $\times$ 2\,MD): colorEnabled spawn, dynamic fast-drop, double-open guard, tableMatrix format, DB on Quit/Restart, tableMatrix display, story info sidebar, nextBlockScore3 TODO}} & \textbf{16} \\
+\multicolumn{4}{|p{0.82\linewidth}|}{\raggedright \textit{V2 Independent Fixes (8 issues $\times$ 1\,MD): colorEnabled spawn, dynamic fast-drop, double-open guard, tableMatrix format, DB on Quit/Restart, tableMatrix display, story info sidebar, nextBlockScore3 TODO}} & \textbf{8} \\
 \hline
 \rowcolor{v2amber!15}
-\multicolumn{4}{|l|}{\textbf{V2 Grand Total}} & \textbf{88\,MD} \\
+\multicolumn{4}{|l|}{\textbf{V2 Grand Total}} & \textbf{44\,MD} \\
 \hline
 \end{tabularx}
 
-\subsubsection{V3 — Tự động Lưu và Cloud Push (9 MD)}
+\subsubsection{V3 — Tự động Lưu và Cloud Push (4.5 MD)}
 
 \begin{tabularx}{\linewidth}{|X|c|r|r|r|}
 \hline
@@ -376,12 +376,12 @@ V2 Integration (SettingsConfig flow, DB lifecycle, cmake sqlite3.c) & 3 & 6 & 3 
 \textbf{Big Task / Component} & \textbf{\# Func} & \textbf{Task\,MD} & \textbf{Intg\,MD} & \textbf{Total\,MD} \\
 \hline
 \rowcolor{rowLight}
-Auto-Save Record (recordID generation YY-MM-DD-HH-MM-SS, auto trigger) & 2 & 4 & 2 & \textbf{6} \\
-V3 Integration (GameOver→SQLite auto 
-flow verify) & 1 & 2 & 1 & \textbf{3} \\
+Auto-Save Record (recordID generation YY-MM-DD-HH-MM-SS, auto trigger) & 2 & 2 & 1 & \textbf{3} \\
+V3 Integration (GameOver→SQLite auto
+flow verify) & 1 & 1 & 0.5 & \textbf{1.5} \\
 \hline
 \rowcolor{v3red!15}
-\textbf{V3 Grand Total} & \textbf{3} & \textbf{6} & \textbf{3} & \textbf{9\,MD} \\
+\textbf{V3 Grand Total} & \textbf{3} & \textbf{3} & \textbf{1.5} & \textbf{4.5\,MD} \\
 \hline
 \end{tabularx}
 
@@ -395,12 +395,12 @@ flow verify) & 1 & 2 & 1 & \textbf{3} \\
 \rowcolor{rowLight}
 \textbf{Phiên Bản} & \textbf{Components MD} & \textbf{Fixes MD} & \textbf{Total MD} & \textbf{Tỷ lệ} \\
 \hline
-V1 & 63 & 12 & \textbf{75}  & 43.6\% \\
-V2 & 72 & 16 & \textbf{88}  & 51.2\% \\
-V3 & 9  & 0  & \textbf{9}   & 5.2\%  \\
+V1 & 31.5 & 6 & \textbf{37.5}  & 43.6\% \\
+V2 & 36   & 8 & \textbf{44}    & 51.2\% \\
+V3 & 4.5  & 0 & \textbf{4.5}   & 5.2\%  \\
 \hline
 \rowcolor{coreViolet!15}
-\textbf{Tổng} & \textbf{144} & \textbf{28} & \textbf{172} & 100\% \\
+\textbf{Tổng} & \textbf{72} & \textbf{14} & \textbf{86} & 100\% \\
 \hline
 \end{tabularx}
 \end{center}
@@ -416,18 +416,18 @@ V3 & 9  & 0  & \textbf{9}   & 5.2\%  \\
 \begin{tabularx}{\linewidth}{|X|r|r|r|r|r|}
 \hline
 \rowcolor{headerGray!30}
-\textbf{Module} 
+\textbf{Module}
 & \textbf{V1 (MD)} & \textbf{V2 (MD)} & \textbf{V3 (MD)} & \textbf{Total} & \textbf{\%} \\
 \hline
 \rowcolor{storyBlue!10}
-\texttt{gameStory} & 70 & 96 & 27 & \textbf{193} & 32.0\% \\
+\texttt{gameStory} & 35 & 48 & 13.5 & \textbf{96.5} & 32.0\% \\
 \rowcolor{consoleOrange!10}
-\texttt{gameConsole} & 92 & 104 & 42 & \textbf{238} & 39.5\% \\
+\texttt{gameConsole} & 46 & 52 & 21 & \textbf{119} & 39.5\% \\
 \rowcolor{coreViolet!10}
-\texttt{gameCore} & 75 & 88 & 9 & \textbf{172} & 28.5\% \\
+\texttt{gameCore} & 37.5 & 44 & 4.5 & \textbf{86} & 28.5\% \\
 \hline
 \rowcolor{headerGray!20}
-\textbf{Total per Version} & \textbf{237} & \textbf{288} & \textbf{78} & \textbf{603} & 100\% \\
+\textbf{Total per Version} & \textbf{118.5} & \textbf{144} & \textbf{39} & \textbf{301.5} & 100\% \\
 \rowcolor{rowLight}
 \textbf{\% of Project} & 39.3\% & 47.8\% & 12.9\% & — & \\
 \hline
@@ -441,6 +441,8 @@ V3 & 9  & 0  & \textbf{9}   & 5.2\%  \\
 % Stacked bar chart showing version contribution per module
 \def\totalW{9.0}
 \def\barH{0.65}
+% scale: 9cm / 119 (max gameConsole) = 0.07563
+\def\scale{0.07563}
 % Legend
 \node[fill=v1green!50,draw=v1green,minimum width=1cm,minimum height=0.4cm] at (-4.5,1.8) {};
 \node[right] at (-3.9,1.8) {V1};
@@ -449,39 +451,38 @@ V3 & 9  & 0  & \textbf{9}   & 5.2\%  \\
 \node[fill=v3red!50,draw=v3red,minimum width=1cm,minimum height=0.4cm] at (-0.5,1.8) {};
 \node[right] at (0.1,1.8) {V3};
 
-% gameStory bar: V1=70, V2=96, V3=27 → total=193
-% scale: 9cm / 238 (max) = 0.03782
-\def\scale{0.03782}
-% gameStory row (y=0.9)
+% gameStory bar: V1=35, V2=48, V3=13.5 → cumulative: 35, 83, 96.5
 \def\ygs{0.9}
-\fill[v1green!50,draw=v1green] (0,\ygs) rectangle (70*\scale,\ygs+\barH);
-\fill[v2amber!60,draw=v2amber] (70*\scale,\ygs) rectangle (166*\scale,\ygs+\barH);
-\fill[v3red!50,draw=v3red] (166*\scale,\ygs) rectangle (193*\scale,\ygs+\barH);
+\fill[v1green!50,draw=v1green] (0,\ygs) rectangle (35*\scale,\ygs+\barH);
+\fill[v2amber!60,draw=v2amber] (35*\scale,\ygs) rectangle (83*\scale,\ygs+\barH);
+\fill[v3red!50,draw=v3red] (83*\scale,\ygs) rectangle (96.5*\scale,\ygs+\barH);
 \node[left] at (-0.1,\ygs+\barH/2) {\textit{gameStory}};
-\node at (35*\scale,\ygs+\barH/2) {70};
-\node at (118*\scale,\ygs+\barH/2) {96};
-\node at (179.5*\scale,\ygs+\barH/2) {27};
+\node at (17.5*\scale,\ygs+\barH/2) {35};
+\node at (59*\scale,\ygs+\barH/2) {48};
+\node at (89.75*\scale,\ygs+\barH/2) {13.5};
 
-% gameConsole row (y=0)
+% gameConsole bar: V1=46, V2=52, V3=21 → cumulative: 46, 98, 119
 \def\ygc{0}
-\fill[v1green!50,draw=v1green] (0,\ygc) rectangle (92*\scale,\ygc+\barH);
-\fill[v2amber!60,draw=v2amber] (92*\scale,\ygc) rectangle (196*\scale,\ygc+\barH);
-\fill[v3red!50,draw=v3red] (196*\scale,\ygc) rectangle (238*\scale,\ygc+\barH);
+\fill[v1green!50,draw=v1green] (0,\ygc) rectangle (46*\scale,\ygc+\barH);
+\fill[v2amber!60,draw=v2amber] (46*\scale,\ygc) rectangle (98*\scale,\ygc+\barH);
+\fill[v3red!50,draw=v3red] (98*\scale,\ygc) rectangle (119*\scale,\ygc+\barH);
 \node[left] at (-0.1,\ygc+\barH/2) {\textit{gameConsole}};
-\node at (46*\scale,\ygc+\barH/2) {92};
-\node at (144*\scale,\ygc+\barH/2) {104};
-\node at (217*\scale,\ygc+\barH/2) {42};
-% gameCore row (y=-0.9)
+\node at (23*\scale,\ygc+\barH/2) {46};
+\node at (72*\scale,\ygc+\barH/2) {52};
+\node at (108.5*\scale,\ygc+\barH/2) {21};
+
+% gameCore bar: V1=37.5, V2=44, V3=4.5 → cumulative: 37.5, 81.5, 86
 \def\ygr{-0.9}
-\fill[v1green!50,draw=v1green] (0,\ygr) rectangle (75*\scale,\ygr+\barH);
-\fill[v2amber!60,draw=v2amber] (75*\scale,\ygr) rectangle (163*\scale,\ygr+\barH);
-\fill[v3red!50,draw=v3red] (163*\scale,\ygr) rectangle (172*\scale,\ygr+\barH);
+\fill[v1green!50,draw=v1green] (0,\ygr) rectangle (37.5*\scale,\ygr+\barH);
+\fill[v2amber!60,draw=v2amber] (37.5*\scale,\ygr) rectangle (81.5*\scale,\ygr+\barH);
+\fill[v3red!50,draw=v3red] (81.5*\scale,\ygr) rectangle (86*\scale,\ygr+\barH);
 \node[left] at (-0.1,\ygr+\barH/2) {\textit{gameCore}};
-\node at (37.5*\scale,\ygr+\barH/2) {75};
-\node at (119*\scale,\ygr+\barH/2) {88};
-\node at (167.5*\scale,\ygr+\barH/2) {9};
+\node at (18.75*\scale,\ygr+\barH/2) {37.5};
+\node at (59.5*\scale,\ygr+\barH/2) {44};
+\node at (83.75*\scale,\ygr+\barH/2) {4.5};
+
 % x-axis labels
-\foreach \x in {0,50,100,150,200,238}{
+\foreach \x in {0,30,60,90,119}{
   \draw (\x*\scale,-1.15)--(\x*\scale,-1.25);
   \node[below] at (\x*\scale,-1.25) {\x\,MD};
 }
@@ -501,18 +502,18 @@ Dựa trên công thức ước tính, công sức được phân bổ tự nhi�
 \textbf{Pha} & \textbf{Mô tả \& Nguồn gốc} & \textbf{MD} & \textbf{\%} \\
 \hline
 \rowcolor{rowLight}
-\textbf{Design} & 0.5\,MD/function (tất cả functions trong components) + 0.5\,MD/fix & 108 & 17.9\% \\
-\textbf{Implement} & 1.0\,MD/function (cốt lõi xử lý) + 1.0\,MD/fix & 215 & 35.7\% \\
+\textbf{Design} & 0.25\,MD/function (tất cả functions trong components) + 0.25\,MD/fix & 54 & 17.9\% \\
+\textbf{Implement} & 0.5\,MD/function (cốt lõi xử lý) + 0.5\,MD/fix & 107.5 & 35.7\% \\
 \rowcolor{rowLight}
-\textbf{Test (Unit)} & 0.5\,MD/function (self-testing) + 0.5\,MD/fix & 108 & 17.9\% \\
-\textbf{Integrate} & 1.0\,MD/function (cross-component integration, không áp dụng cho fixes độc lập) & 173 & 28.7\% \\
+\textbf{Test (Unit)} & 0.25\,MD/function (self-testing) + 0.25\,MD/fix & 54 & 17.9\% \\
+\textbf{Integrate} & 0.5\,MD/function (cross-component integration, không áp dụng cho fixes độc lập) & 86.5 & 28.7\% \\
 \rowcolor{rowLight}
-\textbf{Deploy} & Bao gồm trong Integration (CI/CD, build scripts, WASM) 
+\textbf{Deploy} & Bao gồm trong Integration (CI/CD, build scripts, WASM)
 & — & — \\
-\textbf{Fix / Regression} & Đã được tính trong Independent Fixes (42 issues × 2\,MD) & 84 & $\subset$ above \\
+\textbf{Fix / Regression} & Đã được tính trong Independent Fixes (42 issues × 1\,MD) & 42 & $\subset$ above \\
 \hline
 \rowcolor{headerGray!20}
-\textbf{Grand Total} & \textit{Design + Implement + Test + Integrate} & \textbf{603\,MD} & 100\% \\
+\textbf{Grand Total} & \textit{Design + Implement + Test + Integrate} & \textbf{301.5\,MD} & 100\% \\
 \hline
 \end{tabularx}
 \end{center}
@@ -529,19 +530,19 @@ Pha \textbf{Fix} bao gồm 42 issues đã ghi nhận (5+9+0 gameStory; 4+10+0 ga
 \textbf{Version} & \textbf{Design MD} & \textbf{Implement MD} & \textbf{Test MD} & \textbf{Integrate MD} & \textbf{Total} \\
 \hline
 \rowcolor{v1green!10}
-\textbf{V1} & 34 & 69 & 34 & 69 & \textbf{206} \\
-(+Fixes V1) & +7.5 & +15 & +7.5 & — & (+30) \\
+\textbf{V1} & 17 & 34.5 & 17 & 34.5 & \textbf{103} \\
+(+Fixes V1) & +3.75 & +7.5 & +3.75 & — & (+15) \\
 \rowcolor{v2amber!10}
-\textbf{V2} & 39 & 78 & 39 & 78 & \textbf{234} \\
-(+Fixes V2) & +9 & +18 & +9 & — & (+36) \\
+\textbf{V2} & 19.5 & 39 & 19.5 & 39 & \textbf{117} \\
+(+Fixes V2) & +6.75 & +13.5 & +6.75 & — & (+27) \\
 \rowcolor{v3red!10}
-\textbf{V3} & 11 & 22 & 11 & 22 & \textbf{66} \\
+\textbf{V3} & 6.5 & 13 & 6.5 & 13 & \textbf{39} \\
 (+Fixes V3) & — & — & — & — & (0) \\
 \hline
 \rowcolor{headerGray!20}
-\textbf{Grand Total} & \textbf{101} & \textbf{202} & \textbf{101} & \textbf{169} & \textbf{573} \\
-\textit{incl.\ all fixes} & 
-\textbf{108} & \textbf{215} & \textbf{108} & \textbf{169} & \textbf{600$\approx$603} \\
+\textbf{Grand Total} & \textbf{43} & \textbf{86.5} & \textbf{43} & \textbf{86.5} & \textbf{259} \\
+\textit{incl.\ all fixes} &
+\textbf{54} & \textbf{107.5} & \textbf{54} & \textbf{86.5} & \textbf{302\,$\approx$\,301.5} \\
 \hline
 \end{tabularx}
 \end{center}
@@ -556,10 +557,10 @@ Pha \textbf{Fix} bao gồm 42 issues đã ghi nhận (5+9+0 gameStory; 4+10+0 ga
 \multicolumn{2}{|c|}{\textbf{Tổng Hợp Đầu Tư Dự Án cTetris}} \\
 \hline
 \rowcolor{rowLight}
-\textbf{Tổng công sức} & \textbf{603 Mandays} (≈\,4{,}824 giờ kỹ thuật hiệu quả) \\
-\textbf{Phân bổ module} & gameConsole 39.5\% (238 MD) · gameStory 32.0\% (193 MD) · gameCore 28.5\% (172 MD) \\
+\textbf{Tổng công sức} & \textbf{301.5 Mandays} (≈\,2{,}412 giờ kỹ thuật hiệu quả) \\
+\textbf{Phân bổ module} & gameConsole 39.5\% (119 MD) · gameStory 32.0\% (96.5 MD) · gameCore 28.5\% (86 MD) \\
 \rowcolor{rowLight}
-\textbf{Phân bổ phiên bản} & V1 Foundation 39.3\% (237 MD) · V2 Feature-rich 47.8\% (288 MD) · V3 Cloud 12.9\% (78 MD) \\
+\textbf{Phân bổ phiên bản} & V1 Foundation 39.3\% (118.5 MD) · V2 Feature-rich 47.8\% (144 MD) · V3 Cloud 12.9\% (39 MD) \\
 \textbf{Số lượng tính năng} & 173 hàm/functions trong components;
 42 issues đã giải quyết \\
 \rowcolor{rowLight}
