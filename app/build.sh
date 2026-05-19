@@ -167,6 +167,73 @@ ensure_sqlite() {
 }
 
 # =============================================================================
+# libcurl -- native HTTP sync (manifest, leaderboard, record submit).
+# Detection first; install via OS package manager only when missing.
+# find_package(CURL) in CMakeLists.txt picks it up on its own (system installs).
+# macOS brew-keg-only path is appended to CMAKE_PREFIX_PATH inside build_native.
+# =============================================================================
+ensure_curl() {
+    if command -v curl-config >/dev/null 2>&1; then
+        local ver
+        ver=$(curl-config --version 2>/dev/null | awk '{print $2}')
+        log_ok "libcurl ${ver:-detected} via curl-config"
+        return 0
+    fi
+    if command -v pkg-config >/dev/null 2>&1 && \
+       pkg-config --exists libcurl 2>/dev/null; then
+        log_ok "libcurl detected via pkg-config"
+        return 0
+    fi
+
+    log_warn "libcurl dev headers not found -- attempting install (OS=$OS_NAME)..."
+    case "$OS_NAME" in
+        macos)
+            if command -v brew >/dev/null 2>&1; then
+                brew install curl || log_warn "brew install curl failed"
+            else
+                log_error "Install Homebrew (https://brew.sh), then: brew install curl"
+                return 1
+            fi
+            ;;
+        ubuntu)
+            if command -v apt-get >/dev/null 2>&1; then
+                sudo apt-get update -qq
+                sudo apt-get install -y libcurl4-openssl-dev || \
+                    log_warn "apt-get install libcurl4-openssl-dev failed"
+            fi
+            ;;
+        fedora)
+            sudo dnf install -y libcurl-devel || \
+                log_warn "dnf install libcurl-devel failed"
+            ;;
+        arch)
+            sudo pacman -S --noconfirm curl || \
+                log_warn "pacman -S curl failed"
+            ;;
+        alpine)
+            sudo apk add curl-dev || log_warn "apk add curl-dev failed"
+            ;;
+        opensuse)
+            sudo zypper install -y libcurl-devel || \
+                log_warn "zypper install libcurl-devel failed"
+            ;;
+        *)
+            log_error "Unknown OS '$OS_NAME' -- install libcurl dev package manually"
+            return 1
+            ;;
+    esac
+
+    if command -v curl-config >/dev/null 2>&1 || \
+       (command -v pkg-config >/dev/null 2>&1 && \
+        pkg-config --exists libcurl 2>/dev/null); then
+        log_ok "libcurl installed successfully"
+    else
+        log_warn "libcurl install finished but detection still failed -- find_package(CURL) may not see it"
+    fi
+    return 0   # do not hard-fail; CMakeLists.txt warns + falls back to offline
+}
+
+# =============================================================================
 # validate_endpoints -- check MANIFEST_GIST_URL + CTETRIS_API_URL + media
 # Mirrors the game's loading-bar progress: shows [N/total] for each file.
 # Stops the build (exit 1) on first failure.
@@ -424,6 +491,7 @@ build_native() {
     ensure_nanosvg
     ensure_nlohmann # [cite: 23]
     ensure_sqlite   # FIX 2.6.1: SQLite for Stories DB
+    ensure_curl     # libcurl for native HTTP sync (manifest + API)
 
     # ... [Xử lý icon và SDL3_DIR giống như file gốc] ...
 
@@ -441,11 +509,25 @@ build_native() {
         fi
     done
 
+    # Build CMAKE_PREFIX_PATH (';'-separated CMake list).
+    # macOS Homebrew curl is keg-only; append its opt prefix when present
+    # so find_package(CURL) discovers it without env vars.
+    local prefix_list="$sdl_install"
+    if [ "$OS_NAME" = "macos" ]; then
+        for cand in /opt/homebrew/opt/curl /usr/local/opt/curl; do
+            if [ -d "$cand" ]; then
+                prefix_list="$prefix_list;$cand"
+                log_info "macOS brew-keg curl: $cand"
+                break
+            fi
+        done
+    fi
+
     mkdir -p "$BUILD_NATIVE_DIR"
     cmake -S "$APP_DIR" -B "$BUILD_NATIVE_DIR" \
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_WASM=OFF \
-          -DCMAKE_PREFIX_PATH="$sdl_install" \
+          -DCMAKE_PREFIX_PATH="$prefix_list" \
           -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg" \
           -DNLOHMANN_INCLUDE_DIR="$DOWNLOAD_DIR/nlohmann" \
           -DSQLITE_DIR="$DOWNLOAD_DIR/sqlite" \

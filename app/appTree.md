@@ -15,7 +15,6 @@ app/
 │   ├── logger.h
 │   ├── gameConsole/         # Module quản lý các khối giao diện và logic tương tác của màn hình cấu hình game
 │   │   ├── app.cpp
-│   │   ├── gameConsole_board.json
 │   │   └── include/
 │   │       ├── gameConsole_bg_svg.h
 │   │       ├── gameConsole_db.h

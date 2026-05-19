@@ -90,6 +90,7 @@ $Sdl3Version       = '3.2.18'   # default pin
 $DetectedSdl3Version = ''        # se duoc set boi Initialize-Sdl3Native
 $SqliteVersion     = '3460100'   # SQLite 3.46.1
 $SqliteYear        = '2024'
+$CurlVersion       = '8.10.1'   # libcurl, built with Schannel (no OpenSSL dep)
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -805,6 +806,78 @@ function Build-Sdl3FromSource {
     Write-Ok "SDL3 $Version ($Target) da install vao $InstallPrefix"
 }
 
+# =============================================================================
+# libcurl native (Windows) -- build from source with Schannel backend.
+# Schannel = Windows native SSL/TLS, no OpenSSL dependency.
+# Output: libs\windows\downloads\curl-native\ with CURLConfig.cmake + DLL.
+# =============================================================================
+function Initialize-Curl {
+    $curlInstall = Join-Path $DownloadDir 'curl-native'
+
+    # Cache HIT: skip if CURLConfig.cmake already present
+    foreach ($cand in @(
+        (Join-Path $curlInstall 'lib\cmake\CURL'),
+        (Join-Path $curlInstall 'lib\cmake')
+    )) {
+        if (Test-Path (Join-Path $cand 'CURLConfig.cmake')) {
+            Write-Ok "libcurl native cache HIT: $cand"
+            return
+        }
+    }
+
+    Write-Info "Building libcurl $CurlVersion (Schannel) -> $curlInstall..."
+
+    Import-VsEnv
+
+    $tag     = 'curl-' + ($CurlVersion -replace '\.', '_')
+    $curlSrc = Join-Path $DownloadDir "curl-$CurlVersion"
+    $curlBld = Join-Path $curlSrc 'build-msvc'
+
+    New-Item -ItemType Directory -Force -Path $DownloadDir | Out-Null
+    if (-not (Test-Path (Join-Path $curlSrc '.git'))) {
+        if (Test-Path $curlSrc) { Remove-Item -Recurse -Force $curlSrc }
+        Write-Info "Clone curl $tag vao $curlSrc..."
+        git clone --depth 1 --branch $tag https://github.com/curl/curl.git $curlSrc
+        if ($LASTEXITCODE -ne 0) { throw "git clone curl $tag failed" }
+    } else {
+        Write-Ok "curl source da co tai $curlSrc"
+    }
+
+    if (Test-Path $curlBld) { Remove-Item -Recurse -Force $curlBld }
+
+    $cfg = @(
+        '-S', $curlSrc,
+        '-B', $curlBld,
+        '-G', 'Ninja',
+        '-DCMAKE_BUILD_TYPE=Release',
+        "-DCMAKE_INSTALL_PREFIX=$curlInstall",
+        '-DBUILD_SHARED_LIBS=ON',
+        '-DCURL_USE_SCHANNEL=ON',
+        '-DCURL_USE_OPENSSL=OFF',
+        '-DCURL_USE_LIBSSH2=OFF',
+        '-DCURL_ZLIB=OFF',
+        '-DCURL_BROTLI=OFF',
+        '-DCURL_ZSTD=OFF',
+        '-DUSE_NGHTTP2=OFF',
+        '-DBUILD_TESTING=OFF',
+        '-DBUILD_CURL_EXE=OFF',
+        '-DBUILD_LIBCURL_DOCS=OFF',
+        '-DBUILD_MISC_DOCS=OFF',
+        '-DENABLE_CURL_MANUAL=OFF',
+        '-DCURL_DISABLE_LDAP=ON',
+        '-DCURL_DISABLE_LDAPS=ON',
+        '-DENABLE_UNICODE=ON'
+    )
+    & cmake @cfg
+    if ($LASTEXITCODE -ne 0) { throw "curl configure failed (exit $LASTEXITCODE)" }
+    & cmake --build $curlBld -j
+    if ($LASTEXITCODE -ne 0) { throw "curl build failed (exit $LASTEXITCODE)" }
+    & cmake --install $curlBld
+    if ($LASTEXITCODE -ne 0) { throw "curl install failed (exit $LASTEXITCODE)" }
+
+    Write-Ok "libcurl $CurlVersion installed -> $curlInstall"
+}
+
 
 # Icon: Only copy pre-created icon from brandkit to build output
 function Copy-DesktopIcon {
@@ -1138,6 +1211,7 @@ function Build-Native {
     Initialize-Nanosvg
     Initialize-Nlohmann   # FIX: gameConsole/app.cpp requires nlohmann/json.hpp
     Initialize-Sqlite   # FIX 2.6.1: SQLite for Stories DB
+    Initialize-Curl     # libcurl Schannel build for native HTTP sync (manifest + API)
 
     # Copy icon from brandkit to build output
     Copy-DesktopIcon -OutDir $BuildNativeDir
@@ -1166,13 +1240,18 @@ function Build-Native {
     }
 
     New-Item -ItemType Directory -Force -Path $BuildNativeDir | Out-Null
+    # CMAKE_PREFIX_PATH: semicolon-separated list so find_package(SDL3) +
+    # find_package(CURL) both resolve. CMake parses ';' even on Windows.
+    $curlInstall = Join-Path $DownloadDir 'curl-native'
+    $prefixList  = @($sdlInstall, $curlInstall) -join ';'
+
     $nativeArgs = @(
         '-S', $AppDir,
         '-B', $BuildNativeDir,
         '-DCMAKE_BUILD_TYPE=Release',
         '-DBUILD_WASM=OFF',
         '-G', 'Ninja',
-        "-DCMAKE_PREFIX_PATH=$sdlInstall",
+        "-DCMAKE_PREFIX_PATH=$prefixList",
         "-DNANOSVG_INCLUDE_DIR=$(Join-Path $DownloadDir 'nanosvg')",
         "-DNLOHMANN_INCLUDE_DIR=$(Join-Path $DownloadDir 'nlohmann')",
         "-DSQLITE_DIR=$(Join-Path $DownloadDir 'sqlite')"

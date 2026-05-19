@@ -139,17 +139,9 @@ if(DEFINED NLOHMANN_INCLUDE_DIR AND NOT NLOHMANN_INCLUDE_DIR STREQUAL "")
     target_include_directories(cTetris PRIVATE ${NLOHMANN_INCLUDE_DIR})
 endif()
 
-# libcurl for native gameStory HTTP sync (optional — offline graceful if absent)
-if(NOT BUILD_WASM)
-    find_package(CURL QUIET)
-    if(CURL_FOUND)
-        target_link_libraries(cTetris PRIVATE CURL::libcurl)
-        target_compile_definitions(cTetris PRIVATE HAVE_LIBCURL)
-        message(STATUS "libcurl found — native HTTP sync enabled")
-    else()
-        message(WARNING "libcurl not found — native sync will be offline-only")
-    endif()
-endif()
+# libcurl: consolidated find_package lives at the BOTTOM of this file
+# (after CMAKE_PREFIX_PATH from build.ps1's Initialize-Curl is in scope).
+# Do not re-add a duplicate find_package(CURL) here.
 
 # WASM: Asyncify needed for emscripten_fetch synchronous mode in gameStory
 if(BUILD_WASM)
@@ -300,12 +292,14 @@ if(BUILD_WASM)
     #   - shell-file: HTML wrapper tuy bien (favicon, title, no PWA).
     #   - preload-file: Dong goi file JSON vao virtual filesystem de doc tai runtime.
     # Dung "SHELL:..." prefix de CMake KHONG deduplicate / mangle args.
+    # No --preload-file: leaderboard is fetched from Cloudflare D1 via
+    # CTETRIS_API_URL, chapter content + media is fetched per chapter from
+    # MANIFEST_GIST_URL + mediaBaseUrl at runtime. Both endpoints are
+    # validated by build.sh/build.ps1 before linking.
     target_link_options(cTetris PRIVATE
         "SHELL:-sALLOW_MEMORY_GROWTH=1"
         "SHELL:-sASYNCIFY=1"
         "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/src/gameConsole/gameConsole_board.json@gameConsole_board.json"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/../chapters@chapters"
     )
 
     # Sinh ra cTetris.html (kem .js + .wasm) thay vi binary mac dinh
@@ -401,24 +395,12 @@ else()
         endif()
     endif()
 
-    # -------------------------------------------------------------------------
-    # Copy gameConsole_board.json + chapters/ directory to executable dir.
-    # WASM uses --preload-file above; native uses POST_BUILD copy here.
-    # When V3 adds API-driven chapter discovery, the local copy still serves
-    # as offline fallback (curl writes downloaded SQL into the same path).
-    # -------------------------------------------------------------------------
-    add_custom_command(TARGET cTetris POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/src/gameConsole/gameConsole_board.json"
-            "$<TARGET_FILE_DIR:cTetris>/gameConsole_board.json"
-        COMMENT "[cTetris] Copying gameConsole_board.json to output directory"
-    )
-    add_custom_command(TARGET cTetris POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/../chapters"
-            "$<TARGET_FILE_DIR:cTetris>/chapters"
-        COMMENT "[cTetris] Copying chapters/ directory to output"
-    )
+    # No local copy of gameConsole_board.json or chapters/ — both are now
+    # remote-sourced at runtime:
+    #   - Leaderboard  → Cloudflare D1  (CTETRIS_API_URL/leaderboard)
+    #   - Chapters     → Gist manifest  (MANIFEST_GIST_URL)
+    #   - Media (PNG/MP3) → raw GitHub  (per-chapter mediaBaseUrl)
+    # Endpoint reachability is verified by build.sh/build.ps1 pre-link.
 endif()
 
 # -----------------------------------------------------------------------------
@@ -482,19 +464,44 @@ else()
 endif()
 
 # ── libcurl (native only; WASM uses emscripten_fetch) ────────────────────────
+# Windows: build.ps1 → Initialize-Curl installs libcurl (Schannel backend)
+# to libs/windows/downloads/curl-native/ and passes it via CMAKE_PREFIX_PATH.
+# macOS/Linux: build.sh → ensure_curl uses brew/apt/dnf/pacman to install
+# the system dev package; find_package picks it up from /usr/local or /opt.
 if(NOT EMSCRIPTEN)
-    find_package(CURL QUIET)
+    find_package(CURL QUIET CONFIG)
+    if(NOT CURL_FOUND)
+        find_package(CURL QUIET)   # fall back to FindCURL.cmake module mode
+    endif()
     if(CURL_FOUND)
         message(STATUS "[cTetris] libcurl ${CURL_VERSION_STRING} → HAVE_LIBCURL=1")
         target_link_libraries(cTetris PRIVATE CURL::libcurl)
         target_compile_definitions(cTetris PRIVATE HAVE_LIBCURL=1)
+
+        # Windows: copy libcurl-x64.dll (or libcurl.dll) next to cTetris.exe
+        # so the runtime loader finds it. Mirrors the SDL3.dll POST_BUILD copy.
+        if(WIN32)
+            get_target_property(_CURL_LOC CURL::libcurl IMPORTED_LOCATION_RELEASE)
+            if(NOT _CURL_LOC)
+                get_target_property(_CURL_LOC CURL::libcurl IMPORTED_LOCATION)
+            endif()
+            if(_CURL_LOC AND EXISTS "${_CURL_LOC}")
+                add_custom_command(TARGET cTetris POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${_CURL_LOC}"
+                        "$<TARGET_FILE_DIR:cTetris>/"
+                    COMMENT "[cTetris] Copying libcurl runtime DLL")
+                message(STATUS "[cTetris] libcurl DLL POST_BUILD copy: ${_CURL_LOC}")
+            endif()
+        endif()
     else()
         message(WARNING
             "[cTetris] libcurl NOT found — HTTP sync disabled (offline fallback).\n"
-            "  macOS : brew install curl\n"
-            "  Ubuntu: sudo apt-get install libcurl4-openssl-dev\n"
-            "  Windows vcpkg: vcpkg install curl:x64-windows\n"
-            "         then set: -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake")
+            "  Windows: re-run app\\build.ps1 native  (auto-installs libcurl)\n"
+            "  macOS  : brew install curl\n"
+            "  Ubuntu : sudo apt-get install libcurl4-openssl-dev\n"
+            "  Fedora : sudo dnf install libcurl-devel\n"
+            "  Arch   : sudo pacman -S curl")
     endif()
 endif()
 # WASM: emscripten_fetch is always available — HAVE_LIBCURL not needed.

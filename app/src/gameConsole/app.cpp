@@ -516,67 +516,22 @@ static const FallbackRow FALLBACK_BOARD_ROWS[] = {
     {"GoldenEye",    1400, "2026-04-12T06:45:12Z"}, {"ProGamerVN",   1250, "2026-04-12T08:05:30Z"}
 };
 
-// [C.5] Live board container -- populated at runtime by loadBoard().
-// Replaces the old static const BOARD_DATA[]. g_boardTotal cached for
-// the (very hot) hit-test loop in event handlers.
+// Live board container -- populated at runtime by loadBoardWithFallback()
+// from sync_Records (D1 sync target). g_boardTotal cached for the (very
+// hot) hit-test loop in event handlers.
 static std::vector<BoardEntry> g_board;
 static int g_boardTotal  = 0;
 static const int BOARD_VISIBLE = 9;
 
-// [C.5] Load JSON from <basepath>/gameConsole_board.json. Returns false
-// on any failure (no file, parse error, schema mismatch). Caller falls
-// back to FALLBACK_BOARD_ROWS.
-static bool loadBoardFromJson() {
-    const char* basePath = SDL_GetBasePath();
-    std::string path;
-    if (basePath && basePath[0] != '\0') {
-        path = std::string(basePath) + "gameConsole_board.json";
-    } else {
-        path = "gameConsole_board.json";  // CWD fallback
-    }
-    // SDL_GetBasePath in SDL3: returns const char*, do NOT free
+// [V3] Board JSON loader removed -- leaderboard now sourced from D1 via
+// fetchLeaderboardFromApi() into sync_Records, and loadBoardWithFallback()
+// reads sync_Records via dbLoadRecords(). FALLBACK_BOARD_ROWS still seeds
+// the table on first DB init (see dbInitSchema), and dbLoadRecords falls
+// back to the same static array when sync_Records is empty -- so the
+// leaderboard is never blank, even fully offline before the first sync.
 
-    SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
-    if (!io) {
-        SDL_Log("[gameConsole] khong mo duoc %s -- dung fallback", path.c_str());
-        return false;
-    }
-    Sint64 sz = SDL_GetIOSize(io);
-    if (sz <= 0) { SDL_CloseIO(io); return false; }
-    std::string raw((size_t)sz, '\0');
-    size_t got = SDL_ReadIO(io, &raw[0], (size_t)sz);
-    SDL_CloseIO(io);
-    if (got != (size_t)sz) {
-        SDL_Log("[gameConsole] read sai size: got %zu need %lld",
-                got, (long long)sz);
-        return false;
-    }
-
-    try {
-        nlohmann::json j = nlohmann::json::parse(raw);
-        const auto& arr = j.at("board");
-        std::vector<BoardEntry> out;
-        out.reserve(arr.size());
-        for (const auto& e : arr) {
-            BoardEntry be;
-            be.user      = e.at("user").get<std::string>();
-            be.score     = e.at("score").get<int>();
-            std::string iso = e.at("time").get<std::string>();
-            be.timeEpoch = parseIso8601(iso.c_str());
-            be.time      = formatIsoForDisplay(iso.c_str());
-            out.push_back(std::move(be));
-        }
-        if (out.empty()) return false;
-        g_board = std::move(out);
-        return true;
-    } catch (const std::exception& ex) {
-        SDL_Log("[gameConsole] JSON parse fail: %s", ex.what());
-        return false;
-    }
-}
-
-// [C.5] Load with fallback. Always populates g_board with at least 30
-// fallback rows so leaderboard is never empty.
+// Populate g_board from sync_Records (DB-only path; never blank thanks to
+// the fallback inside dbLoadRecords).
 static void loadBoardWithFallback() {
     g_board.clear();
     std::vector<BoardRecord> rows = dbLoadRecords();

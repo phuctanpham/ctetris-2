@@ -69,6 +69,18 @@
                - Fixes EM_ASM syntax: changed Module.FS.syncfs to Module['FS'].syncfs
                  (bracket notation required in EM_ASM macros at lines 911, 1504).
                - WASM build: exit code 0, media download + IndexedDB persistence complete.
+[x] Issue 3.5: Remove chapters/ from WASM --preload-file (CMakeLists.txt patch).
+               - Chapters now runtime-sourced from Gist manifest + per-chapter mediaBaseUrl.
+               - Local --preload-file copy removed; chapters/ served via remote URLs.
+               - WASM binary size reduced; offline fallback still works (timeouts -> SDK log).
+               - Build: exit code 0, WASM smaller + remote-first.
+[x] Issue 3.6: Build system libcurl integration — affects media download resilience.
+               - build.ps1: Initialize-Curl auto-installs curl (Schannel) to curl-native/
+               - build.sh: ensure_curl detects or auto-installs system curl
+               - CMakeLists.txt: consolidated CURL find_package at bottom (CONFIG + module fallback)
+               - Enables robust HTTP media downloads (native + WASM emscripten_fetch)
+               - Does NOT affect gameStory/app.cpp code; pure build infrastructure.
+               - Build: exit code 0, curl support built-in.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.

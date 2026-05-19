@@ -93,6 +93,13 @@
                - Resolves LNK2019: unresolved external symbol for g_db usage at line 169.
                - Allows gameCore onGameOver() to access sync_Records for record checking.
                - Build: exit code 0, cross-module DB access working.
+[x] Issue 3.3: Build system libcurl integration — CMakeLists.txt, build.ps1, build.sh updated.
+               - build.ps1: Initialize-Curl auto-builds curl with Schannel, installed to curl-native/
+               - build.sh: ensure_curl detects or auto-installs system curl via package manager
+               - Both pass curl location via CMAKE_PREFIX_PATH so find_package(CURL) resolves
+               - CMakeLists.txt: find_package(CURL CONFIG) + module fallback, DLL POST_BUILD copy
+               - Does NOT affect gameCore/app.cpp code; pure build infrastructure.
+               - Build: exit code 0, native + WASM both compile with HTTP sync enabled/fallback.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameCore/app.cpp) duy nhất để viết.
