@@ -174,12 +174,23 @@ jobs:
           echo "$new_manifest" | jq .
 
       # ── 4. Echo manifest Gist URL for copy-paste into app/.env ───────────
+      # Uses github.repository_owner (always available) + reads Gist ID
+      # directly from app/.env — never depends on step outputs that may be
+      # empty when an earlier step fails (e.g. missing GIST_TOKEN secret).
       - name: Echo manifest Gist URL
         if: always()
         run: |
-          mid="${{ steps.cfg.outputs.manifest_id }}"
-          owner="${{ steps.cfg.outputs.owner }}"
-          url="https://gist.githubusercontent.com/${owner}/${mid}/raw/manifest.json"
+          owner="${{ github.repository_owner }}"
+          env_url=$(grep '^MANIFEST_GIST_URL=' app/.env 2>/dev/null \
+                    | cut -d'=' -f2- | tr -d '[:space:]' || true)
+          mid=$(echo "$env_url" | awk -F'/' '{print $5}' || true)
+
+          if [ -n "$mid" ] && ! echo "$mid" | grep -qE '^GIST_ID$|^<'; then
+            url="https://gist.githubusercontent.com/${owner}/${mid}/raw/manifest.json"
+          else
+            url="NOT SET — add GIST_TOKEN secret, then re-run this workflow"
+          fi
+
           echo ""
           echo "=============================================="
           echo "Copy this line into app/.env:"

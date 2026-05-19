@@ -394,6 +394,136 @@ function Initialize-Sqlite {
 }
 
 # =============================================================================
+# Validate-Endpoints -- check MANIFEST_GIST_URL + CTETRIS_API_URL + media
+# Mirrors game loading-bar progress: [N/total] per media file check (HEAD).
+# Stops the build (throw) on first failure.
+# =============================================================================
+function Validate-Endpoints {
+    Write-Info "=== Endpoint & Media Validation ==="
+
+    $envFile = Join-Path $AppDir '.env'
+    if (-not (Test-Path $envFile)) {
+        Write-Err ".env not found at $envFile — create it with MANIFEST_GIST_URL and CTETRIS_API_URL"
+        throw "Missing app/.env"
+    }
+
+    $envContent = Get-Content $envFile -Raw
+
+    $manifestUrl = ''
+    $apiUrl = ''
+    if ($envContent -match '(?m)^MANIFEST_GIST_URL=(.+)$') { $manifestUrl = $Matches[1].Trim() }
+    if ($envContent -match '(?m)^CTETRIS_API_URL=(.+)$') { $apiUrl = $Matches[1].Trim() }
+
+    Write-Info ('[1/3] MANIFEST_GIST_URL: ' + $manifestUrl)
+    if ([string]::IsNullOrWhiteSpace($manifestUrl) -or $manifestUrl -match 'GIST_ID|OWNER|<') {
+        Write-Err 'MANIFEST_GIST_URL is a placeholder. Set real Gist URL in app/.env.'
+        throw 'MANIFEST_GIST_URL not configured'
+    }
+    try {
+        $r = Invoke-WebRequest -Uri $manifestUrl -Method Get -TimeoutSec 15 -UseBasicParsing -ErrorAction Stop
+        if ($r.StatusCode -ne 200) { throw ('HTTP ' + $r.StatusCode) }
+        Write-Ok ('MANIFEST_GIST_URL OK (HTTP ' + $r.StatusCode + ')')
+    } catch {
+        Write-Err ('MANIFEST_GIST_URL unreachable: ' + $_)
+        Write-Err ('  URL: ' + $manifestUrl)
+        throw 'MANIFEST_GIST_URL validation failed'
+    }
+
+    Write-Info ('[2/3] CTETRIS_API_URL: ' + $apiUrl)
+    if ([string]::IsNullOrWhiteSpace($apiUrl) -or $apiUrl -match 'OWNER|<your') {
+        Write-Err 'CTETRIS_API_URL is a placeholder. Deploy Cloudflare Worker and set real URL.'
+        throw 'CTETRIS_API_URL not configured'
+    }
+    try {
+        $apiHealthUrl = $apiUrl + '/health'
+        $r = Invoke-WebRequest -Uri $apiHealthUrl -Method Get -TimeoutSec 15 -UseBasicParsing -ErrorAction Stop
+        if ($r.StatusCode -ne 200) { throw ('HTTP ' + $r.StatusCode) }
+        Write-Ok ('CTETRIS_API_URL OK (HTTP ' + $r.StatusCode + ')')
+    } catch {
+        Write-Err ('CTETRIS_API_URL/health unreachable: ' + $_)
+        Write-Err ('  URL: ' + $apiUrl + '/health')
+        throw 'CTETRIS_API_URL validation failed'
+    }
+
+    Write-Info '[3/3] Checking media files online...'
+
+    $remoteUrl = & git -C $AppDir remote get-url origin 2>$null
+    if ([string]::IsNullOrWhiteSpace($remoteUrl)) {
+        Write-Warn 'No git remote - skipping media checks'
+        return
+    }
+
+    $owner = ''
+    $repo = ''
+    if ($remoteUrl -match 'github\.com[:/]([^/]+)/([^/.]+)(\.git)?$') {
+        $owner = $Matches[1]
+        $repo = $Matches[2]
+    }
+    if (-not $owner -or -not $repo) {
+        Write-Warn ('Cannot parse owner/repo from ' + $remoteUrl + ' - skipping media checks')
+        return
+    }
+
+    $chaptersDir = Join-Path $AppDir '..\chapters\src'
+    if (-not (Test-Path $chaptersDir)) {
+        Write-Warn 'chapters\src not found - skipping media checks'
+        return
+    }
+
+    $mediaItems = @()
+    foreach ($jsonFile in Get-ChildItem -Path $chaptersDir -Recurse -Filter 'c*.json' | Where-Object { $_.FullName -match 'c\d+\\c\d+\.json$' }) {
+        $chapterId = $jsonFile.Directory.Name
+        $mediaBase = 'https://raw.githubusercontent.com/' + $owner + '/' + $repo + '/main/chapters/src/' + $chapterId + '/media/'
+        $content = Get-Content $jsonFile.FullName -Raw
+        $pattern = '"(?:thumbnailPath|imageUrl)"\s*:\s*"([^"]+\.(png|jpg|jpeg|gif|webp|svg))"'
+
+        [regex]::Matches($content, $pattern) | ForEach-Object {
+            $fn = $_.Groups[1].Value
+            if ($fn) {
+                $url = $mediaBase + $fn
+                if (-not ($mediaItems | Where-Object { $_.Url -eq $url })) {
+                    $mediaItems += [PSCustomObject]@{ Url = $url; Label = $chapterId + '/' + $fn }
+                }
+            }
+        }
+    }
+
+    $total = $mediaItems.Count
+    if ($total -eq 0) {
+        Write-Warn 'No media file references found - skipping'
+        return
+    }
+
+    $doneN = 0
+    $failN = 0
+    foreach ($item in $mediaItems) {
+        $doneN++
+        Write-Host ('  [{0}/{1}] {2} ' -f $doneN, $total, $item.Label) -NoNewline
+        try {
+            $r = Invoke-WebRequest -Uri $item.Url -Method Head -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
+            if ($r.StatusCode -eq 200) {
+                Write-Host 'OK' -ForegroundColor Green
+            } else {
+                Write-Host ('HTTP ' + $r.StatusCode) -ForegroundColor Red
+                $failN++
+            }
+        } catch {
+            Write-Host 'MISSING' -ForegroundColor Red
+            Write-Warn ('  -> ' + $item.Url)
+            $failN++
+        }
+    }
+
+    if ($failN -gt 0) {
+        Write-Err ($failN.ToString() + '/' + $total + ' media files not found on GitHub (' + $owner + '/' + $repo + ').')
+        Write-Err 'Commit and push missing files to chapters/src/<chapter>/media/ before building.'
+        throw ('Media validation failed: ' + $failN + ' missing files')
+    }
+
+    Write-Ok ('All ' + $total + ' media files confirmed online (' + $owner + '/' + $repo + ')')
+}
+
+# =============================================================================
 # nanosvg -- shared headers in libs\downloads\nanosvg -> download if missing
 # =============================================================================
 function Initialize-Nanosvg {
@@ -985,6 +1115,7 @@ function Sign-WindowsBinary {
 # Build entry points
 # =============================================================================
 function Build-Native {
+    Validate-Endpoints
     Write-Info "Build NATIVE -> $BuildNativeDir"
     Test-Sources
     Validate-WindowsFixes
@@ -1048,6 +1179,7 @@ function Build-Native {
 }
 
 function Build-Wasm {
+    Validate-Endpoints
     Write-Info "Build WASM -> $BuildWasmDir"
     Test-Sources
     Validate-LoggerIntegration

@@ -166,6 +166,144 @@ ensure_sqlite() {
     log_ok "SQLite amalgamation $SQLITE_VERSION san sang ($((size/1048576)) MB)"
 }
 
+# =============================================================================
+# validate_endpoints -- check MANIFEST_GIST_URL + CTETRIS_API_URL + media
+# Mirrors the game's loading-bar progress: shows [N/total] for each file.
+# Stops the build (exit 1) on first failure.
+# =============================================================================
+validate_endpoints() {
+    log_info "=== Endpoint & Media Validation ==="
+
+    local env_file="$APP_DIR/.env"
+    if [ ! -f "$env_file" ]; then
+        log_error ".env not found at $env_file — create it with MANIFEST_GIST_URL and CTETRIS_API_URL"
+        exit 1
+    fi
+
+    local manifest_url api_url
+    manifest_url=$(grep -E '^MANIFEST_GIST_URL=' "$env_file" | cut -d'=' -f2- | tr -d '[:space:]')
+    api_url=$(grep -E '^CTETRIS_API_URL=' "$env_file" | cut -d'=' -f2- | tr -d '[:space:]')
+
+    # ── 1/3: MANIFEST_GIST_URL ────────────────────────────────────────────
+    log_info "[1/3] MANIFEST_GIST_URL: $manifest_url"
+    if [ -z "$manifest_url" ] || echo "$manifest_url" | grep -qE 'GIST_ID|OWNER|<'; then
+        log_error "MANIFEST_GIST_URL is a placeholder. Set real Gist URL in app/.env and push sync-chapters.yml."
+        exit 1
+    fi
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$manifest_url" 2>/dev/null || echo "000")
+    if [ "$code" != "200" ]; then
+        log_error "MANIFEST_GIST_URL returned HTTP $code — Gist may be private or URL wrong."
+        log_error "  URL: $manifest_url"
+        exit 1
+    fi
+    log_ok "MANIFEST_GIST_URL OK (HTTP $code)"
+
+    # ── 2/3: CTETRIS_API_URL ──────────────────────────────────────────────
+    log_info "[2/3] CTETRIS_API_URL: $api_url"
+    if [ -z "$api_url" ] || echo "$api_url" | grep -qE 'OWNER|<your'; then
+        log_error "CTETRIS_API_URL is a placeholder. Deploy Cloudflare Worker and set real URL in app/.env."
+        exit 1
+    fi
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$api_url/health" 2>/dev/null || echo "000")
+    if [ "$code" != "200" ]; then
+        log_error "CTETRIS_API_URL/health returned HTTP $code — Worker may not be deployed."
+        log_error "  URL: $api_url/health"
+        exit 1
+    fi
+    log_ok "CTETRIS_API_URL OK (HTTP $code)"
+
+    # ── 3/3: Media files — HEAD check on GitHub raw ───────────────────────
+    log_info "[3/3] Checking media files online..."
+
+    # Derive owner/repo from git remote (https or ssh)
+    local remote owner repo
+    remote=$(git -C "$APP_DIR" remote get-url origin 2>/dev/null || echo "")
+    if [ -z "$remote" ]; then
+        log_warn "No git remote detected — skipping media file checks"
+        return 0
+    fi
+    owner=$(echo "$remote" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
+    repo=$(echo "$remote"  | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
+    if [ -z "$owner" ] || [ -z "$repo" ]; then
+        log_warn "Cannot parse owner/repo from remote '$remote' — skipping media checks"
+        return 0
+    fi
+
+    local chapters_dir="$APP_DIR/../chapters/src"
+    if [ ! -d "$chapters_dir" ]; then
+        log_warn "chapters/src not found at $chapters_dir — skipping media checks"
+        return 0
+    fi
+
+    # Build list: "<url> <chapter_id/filename>" lines into temp file
+    local tmp_list
+    tmp_list=$(mktemp)
+    local json_file chapter_id media_base filename
+
+    for json_file in $(find "$chapters_dir" -maxdepth 2 -name "c*.json" \
+                        | grep -E 'c[0-9]+/c[0-9]+\.json$' | sort); do
+        chapter_id=$(basename "$(dirname "$json_file")")
+        media_base="https://raw.githubusercontent.com/$owner/$repo/main/chapters/src/$chapter_id/media/"
+
+        # Extract thumbnailPath values (non-empty, ending in image extension)
+        grep -oE '"thumbnailPath"[[:space:]]*:[[:space:]]*"[^"]+"' "$json_file" \
+            | sed -E 's/.*"thumbnailPath"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
+            | grep -E '\.(png|jpg|jpeg|gif|webp|svg)$' \
+            | sort -u \
+            | while IFS= read -r fn; do
+                echo "${media_base}${fn} ${chapter_id}/${fn}"
+              done >> "$tmp_list"
+
+        # Extract imageUrl values (non-empty, ending in image extension)
+        grep -oE '"imageUrl"[[:space:]]*:[[:space:]]*"[^"]+"' "$json_file" \
+            | sed -E 's/.*"imageUrl"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
+            | grep -E '\.(png|jpg|jpeg|gif|webp|svg)$' \
+            | sort -u \
+            | while IFS= read -r fn; do
+                echo "${media_base}${fn} ${chapter_id}/${fn}"
+              done >> "$tmp_list"
+    done
+
+    # Deduplicate
+    sort -u "$tmp_list" -o "$tmp_list"
+
+    local total done_n fail_n
+    total=$(grep -c . "$tmp_list" 2>/dev/null || echo 0)
+
+    if [ "$total" -eq 0 ]; then
+        log_warn "No media file references found in chapter JSONs — skipping"
+        rm -f "$tmp_list"
+        return 0
+    fi
+
+    done_n=0
+    fail_n=0
+
+    while IFS=' ' read -r url label; do
+        done_n=$((done_n + 1))
+        printf "  [%d/%d] %s " "$done_n" "$total" "$label"
+        code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -I "$url" 2>/dev/null || echo "000")
+        if [ "$code" = "200" ]; then
+            printf "OK\n"
+        else
+            printf "MISSING (HTTP %s)\n" "$code"
+            log_error "  -> $url"
+            fail_n=$((fail_n + 1))
+        fi
+    done < "$tmp_list"
+
+    rm -f "$tmp_list"
+
+    if [ "$fail_n" -gt 0 ]; then
+        log_error "$fail_n/$total media files not found on GitHub."
+        log_error "Commit and push the missing files to chapters/src/<chapter>/media/ before building."
+        exit 1
+    fi
+
+    log_ok "All $total media files confirmed online ($owner/$repo)"
+}
+
 ensure_emsdk() {
     if command -v emcmake >/dev/null 2>&1 && command -v em++ >/dev/null 2>&1; then
         return 0
@@ -279,6 +417,7 @@ ensure_sdl3_wasm() {
 # =============================================================================
 
 build_native() {
+    validate_endpoints
     log_info "Build NATIVE mode -> $BUILD_NATIVE_DIR"
     # validate_sources (giả định hàm này đã được định nghĩa ở trên)
     ensure_sdl3_native
@@ -317,6 +456,7 @@ build_native() {
 }
 
 build_wasm() {
+    validate_endpoints
     log_info "Build WASM mode -> $BUILD_WASM_DIR"
     ensure_sdl3_native || true
     ensure_emsdk
