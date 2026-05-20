@@ -95,7 +95,7 @@
                - Rationale: All includes must be at global scope, never inside functions
                  or code blocks; HAVE_LIBCURL is CMake-guaranteed on native builds.
                - Build: exit code 0, native Windows compile successful, cTetris.exe linked.
-[ ] Issue 3.8: First-start SQL bootstrap is not recursively importing chapter child media URLs.
+[x] Issue 3.8: First-start SQL bootstrap is not recursively importing chapter child media URLs.
                - When init tables do not exist, current flow does not fully trace chapter JSON
                  (c{chapterId}.json) to collect nested child media source URLs and transform
                  them into SQL rows for complete initial import.
