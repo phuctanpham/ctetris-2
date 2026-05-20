@@ -81,6 +81,20 @@
                - Enables robust HTTP media downloads (native + WASM emscripten_fetch)
                - Does NOT affect gameStory/app.cpp code; pure build infrastructure.
                - Build: exit code 0, curl support built-in.
+[x] Issue 3.7: gameStory/app.cpp CURL include inline-scope fix — moved #include <curl/curl.h>
+               from inside httpGetSync() function (line 562-564) to global scope with
+               separate #ifdef HAVE_LIBCURL guard (lines 23-26 in gameStory/app.cpp);
+               removed redundant #else / offline fallback / #endif HAVE_LIBCURL block.
+               - Problem 1: Include was inside function body (C++ anti-pattern), triggered
+                 compiler error C2598 "linkage specification must be at global scope" at
+                 inttypes.h(20), followed by 100+ cascading winsock2.h parse errors.
+               - Problem 2: Redundant HAVE_LIBCURL fallback block (lines 595-599) was
+                 unreachable since native builds guarantee HAVE_LIBCURL=1 via CMakeLists.txt.
+               - Fix: Moved include to file scope (global declaration section), removed
+                 conditional fallback block (one less nesting level).
+               - Rationale: All includes must be at global scope, never inside functions
+                 or code blocks; HAVE_LIBCURL is CMake-guaranteed on native builds.
+               - Build: exit code 0, native Windows compile successful, cTetris.exe linked.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.

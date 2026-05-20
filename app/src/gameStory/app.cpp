@@ -20,6 +20,11 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 
+// libcurl for native HTTP sync (manifest fetch, native WASM not used)
+#ifdef HAVE_LIBCURL
+#include <curl/curl.h>
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/fetch.h>
@@ -558,8 +563,6 @@ static std::string httpGetSync(const char* url) {
     // Declared extern so this TU compiles without curl.h in the include path.
     // The linker resolves the symbol from the curl shared library.
     // If curl is unavailable the build will fail at link time — intentional.
-    #ifdef HAVE_LIBCURL
-    #include <curl/curl.h>
     struct CurlBuf { std::string data; };
     auto writeCallback = [](char* ptr, size_t sz, size_t nmemb, void* ud) -> size_t {
         ((CurlBuf*)ud)->data.append(ptr, sz * nmemb);
@@ -588,12 +591,7 @@ static std::string httpGetSync(const char* url) {
     CTDBG_RES("GET", url, (int)httpCode, buf.data.size());
     CTDBG_BODY(buf.data);
     return buf.data;
-    #else
-    CTDBG_ERR("httpGetSync: built without libcurl, offline fallback");
-    // libcurl not available — treat as offline
-    SDL_Log("[gameStory] httpGetSync: built without libcurl, offline fallback");
-    return "";
-    #endif  // HAVE_LIBCURL
+
 #endif  // __EMSCRIPTEN__
 }
 
