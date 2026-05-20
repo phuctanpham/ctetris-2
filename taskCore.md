@@ -100,6 +100,12 @@
                - CMakeLists.txt: find_package(CURL CONFIG) + module fallback, DLL POST_BUILD copy
                - Does NOT affect gameCore/app.cpp code; pure build infrastructure.
                - Build: exit code 0, native + WASM both compile with HTTP sync enabled/fallback.
+[x] Issue 3.4: app/main.cpp scene routing no longer auto-replays GameStory from PLAY.
+                             - Staged diff removed the `runGameStory(window, renderer, cfg.storyId, cfg.chapterId)`
+                                 call from the `nextScene=1` path.
+                             - PLAY now goes directly to the game scene; dialogue replay is reserved for
+                                 the stories popup (`nextScene=2`).
+                             - Prevents duplicate story launch behavior and keeps scene ownership clearer.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameCore/app.cpp) duy nhất để viết.

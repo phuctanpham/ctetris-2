@@ -112,6 +112,12 @@
                 - Effect: native targets keep curl header path while WASM avoids native
                   curl include path and relies on emscripten fetch path.
                 - Keeps compile path aligned with target platform separation.
+[x] Issue 3.11: stb_image support header added for GameStory image decoding path.
+                - New staged file `app/src/gameStory/include/stb_image.h` adds the single-
+                  header image loader needed for local decode support.
+                - Complements the media workflow so streamed/loaded chapter assets can be
+                  decoded without introducing a separate external build dependency.
+                - Keeps the GameStory media pipeline self-contained in `app/src/gameStory/include`.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.

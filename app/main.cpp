@@ -89,13 +89,8 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        // nextScene=1: PLAY button -> show story dialogue then enter gameCore
-        if (cfg.storyId > 0) {
-            logger.logEvent("STORY", "Playing dialogue story=%d chapter=%d",
-                            cfg.storyId, cfg.chapterId);
-            runGameStory(window, renderer, cfg.storyId, cfg.chapterId);
-        }
-        
+        // nextScene=1: PLAY button -> go directly to game (no dialogue replay)
+        // Dialogue replay is only triggered from the stories popup (nextScene=2).
         int back = runGameCore(window, renderer, cfg);
         if (back != 2) {
             logger.log("User quit from game core");

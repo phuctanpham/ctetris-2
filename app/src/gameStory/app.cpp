@@ -23,6 +23,9 @@
 // libcurl for native HTTP sync (manifest fetch, native WASM not used)
 #ifndef __EMSCRIPTEN__
 #include <curl/curl.h>
+#include <thread>
+#include <mutex>
+#include <atomic>
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -30,7 +33,14 @@
 #include <emscripten/fetch.h>
 #endif
 
+// stb_image: single-header PNG/JPG decoder (vendored from SDL3 source)
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_NO_STDIO
+#include "stb_image.h"
+
 #include "ctetris_debug.h"
+
+#include <map>
 
 // Loading bar duration: 8 s to show story + give WASM time to settle
 const int INTRO_DURATION = 8000;
@@ -385,7 +395,8 @@ static void drawDialoguePage(SDL_Renderer* renderer,
                               const DialogueNode&              node,
                               const std::vector<DialogueChoice>& choices,
                               int   selChoice,
-                              bool  skipHover) {
+                              bool  skipHover,
+                              SDL_Texture* imgTex = nullptr) {
     int nc = (int)choices.size();
 
     // background
@@ -393,15 +404,25 @@ static void drawDialoguePage(SDL_Renderer* renderer,
         DIAG_BG.r, DIAG_BG.g, DIAG_BG.b, DIAG_BG.a);
     SDL_RenderClear(renderer);
 
-    // image area placeholder (V3 replaces with real texture)
+    // image area: render texture if available, else placeholder
     SDL_SetRenderDrawColor(renderer,
         DIAG_IMG_BG.r, DIAG_IMG_BG.g, DIAG_IMG_BG.b, 255);
     SDL_RenderFillRect(renderer, &DIAG_IMG_AREA);
     SDL_SetRenderDrawColor(renderer,
         DIAG_IMG_BORDER.r, DIAG_IMG_BORDER.g, DIAG_IMG_BORDER.b, 255);
     SDL_RenderRect(renderer, &DIAG_IMG_AREA);
-    if (node.imageUrl.empty()) {
+    if (imgTex) {
+        SDL_RenderTexture(renderer, imgTex, nullptr, &DIAG_IMG_AREA);
+    } else if (node.imageUrl.empty()) {
         const char* lbl = "[ IMAGE ]";
+        int ll = (int)SDL_strlen(lbl);
+        SDL_SetRenderDrawColor(renderer, 75, 78, 98, 255);
+        SDL_RenderDebugText(renderer,
+            DIAG_IMG_AREA.x + (DIAG_IMG_AREA.w - ll * 8.0f) / 2.0f,
+            DIAG_IMG_AREA.y + (DIAG_IMG_AREA.h - 8.0f)  / 2.0f,
+            lbl);
+    } else {
+        const char* lbl = "[ loading... ]";
         int ll = (int)SDL_strlen(lbl);
         SDL_SetRenderDrawColor(renderer, 75, 78, 98, 255);
         SDL_RenderDebugText(renderer,
@@ -526,6 +547,77 @@ struct SyncProgress {
     SyncState state = SYNC_IDLE;
     std::vector<std::string> completedTasks;  // rendered below the progress bar
 };
+
+// forward declaration — defined later in this file
+static std::string httpGetSync(const char* url);
+
+// ---------------------------------------------------------------------------
+// Dialogue media: image texture cache + BGM audio stream
+// ---------------------------------------------------------------------------
+static std::map<std::string, SDL_Texture*> g_imgCache;
+static SDL_AudioStream* g_bgmStream  = nullptr;
+static std::string      g_bgmUrl;
+
+static void dialStopBgm() {
+    if (g_bgmStream) {
+        SDL_DestroyAudioStream(g_bgmStream);
+        g_bgmStream = nullptr;
+    }
+    g_bgmUrl.clear();
+}
+
+static SDL_Texture* dialLoadImage(SDL_Renderer* renderer, const std::string& url) {
+    if (url.empty()) return nullptr;
+    auto it = g_imgCache.find(url);
+    if (it != g_imgCache.end()) return it->second;
+
+    std::string bytes = httpGetSync(url.c_str());
+    if (bytes.empty()) return nullptr;
+
+    int w = 0, h = 0, n = 0;
+    unsigned char* px = stbi_load_from_memory(
+        (const unsigned char*)bytes.data(), (int)bytes.size(), &w, &h, &n, 4);
+    if (!px) return nullptr;
+
+    SDL_Surface* surf = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_RGBA32, px, w * 4);
+    SDL_Texture* tex = surf ? SDL_CreateTextureFromSurface(renderer, surf) : nullptr;
+    SDL_DestroySurface(surf);
+    stbi_image_free(px);
+
+    if (tex) g_imgCache[url] = tex;
+    return tex;
+}
+
+static void dialPlayBgm(const std::string& url) {
+    if (url == g_bgmUrl) return;
+    dialStopBgm();
+    if (url.empty()) return;
+
+    std::string bytes = httpGetSync(url.c_str());
+    if (bytes.empty()) { g_bgmUrl = url; return; }
+
+    SDL_IOStream* io = SDL_IOFromMem((void*)bytes.data(), (int)bytes.size());
+    if (!io) { g_bgmUrl = url; return; }
+
+    SDL_AudioSpec spec{};
+    Uint8* wav = nullptr; Uint32 wavLen = 0;
+    if (!SDL_LoadWAV_IO(io, true, &spec, &wav, &wavLen)) {
+        g_bgmUrl = url; return;
+    }
+
+    SDL_AudioDeviceID dev = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec);
+    if (dev == 0) { SDL_free(wav); g_bgmUrl = url; return; }
+
+    g_bgmStream = SDL_CreateAudioStream(&spec, &spec);
+    if (g_bgmStream) {
+        SDL_BindAudioStream(dev, g_bgmStream);
+        SDL_PutAudioStreamData(g_bgmStream, wav, (int)wavLen);
+        SDL_ResumeAudioDevice(dev);
+    }
+    SDL_free(wav);
+    SDL_CloseAudioDevice(dev);
+    g_bgmUrl = url;
+}
 
 // ---------------------------------------------------------------------------
 // Minimal HTTP GET — returns body string or empty on failure.
@@ -859,9 +951,11 @@ static void syncFromGist(sqlite3* db) {
         return;
     }
 
+    g_syncProgress.completedTasks.push_back("manifest: fetching...");
     std::string manifestBody = httpGetSync(manifestUrl);
     if (manifestBody.empty()) {
         SDL_Log("[gameStory] manifest fetch failed — offline");
+        g_syncProgress.completedTasks.back() = "manifest: fetch failed";
         g_syncProgress.state = SYNC_OFFLINE;
         return;
     }
@@ -871,9 +965,12 @@ static void syncFromGist(sqlite3* db) {
         manifest = nlohmann::json::parse(manifestBody);
     } catch (...) {
         SDL_Log("[gameStory] manifest JSON parse fail — offline");
+        g_syncProgress.completedTasks.back() = "manifest: parse error";
         g_syncProgress.state = SYNC_OFFLINE;
         return;
     }
+    g_syncProgress.completedTasks.back() = "manifest: OK";
+
     // Read versions[latest] — format: { "c001": { latestCommitId, gistUrl, mediaBaseUrl, updatedDate } }
     std::string latest = manifest.value("latest", std::string());
     if (latest.empty() || !manifest.contains(latest) || !manifest[latest].is_object()) {
@@ -892,12 +989,14 @@ static void syncFromGist(sqlite3* db) {
         std::string gistUrl  = it.value().value("gistUrl",        std::string());
         std::string mediaBU  = it.value().value("mediaBaseUrl",   std::string());
         if (cid.empty() || newSha.empty() || gistUrl.empty()) continue;
+        g_syncProgress.completedTasks.push_back(cid + ": checking...");
         std::string localSha = metaGetSha(db, cid.c_str());
         if (localSha == newSha) {
             SDL_Log("[gameStory] %s SHA match — skip", cid.c_str());
-            g_syncProgress.completedTasks.push_back(cid + ": up to date");
+            g_syncProgress.completedTasks.back() = cid + ": up to date";
         } else {
             SDL_Log("[gameStory] %s SHA diff — queue update", cid.c_str());
+            g_syncProgress.completedTasks.back() = cid + ": update available";
             toUpdate.push_back({cid, newSha, gistUrl, mediaBU});
         }
     }
@@ -914,21 +1013,24 @@ static void syncFromGist(sqlite3* db) {
     g_syncProgress.state = SYNC_UPDATING_DB;
     for (const auto& entry : toUpdate) {
         g_syncProgress.currentId = entry.id;
+        g_syncProgress.completedTasks.push_back(entry.id + ": fetching JSON...");
         std::string body = httpGetSync(entry.gistUrl.c_str());
         if (body.empty()) {
-            SDL_Log("[gameStory] %s gistUrl fetch fail — skip",
-                    entry.id.c_str());
-            g_syncProgress.completedTasks.push_back(entry.id + ": fetch failed");
-        } else if (applyChapterJson(db, body, entry.id.c_str(),
-                                    entry.mediaBaseUrl.c_str())) {
-            metaSetSha(db, entry.id.c_str(), entry.sha.c_str(),
-                       entry.mediaBaseUrl.c_str());
-            g_syncProgress.completedTasks.push_back(entry.id + ": synced OK");
-#ifdef __EMSCRIPTEN__
-            EM_ASM({ Module['FS'].syncfs(false, function(){}); });
-#endif
+            SDL_Log("[gameStory] %s gistUrl fetch fail — skip", entry.id.c_str());
+            g_syncProgress.completedTasks.back() = entry.id + ": fetch failed";
         } else {
-            g_syncProgress.completedTasks.push_back(entry.id + ": import error");
+            g_syncProgress.completedTasks.back() = entry.id + ": importing...";
+            if (applyChapterJson(db, body, entry.id.c_str(),
+                                 entry.mediaBaseUrl.c_str())) {
+                metaSetSha(db, entry.id.c_str(), entry.sha.c_str(),
+                           entry.mediaBaseUrl.c_str());
+                g_syncProgress.completedTasks.back() = entry.id + ": synced OK";
+#ifdef __EMSCRIPTEN__
+                EM_ASM({ Module['FS'].syncfs(false, function(){}); });
+#endif
+            } else {
+                g_syncProgress.completedTasks.back() = entry.id + ": import error";
+            }
         }
         g_syncProgress.done++;
     }
@@ -1125,15 +1227,20 @@ static int postSyncConditionCheck(sqlite3* db, const char* idUser) {
     return sel.id;
 }
 
-// [D.6] BGM stub: log URL change, no playback until V3 provides media files.
-static std::string s_currentBgmUrl;
-static void diagUpdateBgm(const std::string& bgmUrl) {
-    if (bgmUrl == s_currentBgmUrl) return;
-    s_currentBgmUrl = bgmUrl;
-    if (!bgmUrl.empty())
-        SDL_Log("[gameStory] BGM stub: would play '%s' (V3)", bgmUrl.c_str());
-    else
-        SDL_Log("[gameStory] BGM stub: silence");
+static void diagUpdateBgm(const std::string& fullUrl) {
+    dialPlayBgm(fullUrl);
+}
+
+// Resolve a media filename to a full URL using shared_meta.media_base_url.
+static std::string dialMediaUrl(const std::string& filename, int chapterId) {
+    if (filename.empty()) return "";
+    if (filename.rfind("http", 0) == 0) return filename;   // already absolute
+    char cid[8];
+    SDL_snprintf(cid, sizeof(cid), "c%03d", chapterId);
+    std::string base = g_storyDb ? metaGetMediaBaseUrl(g_storyDb, cid) : "";
+    if (base.empty()) return "";
+    if (base.back() != '/') base += '/';
+    return base + filename;
 }
 
 // D.1-D.7: inner dialogue event + render loop
@@ -1146,6 +1253,7 @@ static void dialRunLoop(SDL_Renderer* renderer,
     int  selCh     = 0;
     std::vector<DialogueChoice> curChoices;
     SDL_Event ev;
+    SDL_Texture* curImg = nullptr;
 
     // D.4 placeholder screen when no nodes loaded
     if (nodes.empty()) {
@@ -1167,12 +1275,13 @@ static void dialRunLoop(SDL_Renderer* renderer,
         return;
     }
 
-    // Load choices for first node
+    // Load choices and media for first node
     if (nodes[0].hasChoices)
         curChoices = storyDbLoadChoices(storyId, chapterId, nodes[0].nodeId);
+    curImg = dialLoadImage(renderer, dialMediaUrl(nodes[0].imageUrl, chapterId));
 
     // D.6 initial BGM
-    diagUpdateBgm(nodes[0].bgmUrl);
+    diagUpdateBgm(dialMediaUrl(nodes[0].bgmUrl, chapterId));
 
     while (!quit && curIdx < (int)nodes.size()) {
         const DialogueNode& node = nodes[curIdx];  // valid until curIdx changes
@@ -1223,7 +1332,7 @@ static void dialRunLoop(SDL_Renderer* renderer,
             }
 
             // D.4 render
-            drawDialoguePage(renderer, node, curChoices, selCh, skipHover);
+            drawDialoguePage(renderer, node, curChoices, selCh, skipHover, curImg);
             SDL_RenderPresent(renderer);
             SDL_Delay(16);
         }
@@ -1252,14 +1361,15 @@ static void dialRunLoop(SDL_Renderer* renderer,
 
         curIdx = nextIdx;
 
-        // Load choices + update BGM for new node
+        // Load choices + media for new node
         if (nodes[curIdx].hasChoices)
             curChoices = storyDbLoadChoices(storyId, chapterId,
                                             nodes[curIdx].nodeId);
-        diagUpdateBgm(nodes[curIdx].bgmUrl);   // D.6
+        curImg = dialLoadImage(renderer, dialMediaUrl(nodes[curIdx].imageUrl, chapterId));
+        diagUpdateBgm(dialMediaUrl(nodes[curIdx].bgmUrl, chapterId));
     }
 
-    s_currentBgmUrl.clear();   // reset bgm state on exit
+    dialStopBgm();   // stop audio on exit
 }
 
 // =============================================================================
@@ -1304,29 +1414,61 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
         dbOpenedHere = true;
     }
 
-    // --- Ensure shared_meta table exists (sync tracking) ---
+    // --- Ensure shared_* tables exist so sync can write on first startup ---
+    // gameConsole.dbInitSchema() also creates these (idempotent CREATE IF NOT EXISTS).
+    // Creating them here means sync can succeed before gameConsole has ever run.
     if (g_storyDb) {
         sqlite3_exec(g_storyDb,
             "CREATE TABLE IF NOT EXISTS shared_meta ("
-            "  chapter_id    TEXT PRIMARY KEY,"
-            "  sha           TEXT NOT NULL,"
-            "  updated_at    INTEGER,"
-            "  media_base_url TEXT DEFAULT ''"
-            ");",
+            "  chapter_id TEXT PRIMARY KEY, sha TEXT NOT NULL,"
+            "  updated_at INTEGER, media_base_url TEXT DEFAULT '');",
+            nullptr, nullptr, nullptr);
+        sqlite3_exec(g_storyDb,
+            "CREATE TABLE IF NOT EXISTS shared_data ("
+            "  idStory INTEGER NOT NULL, storyName TEXT NOT NULL,"
+            "  idChapter INTEGER NOT NULL, chapterName TEXT,"
+            "  minScore INTEGER DEFAULT 0, minSpeed REAL DEFAULT 0,"
+            "  minRetries INTEGER DEFAULT 0, requiredStories TEXT DEFAULT '',"
+            "  nextBlockScore INTEGER DEFAULT 0, nextBlockSpeed REAL DEFAULT 0,"
+            "  tableMatrix TEXT DEFAULT '', xmlDialogue TEXT DEFAULT '',"
+            "  thumbnailPath TEXT DEFAULT '',"
+            "  PRIMARY KEY (idStory, idChapter));",
+            nullptr, nullptr, nullptr);
+        sqlite3_exec(g_storyDb,
+            "CREATE TABLE IF NOT EXISTS shared_dialogues ("
+            "  rowId INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  idStory INTEGER NOT NULL, idChapter INTEGER NOT NULL,"
+            "  nodeId INTEGER NOT NULL, speaker TEXT DEFAULT '',"
+            "  text TEXT DEFAULT '', imageUrl TEXT DEFAULT '',"
+            "  bgmUrl TEXT DEFAULT '', sfxUrl TEXT DEFAULT '',"
+            "  nextNodeId INTEGER DEFAULT 0, hasChoices INTEGER DEFAULT 0,"
+            "  UNIQUE(idStory, idChapter, nodeId));",
+            nullptr, nullptr, nullptr);
+        sqlite3_exec(g_storyDb,
+            "CREATE TABLE IF NOT EXISTS shared_choices ("
+            "  rowId INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  idStory INTEGER NOT NULL, idChapter INTEGER NOT NULL,"
+            "  nodeId INTEGER NOT NULL, choiceIdx INTEGER NOT NULL,"
+            "  label TEXT DEFAULT '', nextNodeId INTEGER DEFAULT 0,"
+            "  UNIQUE(idStory, idChapter, nodeId, choiceIdx));",
             nullptr, nullptr, nullptr);
     }
 
-    // --- Phase 1: Sync (non-blocking render loop) ---
-    // syncFromGist() is synchronous — it blocks for the duration of HTTP.
-    // We run it BEFORE entering the render loop to keep logic simple.
-    // The render loop below shows the result immediately after.
-    // For WASM: Asyncify handles the blocking; browser stays responsive.
-    if (g_storyDb) {
-        syncFromGist(g_storyDb);
-    } else {
-        g_syncProgress.state = SYNC_OFFLINE;
-        SDL_Log("[gameStory] DB not available — skip sync");
-    }
+    // --- Phase 1: Sync ---
+    // Native: run syncFromGist() in a background thread so the render loop
+    // below shows live per-chapter progress.
+    // WASM: sync runs synchronously (Asyncify); progress shows after it finishes.
+#ifndef __EMSCRIPTEN__
+    std::atomic<bool> syncDone{false};
+    std::thread syncThread([&syncDone]() {
+        if (g_storyDb) syncFromGist(g_storyDb);
+        else           g_syncProgress.state = SYNC_OFFLINE;
+        syncDone = true;
+    });
+#else
+    if (g_storyDb) syncFromGist(g_storyDb);
+    else           g_syncProgress.state = SYNC_OFFLINE;
+#endif
 
     // --- Phase 2: Logo animation with real progress bar ---
     enum IntroPhase { PHASE_LOGO, PHASE_DONE };
@@ -1349,7 +1491,13 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
         }
 
         Uint32 elapsedTime = SDL_GetTicks() - startTime;
+        // On native, also wait until background sync finishes so the tasks
+        // console can show all completed steps.
+#ifndef __EMSCRIPTEN__
+        if (elapsedTime > (Uint32)INTRO_DURATION && syncDone) phase = PHASE_DONE;
+#else
         if (elapsedTime > (Uint32)INTRO_DURATION) phase = PHASE_DONE;
+#endif
 
         SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
         SDL_RenderClear(renderer);
@@ -1420,10 +1568,10 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
                     barY - 14.0f, statusBuf);
             }
 
-            // Completed task console below bar (newest 4, small text)
+            // Completed task console below bar (newest 6, small text)
             const float taskGap  = 4.0f;
             const float taskStep = 10.0f;
-            const int   maxTask  = 4;
+            const int   maxTask  = 6;
             float taskY = barY + barH + taskGap;
             int nTasks  = (int)g_syncProgress.completedTasks.size();
             int taskStart = (nTasks > maxTask) ? (nTasks - maxTask) : 0;
@@ -1444,6 +1592,11 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
+
+#ifndef __EMSCRIPTEN__
+    // Wait for background sync to finish before querying the DB.
+    syncThread.join();
+#endif
 
     // --- Issue 2.9: Post-sync condition check ---
     // Determine next story to run based on DB state.
