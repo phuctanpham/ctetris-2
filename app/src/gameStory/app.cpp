@@ -21,7 +21,7 @@
 #include <nlohmann/json.hpp>
 
 // libcurl for native HTTP sync (manifest fetch, native WASM not used)
-#ifdef HAVE_LIBCURL
+#ifndef __EMSCRIPTEN__
 #include <curl/curl.h>
 #endif
 

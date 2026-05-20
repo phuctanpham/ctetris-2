@@ -106,6 +106,12 @@
                - Small task console under the bar shows latest completed sync tasks
                  (up-to-date, synced, fetch/import failures) from sync pipeline.
                - Includes manifest-fetching state and adjusted layout spacing for readability.
+[x] Issue 3.10: libcurl include guard refined for platform split in gameStory/app.cpp.
+                - Staged line change at top include block: #ifdef HAVE_LIBCURL ->
+                  #ifndef __EMSCRIPTEN__.
+                - Effect: native targets keep curl header path while WASM avoids native
+                  curl include path and relies on emscripten fetch path.
+                - Keeps compile path aligned with target platform separation.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.
