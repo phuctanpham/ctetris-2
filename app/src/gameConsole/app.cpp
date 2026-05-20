@@ -20,6 +20,11 @@
 #include "sqlite3.h"
 #include "ctetris_debug.h"
 
+// libcurl for native + WASM HTTP sync (manifest, leaderboard, record submit)
+#ifdef HAVE_LIBCURL
+#include <curl/curl.h>
+#endif
+
 // [G/H] Smart Sorting Engine v2.0 -- powers sort-by-time + sort-by-score
 //        in the board popup. Router picks Insertion for n<=64 by default,
 //        so our 30-row leaderboard runs near O(n).
@@ -33,12 +38,6 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/fetch.h>
-
-// [F.7] IDBFS persistence for sqlite file across browser tab reloads.
-
-#ifdef HAVE_LIBCURL
-#include <curl/curl.h>
-#endif
 // FS.syncfs is async; Asyncify.handleSleep blocks the C caller until JS
 // resolves. Requires -sASYNCIFY=1 (already set in CMakeLists.txt WASM link
 // options). All three helpers degrade to no-op if FS isn't ready.

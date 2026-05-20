@@ -98,6 +98,19 @@
                 - Dropped first CURL block (inside "if(NOT BUILD_WASM)" guard at top).
                 - Kept consolidated CURL block at bottom with CONFIG mode + module fallback.
                 - Added Windows DLL POST_BUILD copy (mirrors SDL3.dll pattern).
+[x] Issue 3.12: gameConsole/app.cpp CURL include scoping fix — moved #include <curl/curl.h>
+                from inside #ifdef __EMSCRIPTEN__ block to global scope with separate
+                #ifdef HAVE_LIBCURL guard (lines 23-25 in gameConsole/app.cpp).
+                - Problem: include was nested in WASM-only section, unavailable on native
+                  Windows build where __EMSCRIPTEN__ is undefined.
+                - Native build errors: 40+ "CURL undeclared", "curl_easy_init not found",
+                  "CURLOPT_URL undeclared" at lines 1295-1384 where curl functions used.
+                - Fix: Separated platform guards (WASM via #ifdef __EMSCRIPTEN__) from
+                  library guards (CURL via #ifdef HAVE_LIBCURL with independent scope).
+                - Rationale: __EMSCRIPTEN__ and HAVE_LIBCURL are independent concepts;
+                  WASM uses emscripten_fetch (headers in EMSCRIPTEN block), native uses
+                  libcurl (headers in HAVE_LIBCURL block).
+                - Build: exit code 0, native Windows compile + link successful.
                 - Updated error message to recommend: Windows: .\build.ps1 native (auto-installs).
                 - Build: exit code 0, CURL integration simplified + robust.
 
