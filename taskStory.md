@@ -95,6 +95,17 @@
                - Rationale: All includes must be at global scope, never inside functions
                  or code blocks; HAVE_LIBCURL is CMake-guaranteed on native builds.
                - Build: exit code 0, native Windows compile successful, cTetris.exe linked.
+[ ] Issue 3.8: First-start SQL bootstrap is not recursively importing chapter child media URLs.
+               - When init tables do not exist, current flow does not fully trace chapter JSON
+                 (c{chapterId}.json) to collect nested child media source URLs and transform
+                 them into SQL rows for complete initial import.
+               - Requirement: if tables already exist, recursively checksum JSON sources and
+                 re-import related rows with override semantics when content changes.
+[x] Issue 3.9: Loading progress UX improved with explicit percent + completed-task console.
+               - Progress bar now renders centered percentage text for process visibility.
+               - Small task console under the bar shows latest completed sync tasks
+                 (up-to-date, synced, fetch/import failures) from sync pipeline.
+               - Includes manifest-fetching state and adjusted layout spacing for readability.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.

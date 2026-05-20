@@ -520,10 +520,11 @@ enum SyncState {
 
 // Per-chapter sync progress tracked across frames
 struct SyncProgress {
-    int  total     = 0;   // chapters that need updating
-    int  done      = 0;   // chapters processed
-    std::string currentId;   // chapter being processed ("c001", ...)
+    int  total     = 0;
+    int  done      = 0;
+    std::string currentId;
     SyncState state = SYNC_IDLE;
+    std::vector<std::string> completedTasks;  // rendered below the progress bar
 };
 
 // ---------------------------------------------------------------------------
@@ -873,12 +874,6 @@ static void syncFromGist(sqlite3* db) {
         g_syncProgress.state = SYNC_OFFLINE;
         return;
     }
-    if (!manifest.contains("chapters") || !manifest["chapters"].is_array()) {
-        SDL_Log("[gameStory] manifest: no chapters array");
-        g_syncProgress.state = SYNC_OFFLINE;
-        return;
-    }
-
     // Read versions[latest] — format: { "c001": { latestCommitId, gistUrl, mediaBaseUrl, updatedDate } }
     std::string latest = manifest.value("latest", std::string());
     if (latest.empty() || !manifest.contains(latest) || !manifest[latest].is_object()) {
@@ -900,6 +895,7 @@ static void syncFromGist(sqlite3* db) {
         std::string localSha = metaGetSha(db, cid.c_str());
         if (localSha == newSha) {
             SDL_Log("[gameStory] %s SHA match — skip", cid.c_str());
+            g_syncProgress.completedTasks.push_back(cid + ": up to date");
         } else {
             SDL_Log("[gameStory] %s SHA diff — queue update", cid.c_str());
             toUpdate.push_back({cid, newSha, gistUrl, mediaBU});
@@ -922,14 +918,17 @@ static void syncFromGist(sqlite3* db) {
         if (body.empty()) {
             SDL_Log("[gameStory] %s gistUrl fetch fail — skip",
                     entry.id.c_str());
+            g_syncProgress.completedTasks.push_back(entry.id + ": fetch failed");
         } else if (applyChapterJson(db, body, entry.id.c_str(),
                                     entry.mediaBaseUrl.c_str())) {
             metaSetSha(db, entry.id.c_str(), entry.sha.c_str(),
                        entry.mediaBaseUrl.c_str());
+            g_syncProgress.completedTasks.push_back(entry.id + ": synced OK");
 #ifdef __EMSCRIPTEN__
-            // Persist to IndexedDB after each chapter write
             EM_ASM({ Module['FS'].syncfs(false, function(){}); });
 #endif
+        } else {
+            g_syncProgress.completedTasks.push_back(entry.id + ": import error");
         }
         g_syncProgress.done++;
     }
@@ -1368,20 +1367,39 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
         float timeProgress = (float)elapsedTime / (float)INTRO_DURATION;
         float barProgress = (syncProgress > timeProgress) ? syncProgress : timeProgress;
 
-        // Draw bar using syncProgress as fill, same layout as drawLoadingBar()
+        // Progress bar + percentage + task console
         {
-            const float barW = 180.0f, barH = 12.0f;
+            const float barW = 180.0f, barH = 14.0f;
             const float barX = (STORY_SCREEN_WIDTH  - barW) / 2.0f;
             const float barY = STORY_SCREEN_HEIGHT - 110.0f;
+
+            // Background track
             SDL_FRect bgBar = { barX, barY, barW, barH };
-            SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+            SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
             SDL_RenderFillRect(renderer, &bgBar);
+
             float fill = barProgress;
             if (fill > 1.0f) fill = 1.0f;
-            SDL_FRect fgBar = { barX, barY, barW * fill, barH };
-            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-            SDL_RenderFillRect(renderer, &fgBar);
-            // Status line
+
+            // Filled portion
+            if (fill > 0.0f) {
+                SDL_FRect fgBar = { barX, barY, barW * fill, barH };
+                SDL_SetRenderDrawColor(renderer, 0, 200, 80, 255);
+                SDL_RenderFillRect(renderer, &fgBar);
+            }
+
+            // Percentage text centered in bar
+            int pct = (int)(fill * 100.0f);
+            char pctBuf[8];
+            SDL_snprintf(pctBuf, sizeof(pctBuf), "%d%%", pct);
+            int pctLen = (int)SDL_strlen(pctBuf);
+            SDL_SetRenderDrawColor(renderer, 10, 10, 10, 220);
+            SDL_RenderDebugText(renderer,
+                barX + (barW - pctLen * 8.0f) / 2.0f,
+                barY + (barH - 8.0f) / 2.0f,
+                pctBuf);
+
+            // Status line above bar
             char statusBuf[48] = "";
             if (g_syncProgress.state == SYNC_UPDATING_DB &&
                 !g_syncProgress.currentId.empty()) {
@@ -1391,17 +1409,35 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
                 SDL_strlcpy(statusBuf, "Offline - using local data", sizeof(statusBuf));
             } else if (g_syncProgress.state == SYNC_DONE) {
                 SDL_strlcpy(statusBuf, "Up to date", sizeof(statusBuf));
+            } else if (g_syncProgress.state == SYNC_FETCHING) {
+                SDL_strlcpy(statusBuf, "Fetching manifest...", sizeof(statusBuf));
             }
             if (statusBuf[0] != '\0') {
                 int sl2 = (int)SDL_strlen(statusBuf);
-                SDL_SetRenderDrawColor(renderer, 180, 180, 180, 200);
+                SDL_SetRenderDrawColor(renderer, 160, 160, 160, 200);
                 SDL_RenderDebugText(renderer,
                     (STORY_SCREEN_WIDTH - sl2 * 8.0f) / 2.0f,
-                    barY - 18.0f, statusBuf);
+                    barY - 14.0f, statusBuf);
             }
-            // Corp credit below bar
-            float barBottomY = barY + barH;
-            drawCorpCredit(renderer, elapsedTime, barBottomY);
+
+            // Completed task console below bar (newest 4, small text)
+            const float taskGap  = 4.0f;
+            const float taskStep = 10.0f;
+            const int   maxTask  = 4;
+            float taskY = barY + barH + taskGap;
+            int nTasks  = (int)g_syncProgress.completedTasks.size();
+            int taskStart = (nTasks > maxTask) ? (nTasks - maxTask) : 0;
+            for (int ti = taskStart; ti < nTasks; ti++) {
+                SDL_SetRenderDrawColor(renderer, 120, 190, 120, 200);
+                SDL_RenderDebugText(renderer,
+                    barX,
+                    taskY + (ti - taskStart) * taskStep,
+                    g_syncProgress.completedTasks[ti].c_str());
+            }
+
+            // Corp credit below the task console area
+            float corpTopY = taskY + maxTask * taskStep + 2.0f;
+            drawCorpCredit(renderer, elapsedTime, corpTopY);
         }
 
         // [ SKIP ] is rendered only by drawDialoguePage() in dialRunLoop().
