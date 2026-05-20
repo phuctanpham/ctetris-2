@@ -85,7 +85,6 @@ $WebDir        = Join-Path $AppDir 'web'
 # Sdl3Version pin.
 $CmakeMinVersion   = '3.16'
 $EmsdkVersion      = '3.1.72'
-$Sdl3VersionMin    = '3.2.0'
 $Sdl3Version       = '3.2.18'   # default pin
 $DetectedSdl3Version = ''        # se duoc set boi Initialize-Sdl3Native
 $SqliteVersion     = '3460100'   # SQLite 3.46.1
@@ -395,11 +394,11 @@ function Initialize-Sqlite {
 }
 
 # =============================================================================
-# Validate-Endpoints -- check MANIFEST_GIST_URL + CTETRIS_API_URL + media
+# Test-Endpoints -- check MANIFEST_GIST_URL + CTETRIS_API_URL + media
 # Mirrors game loading-bar progress: [N/total] per media file check (HEAD).
 # Stops the build (throw) on first failure.
 # =============================================================================
-function Validate-Endpoints {
+function Test-Endpoints {
     Write-Info "=== Endpoint & Media Validation ==="
 
     $envFile = Join-Path $AppDir '.env'
@@ -723,7 +722,7 @@ function Initialize-Sdl3Native {
     # Priority 4: Build tu source
     Write-Info "  [4/4] Build SDL3 $Sdl3Version tu source..."
     $script:DetectedSdl3Version = $Sdl3Version
-    Build-Sdl3FromSource -InstallPrefix (Join-Path $DownloadDir 'sdl3-native') `
+    Invoke-BuildSdl3 -InstallPrefix (Join-Path $DownloadDir 'sdl3-native') `
                          -Target 'native' `
                          -Version $Sdl3Version
 }
@@ -754,14 +753,14 @@ function Initialize-Sdl3Wasm {
     Write-Info 'System SDL3 (neu co) la native arch -- KHONG dung duoc cho wasm32'
     Write-Info "Build SDL3 $targetVersion cho WASM target (lan dau, ~1-2 phut)..."
 
-    Build-Sdl3FromSource -InstallPrefix $installDir -Target 'wasm' -Version $targetVersion
+    Invoke-BuildSdl3 -InstallPrefix $installDir -Target 'wasm' -Version $targetVersion
 }
 
 # =============================================================================
 # SDL3 build tu source -- dung Ninja cho ca native va WASM
 # (Ninja di kem VS Build Tools, khong phu thuoc nmake)
 # =============================================================================
-function Build-Sdl3FromSource {
+function Invoke-BuildSdl3 {
     param([string]$InstallPrefix, [string]$Target, [string]$Version)
 
     $sdlSrc   = Join-Path $DownloadDir "SDL-$Version"
@@ -995,7 +994,7 @@ function Test-Sources {
 # Validate Windows console-hiding fixes in CMakeLists.txt
 # (auto-applied on fresh clone to ensure console hidden on Windows)
 # =============================================================================
-function Validate-WindowsFixes {
+function Test-WindowsFixes {
     $cmakelists = Join-Path $AppDir 'CMakeLists.txt'
     $content = Get-Content $cmakelists -Raw
     
@@ -1055,7 +1054,7 @@ endif()
 # =============================================================================
 # Validate logger.h exists and is properly integrated
 # =============================================================================
-function Validate-LoggerIntegration {
+function Test-LoggerIntegration {
     $loggerHeader = Join-Path $AppDir 'src\logger.h'
     if (-not (Test-Path $loggerHeader)) {
         Write-Err 'logger.h not found - logging system missing'
@@ -1147,7 +1146,7 @@ function Show-SmartAppControlGuide {
 #   CTETRIS_SIGN_CERT_PWD   : password for the .pfx file
 #   CTETRIS_SIGN_TIMESTAMP  : timestamp server URL
 # =============================================================================
-function Sign-WindowsBinary {
+function Protect-WindowsBinary {
     param([string]$ExePath)
 
     if ($env:OS -ne 'Windows_NT') { return }
@@ -1177,17 +1176,17 @@ function Sign-WindowsBinary {
         $timestamp = 'http://timestamp.digicert.com'
     }
 
-    $args = @('sign', '/fd', 'SHA256', '/f', $certPath)
+    $signtoolArgs = @('sign', '/fd', 'SHA256', '/f', $certPath)
     if (-not [string]::IsNullOrWhiteSpace($env:CTETRIS_SIGN_CERT_PWD)) {
-        $args += @('/p', $env:CTETRIS_SIGN_CERT_PWD)
+        $signtoolArgs += @('/p', $env:CTETRIS_SIGN_CERT_PWD)
     }
     if (-not [string]::IsNullOrWhiteSpace($timestamp)) {
-        $args += @('/tr', $timestamp, '/td', 'SHA256')
+        $signtoolArgs += @('/tr', $timestamp, '/td', 'SHA256')
     }
-    $args += $ExePath
+    $signtoolArgs += $ExePath
 
     Write-Info "Signing native EXE with Authenticode certificate: $certPath"
-    & $signtool.Path @args
+    & $signtool.Path @signtoolArgs
     if ($LASTEXITCODE -ne 0) {
         throw "signtool sign failed (exit $LASTEXITCODE)"
     }
@@ -1198,11 +1197,11 @@ function Sign-WindowsBinary {
 # =============================================================================
 # Build entry points
 # =============================================================================
-function Build-Native {
+function Invoke-NativeBuild {
     Write-Info "Build NATIVE -> $BuildNativeDir"
     Test-Sources
-    Validate-WindowsFixes
-    Validate-LoggerIntegration
+    Test-WindowsFixes
+    Test-LoggerIntegration
 
     # FIX: Load MSVC compiler environment truoc khi lam bat cu thu gi voi cmake
     Import-VsEnv
@@ -1263,14 +1262,14 @@ function Build-Native {
 
 
     Write-Ok "Native build hoan tat: $BuildNativeDir"
-    Sign-WindowsBinary -ExePath (Join-Path $BuildNativeDir 'cTetris.exe')
+    Protect-WindowsBinary -ExePath (Join-Path $BuildNativeDir 'cTetris.exe')
     Show-SmartAppControlGuide -ExePath (Join-Path $BuildNativeDir 'cTetris.exe')
 }
 
-function Build-Wasm {
+function Invoke-WasmBuild {
     Write-Info "Build WASM -> $BuildWasmDir"
     Test-Sources
-    Validate-LoggerIntegration
+    Test-LoggerIntegration
     Initialize-WindowsTools
 
     # Detect version SDL3 native truoc -- WASM build se MATCH version do
@@ -1357,9 +1356,9 @@ function Build-Wasm {
 }
 
 switch ($Mode) {
-    'native'    { Build-Native }
-    'wasm'      { Build-Wasm }
-    'all'       { Build-Native; Build-Wasm }
+    'native'    { Invoke-NativeBuild }
+    'wasm'      { Invoke-WasmBuild }
+    'all'       { Invoke-NativeBuild; Invoke-WasmBuild }
     'clean'     {
         Write-Info 'Don dep build/ (giu lai libs/ cache)...'
         $b = Join-Path $AppDir 'build'
