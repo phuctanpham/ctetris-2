@@ -1,0 +1,18 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"compatibility_date": "2025-10-08",
+	"compatibility_flags": ["nodejs_compat"],
+	"main": "src/index.ts",
+	"name": "ctetris-2",
+	"upload_source_maps": true,
+	"d1_databases": [
+		{
+			"binding": "ctetris-2-db-var",
+			"database_id": "28b71161-0e36-4886-9bd1-639dce7281f3",
+			"database_name": "ctetris-2-db"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
+}

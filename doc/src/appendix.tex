@@ -1,4 +1,4 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
@@ -27,9 +27,14 @@
 	\pagenumbering{arabic}% This safely and strictly hard-resets the page counter to 1
 	\InputAppendixFile{#1}%
 }
-
-\InputAppendixUnit{01-teamContract.tex}
+\includepdf[pages=-]{appendix/01-teamContract.pdf}
+%\InputAppendixUnit{01-teamContract.tex}
 \InputAppendixUnit{02-teamContractValidation.tex}
 \InputAppendixUnit{03-meetingMinute.tex}
 \InputAppendixUnit{04-teamConflictSolving.tex}
+\includepdf[pages=-]{appendix/05-cvPhucpt.pdf}
+\includepdf[pages=-]{appendix/06-cvTruongtm.pdf}
+\includepdf[pages=-]{appendix/07-cvKiennt.pdf}
+\includepdf[pages=-]{appendix/08-cvThaidg.pdf}
+\includepdf[pages=-]{appendix/09-cvVint.pdf}
 \end{document}

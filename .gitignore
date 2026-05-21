@@ -31,6 +31,7 @@
 
 # Visual Studio specific files
 .vs/
+.vscode/
 *.user
 *.suo
 *.userosscache
@@ -81,4 +82,12 @@ bld/
 *.svclog
 *.scc
 **/build
-**/libs
+app/libs
+
+# API / Cloudflare
+**/node_modules/
+**/.wrangler/
+!**/.env.example
+**/.dev.vars*
+!**/.dev.vars.example
+**/*.tsbuildinfo

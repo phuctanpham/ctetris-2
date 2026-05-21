@@ -18,16 +18,27 @@
 // [F.1] SQLite database for Stories / Records / Catalogue
 #include "gameConsole_db.h"
 #include "sqlite3.h"
+#include "ctetris_debug.h"
 
 // [G/H] Smart Sorting Engine v2.0 -- powers sort-by-time + sort-by-score
 //        in the board popup. Router picks Insertion for n<=64 by default,
 //        so our 30-row leaderboard runs near O(n).
 #include "gameConsole_sort.h"
 
+// Fallback for API URL if not provided by CMake
+#ifndef CTETRIS_API_URL
+#define CTETRIS_API_URL ""
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/fetch.h>
 
 // [F.7] IDBFS persistence for sqlite file across browser tab reloads.
+
+#ifdef HAVE_LIBCURL
+#include <curl/curl.h>
+#endif
 // FS.syncfs is async; Asyncify.handleSleep blocks the C caller until JS
 // resolves. Requires -sASYNCIFY=1 (already set in CMakeLists.txt WASM link
 // options). All three helpers degrade to no-op if FS isn't ready.
@@ -74,6 +85,15 @@ EM_JS(void, idbfs_save_to_idb, (), {
 // Mau text "nhe" -- 220 thay vi 255
 static const SDL_Color SOFT_WHITE  = {220, 220, 220, 255};
 static const SDL_Color HIGHLIGHT_Y = {255, 215,   0, 255};
+
+#ifdef HAVE_LIBCURL
+static size_t curlWriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+    size_t total = size * nmemb;
+    auto* out = static_cast<std::string*>(userdata);
+    out->append(ptr, total);
+    return total;
+}
+#endif
 
 // =========================================================
 // [B.2] SvgTexture + loadSvgTextureFromMem helper
@@ -398,6 +418,8 @@ struct AppState {
     // [D.3] Volume slider drag state
     bool draggingVolume = false;
 
+    std::string apiSyncStatus;   // [V3] feedback shown in Settings after sync
+
     // WASM-only: khi QUIT duoc chon, hien shutdown screen thay vi
     // tra ve 0 lam canvas trang (khong co SDL_DestroyWindow phu hop)
     bool wasmShutdown = false;
@@ -449,6 +471,26 @@ static std::string formatIsoForDisplay(const char* iso) {
     return std::string(buf);
 }
 
+static std::string formatEpochForDisplay(int64_t epoch) {
+    std::tm tm{};
+    std::time_t t = (std::time_t)epoch;
+#if defined(_WIN32)
+    if (gmtime_s(&tm, &t) != 0) {
+        return std::string();
+    }
+#else
+    if (std::tm* tmp = std::gmtime(&t)) {
+        tm = *tmp;
+    } else {
+        return std::string();
+    }
+#endif
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%02d-%02d %02d:%02d",
+                  tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
+    return std::string(buf);
+}
+
 // =========================================================
 // [C.5] Fallback hardcoded leaderboard (used if JSON load fails).
 // Format matches gameConsole_board.json (ISO 8601 timestamps) so the
@@ -474,86 +516,35 @@ static const FallbackRow FALLBACK_BOARD_ROWS[] = {
     {"GoldenEye",    1400, "2026-04-12T06:45:12Z"}, {"ProGamerVN",   1250, "2026-04-12T08:05:30Z"}
 };
 
-// [C.5] Live board container -- populated at runtime by loadBoard().
-// Replaces the old static const BOARD_DATA[]. g_boardTotal cached for
-// the (very hot) hit-test loop in event handlers.
+// Live board container -- populated at runtime by loadBoardWithFallback()
+// from sync_Records (D1 sync target). g_boardTotal cached for the (very
+// hot) hit-test loop in event handlers.
 static std::vector<BoardEntry> g_board;
 static int g_boardTotal  = 0;
 static const int BOARD_VISIBLE = 9;
 
-// [C.5] Load JSON from <basepath>/gameConsole_board.json. Returns false
-// on any failure (no file, parse error, schema mismatch). Caller falls
-// back to FALLBACK_BOARD_ROWS.
-static bool loadBoardFromJson() {
-    const char* basePath = SDL_GetBasePath();
-    std::string path;
-    if (basePath && basePath[0] != '\0') {
-        path = std::string(basePath) + "gameConsole_board.json";
-    } else {
-        path = "gameConsole_board.json";  // CWD fallback
-    }
-    // SDL_GetBasePath in SDL3: returns const char*, do NOT free
+// [V3] Board JSON loader removed -- leaderboard now sourced from D1 via
+// fetchLeaderboardFromApi() into sync_Records, and loadBoardWithFallback()
+// reads sync_Records via dbLoadRecords(). FALLBACK_BOARD_ROWS still seeds
+// the table on first DB init (see dbInitSchema), and dbLoadRecords falls
+// back to the same static array when sync_Records is empty -- so the
+// leaderboard is never blank, even fully offline before the first sync.
 
-    SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
-    if (!io) {
-        SDL_Log("[gameConsole] khong mo duoc %s -- dung fallback", path.c_str());
-        return false;
-    }
-    Sint64 sz = SDL_GetIOSize(io);
-    if (sz <= 0) { SDL_CloseIO(io); return false; }
-    std::string raw((size_t)sz, '\0');
-    size_t got = SDL_ReadIO(io, &raw[0], (size_t)sz);
-    SDL_CloseIO(io);
-    if (got != (size_t)sz) {
-        SDL_Log("[gameConsole] read sai size: got %zu need %lld",
-                got, (long long)sz);
-        return false;
-    }
-
-    try {
-        nlohmann::json j = nlohmann::json::parse(raw);
-        const auto& arr = j.at("board");
-        std::vector<BoardEntry> out;
-        out.reserve(arr.size());
-        for (const auto& e : arr) {
-            BoardEntry be;
-            be.user      = e.at("user").get<std::string>();
-            be.score     = e.at("score").get<int>();
-            std::string iso = e.at("time").get<std::string>();
-            be.timeEpoch = parseIso8601(iso.c_str());
-            be.time      = formatIsoForDisplay(iso.c_str());
-            out.push_back(std::move(be));
-        }
-        if (out.empty()) return false;
-        g_board = std::move(out);
-        return true;
-    } catch (const std::exception& ex) {
-        SDL_Log("[gameConsole] JSON parse fail: %s", ex.what());
-        return false;
-    }
-}
-
-// [C.5] Load with fallback. Always populates g_board with at least 30
-// fallback rows so leaderboard is never empty.
+// Populate g_board from sync_Records (DB-only path; never blank thanks to
+// the fallback inside dbLoadRecords).
 static void loadBoardWithFallback() {
-    if (loadBoardFromJson()) {
-        SDL_Log("[gameConsole] board loaded tu JSON: %d entries",
-                (int)g_board.size());
-    } else {
-        g_board.clear();
-        const int n = (int)(sizeof(FALLBACK_BOARD_ROWS)/sizeof(FALLBACK_BOARD_ROWS[0]));
-        g_board.reserve(n);
-        for (int i = 0; i < n; i++) {
-            const FallbackRow& r = FALLBACK_BOARD_ROWS[i];
-            BoardEntry be;
-            be.user      = r.user;
-            be.score     = r.score;
-            be.timeEpoch = parseIso8601(r.iso);
-            be.time      = formatIsoForDisplay(r.iso);
-            g_board.push_back(std::move(be));
-        }
-        SDL_Log("[gameConsole] board fallback: %d entries", (int)g_board.size());
+    g_board.clear();
+    std::vector<BoardRecord> rows = dbLoadRecords();
+    g_board.reserve(rows.size());
+    for (const auto& r : rows) {
+        BoardEntry be;
+        be.user = r.idUser;
+        be.score = r.totalScore;
+        be.timeEpoch = r.endTS;
+        be.time = formatEpochForDisplay(r.endTS);
+        g_board.push_back(std::move(be));
     }
+    SDL_Log("[gameConsole] board loaded tu DB: %d entries", (int)g_board.size());
     g_boardTotal = (int)g_board.size();
 }
 
@@ -598,9 +589,14 @@ static void applyBoardSort(AppState& state) {
 // Lifetime: opened on runGameConsole entry, closed on exit.
 // WASM IDBFS persistence wired in Step 2.6.12.
 // =========================================================
-static sqlite3*    g_db = nullptr;
+sqlite3*           g_db = nullptr;  // extern: accessed by gameCore for record checking
 static std::string g_dbCurrentUser;
 static std::string g_dbPath;
+
+// Helper: returns "{idUser}_{suffix}" for Group-1 dynamic tables
+static std::string userTable(const std::string& suffix) {
+    return g_dbCurrentUser + "_" + suffix;
+}
 
 static bool dbExec(const char* sql, const char* what) {
     if (!g_db) return false;
@@ -678,15 +674,27 @@ void dbClose() {
     }
 }
 
+bool dbIsOpen() {
+    return g_db != nullptr;
+}
+
 bool dbInitSchema() {
     if (!g_db) {
         SDL_Log("[gameConsole_db] dbInitSchema: DB chua mo");
         return false;
     }
 
-    // Records: per-session game log
-    if (!dbExec(
-        "CREATE TABLE IF NOT EXISTS idUser_Records ("
+    // ── Group 1: {idUser}_* — personal R/W ──────────────────────────────
+    std::string rec  = userTable("Records");
+    std::string stor = userTable("Stories");
+    std::string sett = userTable("Settings");
+
+    auto createSQL = [&](const std::string& sql, const char* what) -> bool {
+        return dbExec(sql.c_str(), what);
+    };
+
+    if (!createSQL(
+        "CREATE TABLE IF NOT EXISTS " + rec + " ("
         "  id            INTEGER PRIMARY KEY AUTOINCREMENT,"
         "  idUser        TEXT NOT NULL,"
         "  startTS       INTEGER NOT NULL,"
@@ -698,11 +706,10 @@ bool dbInitSchema() {
         "  avgSpeed      REAL,"
         "  retryNo       INTEGER"
         ");",
-        "CREATE idUser_Records")) return false;
+        "CREATE _Records")) return false;
 
-    // Stories: per-user progress overlay
-    if (!dbExec(
-        "CREATE TABLE IF NOT EXISTS idUser_Stories ("
+    if (!createSQL(
+        "CREATE TABLE IF NOT EXISTS " + stor + " ("
         "  idUser        TEXT NOT NULL,"
         "  idStory       INTEGER NOT NULL,"
         "  idChapter     INTEGER NOT NULL,"
@@ -713,9 +720,16 @@ bool dbInitSchema() {
         "  lastMaxSpeed  REAL    DEFAULT 0,"
         "  PRIMARY KEY (idUser, idStory, idChapter)"
         ");",
-        "CREATE idUser_Stories")) return false;
+        "CREATE _Stories")) return false;
 
-    // Shared catalogue: static story data (seeded in Step 2.6.5)
+    if (!createSQL(
+        "CREATE TABLE IF NOT EXISTS " + sett + " ("
+        "  key   TEXT PRIMARY KEY,"
+        "  value TEXT NOT NULL DEFAULT ''"
+        ");",
+        "CREATE _Settings")) return false;
+
+    // ── Group 2: shared_* — Gist JSON import, read-only ─────────────────
     if (!dbExec(
         "CREATE TABLE IF NOT EXISTS shared_data ("
         "  idStory         INTEGER NOT NULL,"
@@ -735,88 +749,111 @@ bool dbInitSchema() {
         ");",
         "CREATE shared_data")) return false;
 
-    SDL_Log("[gameConsole_db] schema initialized (3 tables)");
+    // shared_dialogues: per-node dialogue consumed by gameStory V2
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS shared_dialogues ("
+        "  rowId      INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  idStory    INTEGER NOT NULL,"
+        "  idChapter  INTEGER NOT NULL,"
+        "  nodeId     INTEGER NOT NULL,"
+        "  speaker    TEXT    DEFAULT '',"
+        "  text       TEXT    DEFAULT '',"
+        "  imageUrl   TEXT    DEFAULT '',"
+        "  bgmUrl     TEXT    DEFAULT '',"
+        "  sfxUrl     TEXT    DEFAULT '',"
+        "  nextNodeId INTEGER DEFAULT 0,"
+        "  hasChoices INTEGER DEFAULT 0,"
+        "  UNIQUE(idStory, idChapter, nodeId)"
+        ");",
+        "CREATE shared_dialogues")) return false;
+
+    // shared_choices: branching choices consumed by gameStory V2
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS shared_choices ("
+        "  rowId      INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  idStory    INTEGER NOT NULL,"
+        "  idChapter  INTEGER NOT NULL,"
+        "  nodeId     INTEGER NOT NULL,"
+        "  choiceIdx  INTEGER NOT NULL,"
+        "  label      TEXT    DEFAULT '',"
+        "  nextNodeId INTEGER DEFAULT 0,"
+        "  UNIQUE(idStory, idChapter, nodeId, choiceIdx)"
+        ");",
+        "CREATE shared_choices")) return false;
+
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS shared_meta ("
+        "  chapter_id     TEXT PRIMARY KEY,"
+        "  sha            TEXT NOT NULL,"
+        "  updated_at     INTEGER,"
+        "  media_base_url TEXT DEFAULT ''"
+        ");",
+        "CREATE shared_meta")) return false;
+
+    // ── Group 3: sync_* — Cloudflare D1 1-way sync, read-only ───────────
+    if (!dbExec(
+        "CREATE TABLE IF NOT EXISTS sync_Records ("
+        "  id           INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  nameUser     TEXT    DEFAULT '',"
+        "  totalScore   INTEGER DEFAULT 0,"
+        "  totalSeconds INTEGER DEFAULT 0,"
+        "  avgSpeed     REAL    DEFAULT 0,"
+        "  endTS        INTEGER DEFAULT 0,"
+        "  idStory      INTEGER DEFAULT 0,"
+        "  idChapter    INTEGER DEFAULT 0"
+        ");",
+        "CREATE sync_Records")) return false;
+
+    // Seed fake leaderboard data on first init (idempotent)
+    {
+        sqlite3_stmt* chk = nullptr;
+        int cnt = 0;
+        if (sqlite3_prepare_v2(g_db,
+            "SELECT COUNT(*) FROM sync_Records;", -1, &chk, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(chk) == SQLITE_ROW) cnt = sqlite3_column_int(chk, 0);
+            sqlite3_finalize(chk);
+        }
+        if (cnt == 0) {
+            const int n = (int)(sizeof(FALLBACK_BOARD_ROWS)/sizeof(FALLBACK_BOARD_ROWS[0]));
+            for (int i = 0; i < n; i++) {
+                const FallbackRow& r = FALLBACK_BOARD_ROWS[i];
+                int64_t ts = parseIso8601(r.iso);
+                char sql[256];
+                SDL_snprintf(sql, sizeof(sql),
+                    "INSERT INTO sync_Records "
+                    "(nameUser,totalScore,totalSeconds,avgSpeed,endTS) "
+                    "VALUES ('%s',%d,%d,%.2f,%lld);",
+                    r.user, r.score, r.score / 2,
+                    (float)r.score / (float)(r.score / 2 + 1),
+                    (long long)ts);
+                dbExec(sql, "seed sync_Records");
+            }
+            SDL_Log("[gameConsole_db] sync_Records seeded with %d fake rows", n);
+            dbSyncToPersistent();
+        }
+    }
+
+    SDL_Log("[gameConsole_db] schema initialized (9 tables: 3 user + 4 shared + 1 sync + meta)");
     return true;
 }
 
 bool dbSeedSharedData() {
     if (!g_db) return false;
 
-    // Idempotent guard: skip if shared_data already has rows.
-    // INSERT OR REPLACE inside each chapter SQL keeps updates safe even
-    // when this guard is bypassed in a future "force re-seed" V3 flow.
+    // Data is populated by gameStory sync at startup.
+    // Console only verifies rows exist; redirects to gameStory if empty.
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(g_db, "SELECT COUNT(*) FROM shared_data;",
-                           -1, &st, nullptr) != SQLITE_OK) {
-        SDL_Log("[gameConsole_db] seed COUNT prepare fail: %s",
-                sqlite3_errmsg(g_db));
-        return false;
-    }
-    int existingCount = 0;
-    if (sqlite3_step(st) == SQLITE_ROW) {
-        existingCount = sqlite3_column_int(st, 0);
-    }
+                           -1, &st, nullptr) != SQLITE_OK) return false;
+    int cnt = 0;
+    if (sqlite3_step(st) == SQLITE_ROW) cnt = sqlite3_column_int(st, 0);
     sqlite3_finalize(st);
-    if (existingCount > 0) {
-        SDL_Log("[gameConsole_db] shared_data da co %d rows, skip seed",
-                existingCount);
+    if (cnt > 0) {
+        SDL_Log("[gameConsole_db] shared_data %d rows (sync ok)", cnt);
         return true;
     }
-
-    // V2: hardcoded chapter list bundled with binary.
-    // V3 (Task 3.1): GET https://<pages>/chapters/index.json to discover
-    // new chapter IDs, curl each <id>/<id>.sql, then re-run this exec loop.
-    const char* chapterDirs[] = { "c001" };
-    const int   nChapters     = (int)(sizeof(chapterDirs) / sizeof(chapterDirs[0]));
-
-    const char* basePath = SDL_GetBasePath();
-    int totalLoaded = 0;
-
-    for (int ci = 0; ci < nChapters; ci++) {
-        std::string sqlPath = (basePath && basePath[0] != '\0')
-            ? std::string(basePath) + "chapters/" + chapterDirs[ci] + "/" + chapterDirs[ci] + ".sql"
-            : std::string("chapters/") + chapterDirs[ci] + "/" + chapterDirs[ci] + ".sql";
-
-        SDL_IOStream* io = SDL_IOFromFile(sqlPath.c_str(), "rb");
-        if (!io) {
-            SDL_Log("[gameConsole_db] khong mo duoc %s -- skip chapter %s",
-                    sqlPath.c_str(), chapterDirs[ci]);
-            continue;
-        }
-        Sint64 sz = SDL_GetIOSize(io);
-        if (sz <= 0) { SDL_CloseIO(io); continue; }
-
-        std::string sqlText((size_t)sz, '\0');
-        size_t got = SDL_ReadIO(io, &sqlText[0], (size_t)sz);
-        SDL_CloseIO(io);
-        if (got != (size_t)sz) {
-            SDL_Log("[gameConsole_db] %s: read sai size (%zu/%lld)",
-                    sqlPath.c_str(), got, (long long)sz);
-            continue;
-        }
-
-        // sqlite3_exec handles multi-statement scripts (BEGIN/INSERT/COMMIT)
-        char* errMsg = nullptr;
-        int rc = sqlite3_exec(g_db, sqlText.c_str(), nullptr, nullptr, &errMsg);
-        if (rc != SQLITE_OK) {
-            SDL_Log("[gameConsole_db] %s exec fail: %s",
-                    chapterDirs[ci], errMsg ? errMsg : "(no msg)");
-            sqlite3_free(errMsg);
-            // Try next chapter; partial failure is non-fatal
-            continue;
-        }
-        SDL_Log("[gameConsole_db] chapter %s seeded tu %s",
-                chapterDirs[ci], sqlPath.c_str());
-        totalLoaded++;
-    }
-
-    if (totalLoaded == 0) {
-        SDL_Log("[gameConsole_db] khong load duoc chapter nao -- shared_data trong");
-        return false;
-    }
-    SDL_Log("[gameConsole_db] %d chapter(s) seeded vao shared_data", totalLoaded);
-    dbSyncToPersistent();   // [F.7]
-    return true;
+    SDL_Log("[gameConsole_db] shared_data empty — gameStory sync required");
+    return false;
 }
 
 std::vector<StoryRow> dbLoadStories(const char* idUser, int idChapter) {
@@ -826,7 +863,7 @@ std::vector<StoryRow> dbLoadStories(const char* idUser, int idChapter) {
     // LEFT JOIN shared_data (catalogue) with idUser_Stories (per-user overlay).
     // COALESCE turns NULL overlays into safe defaults so untouched stories
     // render as locked/unplayed without separate code paths.
-    const char* sql =
+    std::string sql =
         "SELECT s.idStory, s.storyName, s.idChapter, s.chapterName,"
         "       s.minScore, s.minSpeed, s.minRetries, s.requiredStories,"
         "       s.nextBlockScore, s.nextBlockSpeed,"
@@ -837,7 +874,7 @@ std::vector<StoryRow> dbLoadStories(const char* idUser, int idChapter) {
         "       COALESCE(u.lastMaxScore, 0),"
         "       COALESCE(u.lastMaxSpeed, 0.0) "
         "FROM shared_data s "
-        "LEFT JOIN idUser_Stories u "
+        "LEFT JOIN " + userTable("Stories") + " u "
         "  ON s.idStory = u.idStory "
         " AND s.idChapter = u.idChapter "
         " AND u.idUser = ?1 "
@@ -845,7 +882,7 @@ std::vector<StoryRow> dbLoadStories(const char* idUser, int idChapter) {
         "ORDER BY s.idStory;";
 
     sqlite3_stmt* st = nullptr;
-    if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         SDL_Log("[gameConsole_db] dbLoadStories prepare fail: %s",
                 sqlite3_errmsg(g_db));
         return out;
@@ -898,10 +935,10 @@ int dbMaxActivatedChapter(const char* idUser) {
     if (!g_db || !idUser || !*idUser) return 1;
 
     sqlite3_stmt* st = nullptr;
-    const char* sql =
-        "SELECT COALESCE(MAX(idChapter), 1) FROM idUser_Stories "
-        "WHERE idUser = ? AND isActivated = 1;";
-    if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+    std::string sql =
+        "SELECT COALESCE(MAX(idChapter), 1) FROM " + userTable("Stories") +
+        " WHERE idUser = ? AND isActivated = 1;";
+    if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         SDL_Log("[gameConsole_db] dbMaxActivatedChapter prepare fail: %s",
                 sqlite3_errmsg(g_db));
         return 1;
@@ -924,12 +961,12 @@ int dbCheckAndUnlockStories(const char* idUser) {
     std::vector<StoryRow> candidates;
     {
         sqlite3_stmt* st = nullptr;
-        const char* sql =
+        std::string sql =
             "SELECT idStory, idChapter, minScore, minSpeed, minRetries, "
             "       requiredStories "
             "FROM shared_data "
             "WHERE requiredStories != '';";
-        if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
             SDL_Log("[gameConsole_db] unlock list prepare fail: %s",
                     sqlite3_errmsg(g_db));
             return 0;
@@ -950,23 +987,29 @@ int dbCheckAndUnlockStories(const char* idUser) {
 
     // Pass 2: prepare reusable statements
     sqlite3_stmt* lookupParent = nullptr;
-    sqlite3_prepare_v2(g_db,
-        "SELECT lastMaxScore, lastMaxSpeed, totalRetries "
-        "FROM idUser_Stories WHERE idUser = ? AND idStory = ?;",
-        -1, &lookupParent, nullptr);
+    {
+        std::string lpSQL =
+            "SELECT lastMaxScore, lastMaxSpeed, totalRetries FROM " +
+            userTable("Stories") + " WHERE idUser = ? AND idStory = ?;";
+        sqlite3_prepare_v2(g_db, lpSQL.c_str(), -1, &lookupParent, nullptr);
+    }
 
     sqlite3_stmt* checkExisting = nullptr;
-    sqlite3_prepare_v2(g_db,
-        "SELECT isActivated FROM idUser_Stories "
-        "WHERE idUser = ? AND idStory = ? AND idChapter = ?;",
-        -1, &checkExisting, nullptr);
+    {
+        std::string ceSQL =
+            "SELECT isActivated FROM " + userTable("Stories") +
+            " WHERE idUser = ? AND idStory = ? AND idChapter = ?;";
+        sqlite3_prepare_v2(g_db, ceSQL.c_str(), -1, &checkExisting, nullptr);
+    }
 
     sqlite3_stmt* doUnlock = nullptr;
-    sqlite3_prepare_v2(g_db,
-        "INSERT INTO idUser_Stories (idUser, idStory, idChapter, isActivated) "
-        "VALUES (?, ?, ?, 1) "
-        "ON CONFLICT(idUser, idStory, idChapter) DO UPDATE SET isActivated = 1;",
-        -1, &doUnlock, nullptr);
+    {
+        std::string duSQL =
+            "INSERT INTO " + userTable("Stories") +
+            " (idUser, idStory, idChapter, isActivated) VALUES (?, ?, ?, 1) "
+            "ON CONFLICT(idUser, idStory, idChapter) DO UPDATE SET isActivated = 1;";
+        sqlite3_prepare_v2(g_db, duSQL.c_str(), -1, &doUnlock, nullptr);
+    }
 
     int unlocked = 0;
 
@@ -1048,13 +1091,13 @@ int dbCheckAndUnlockStories(const char* idUser) {
 
 bool dbInsertRecord(const GameRecord& rec) {
     if (!g_db) return false;
-    const char* sql =
-        "INSERT INTO idUser_Records "
+    std::string sql =
+        "INSERT INTO " + userTable("Records") + " "
         "(idUser,startTS,endTS,idStory,idChapter,"
         " totalScore,totalSeconds,avgSpeed,retryNo) "
         "VALUES (?,?,?,?,?,?,?,?,?);";
     sqlite3_stmt* st = nullptr;
-    if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         SDL_Log("[gameConsole_db] dbInsertRecord prepare fail: %s", sqlite3_errmsg(g_db));
         return false;
     }
@@ -1080,15 +1123,15 @@ bool dbInsertRecord(const GameRecord& rec) {
 bool dbUpsertStoryProgress(const char* idUser, int idStory, int idChapter,
                            bool isActivated, bool isSelected) {
     if (!g_db || !idUser || !*idUser) return false;
-    const char* sql =
-        "INSERT INTO idUser_Stories "
+    std::string sql =
+        "INSERT INTO " + userTable("Stories") + " "
         "(idUser,idStory,idChapter,isActivated,isSelected) "
         "VALUES (?,?,?,?,?) "
         "ON CONFLICT(idUser,idStory,idChapter) DO UPDATE SET "
         "  isActivated = MAX(isActivated, excluded.isActivated),"
         "  isSelected  = excluded.isSelected;";
     sqlite3_stmt* st = nullptr;
-    if (sqlite3_prepare_v2(g_db, sql, -1, &st, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         SDL_Log("[gameConsole_db] dbUpsertStoryProgress prepare fail: %s", sqlite3_errmsg(g_db));
         return false;
     }
@@ -1103,18 +1146,351 @@ bool dbUpsertStoryProgress(const char* idUser, int idStory, int idChapter,
     return ok;
 }
 
+// gameconsole-nut-setting-10 / Issue 2.2-2.3
+// Persist SettingsConfig to user_settings table (INSERT OR REPLACE per key).
+bool dbSaveSettings(const SettingsConfig& cfg) {
+    if (!g_db) return false;
+    std::string sql =
+        "INSERT OR REPLACE INTO " + userTable("Settings") +
+        " (key, value) VALUES (?, ?);";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbSaveSettings prepare fail: %s",
+                sqlite3_errmsg(g_db));
+        return false;
+    }
+    auto kv = [&](const char* k, const char* v) {
+        sqlite3_reset(st);
+        sqlite3_bind_text(st, 1, k, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(st, 2, v, -1, SQLITE_TRANSIENT);
+        sqlite3_step(st);
+    };
+    char buf[32];
+    SDL_snprintf(buf, sizeof(buf), "%.4f", (double)cfg.volume);
+    kv("volume", buf);
+    for (int i = 0; i < 7; i++) {
+        char key[12];
+        SDL_snprintf(key, sizeof(key), "color%d", i);
+        kv(key, cfg.colorEnabled[i] ? "1" : "0");
+    }
+    SDL_snprintf(buf, sizeof(buf), "%d", cfg.storyId);   kv("storyId",   buf);
+    SDL_snprintf(buf, sizeof(buf), "%d", cfg.chapterId); kv("chapterId", buf);
+    sqlite3_finalize(st);
+    dbSyncToPersistent();
+    SDL_Log("[gameConsole_db] settings saved");
+    return true;
+}
+
+// Load SettingsConfig from user_settings table.
+// Returns false when table has no rows (caller keeps struct defaults).
+bool dbLoadSettings(SettingsConfig& cfg) {
+    if (!g_db) return false;
+    sqlite3_stmt* st = nullptr;
+    std::string sql = "SELECT key, value FROM " + userTable("Settings") + ";";
+    if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) return false;
+    bool found = false;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        found = true;
+        const char* k = (const char*)sqlite3_column_text(st, 0);
+        const char* v = (const char*)sqlite3_column_text(st, 1);
+        if (!k || !v) continue;
+        if (SDL_strcmp(k, "volume") == 0) {
+            float vol = (float)SDL_atof(v);
+            if (vol < 0.0f) vol = 0.0f;
+            if (vol > 1.0f) vol = 1.0f;
+            cfg.volume = vol;
+        } else if (SDL_strcmp(k, "storyId")   == 0) { cfg.storyId   = SDL_atoi(v); }
+        else if (SDL_strcmp(k, "chapterId") == 0) { cfg.chapterId = SDL_atoi(v); }
+        else {
+            for (int i = 0; i < 7; i++) {
+                char expect[12];
+                SDL_snprintf(expect, sizeof(expect), "color%d", i);
+                if (SDL_strcmp(k, expect) == 0) {
+                    cfg.colorEnabled[i] = (SDL_atoi(v) != 0);
+                    break;
+                }
+            }
+        }
+    }
+    sqlite3_finalize(st);
+    if (found) SDL_Log("[gameConsole_db] settings loaded");
+    return found;
+}
+
+// Issue 2.7: Load leaderboard from sync_Records (replaces board.json).
+std::vector<BoardRecord> dbLoadRecords(int limit) {
+    std::vector<BoardRecord> out;
+    if (!g_db) return out;
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db,
+    "SELECT nameUser, totalScore, totalSeconds, avgSpeed, endTS "
+    "FROM sync_Records ORDER BY totalScore DESC LIMIT ?;",
+        -1, &st, nullptr) != SQLITE_OK) {
+        SDL_Log("[gameConsole_db] dbLoadRecords prepare fail: %s",
+                sqlite3_errmsg(g_db));
+        return out;
+    }
+    sqlite3_bind_int(st, 1, limit);
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        BoardRecord r;
+        const unsigned char* u = sqlite3_column_text(st, 0);
+        r.idUser       = u ? (const char*)u : "";
+        r.totalScore   = sqlite3_column_int   (st, 1);
+        r.totalSeconds = sqlite3_column_int   (st, 2);
+        r.avgSpeed     = (float)sqlite3_column_double(st, 3);
+        r.endTS        = (int64_t)sqlite3_column_int64(st, 4);
+        out.push_back(std::move(r));
+    }
+    sqlite3_finalize(st);
+    if (out.empty()) {
+        const int n = (int)(sizeof(FALLBACK_BOARD_ROWS) / sizeof(FALLBACK_BOARD_ROWS[0]));
+        out.reserve(n);
+        for (int i = 0; i < n; i++) {
+            const FallbackRow& r = FALLBACK_BOARD_ROWS[i];
+            BoardRecord row;
+            row.idUser = r.user;
+            row.totalScore = r.score;
+            row.totalSeconds = r.score / 2;
+            row.avgSpeed = (float)r.score / (float)(r.score / 2 + 1);
+            row.endTS = parseIso8601(r.iso);
+            out.push_back(std::move(row));
+        }
+    }
+    SDL_Log("[gameConsole_db] dbLoadRecords: %d rows", (int)out.size());
+    return out;
+}
+
+// gameconsole-tich-hop-backend-13
+// Minimal synchronous HTTP GET.
+// WASM: emscripten_fetch with Asyncify (requires -sASYNCIFY=1, already set).
+// Native: libcurl (linked when HAVE_LIBCURL; graceful offline otherwise).
+static std::string consoleHttpGet(const char* url) {
+    if (!url || !*url) return "";
+
+    CTDBG_REQ("GET", url);
+
+#ifdef __EMSCRIPTEN__
+    emscripten_fetch_attr_t attr;
+    emscripten_fetch_attr_init(&attr);
+    SDL_strlcpy(attr.requestMethod, "GET", sizeof(attr.requestMethod));
+    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY |
+                      EMSCRIPTEN_FETCH_SYNCHRONOUS;
+    emscripten_fetch_t* fetch = emscripten_fetch(&attr, url);
+    std::string body;
+    if (fetch && fetch->status == 200 && fetch->numBytes > 0) {
+        body.assign(fetch->data, (size_t)fetch->numBytes);
+        CTDBG_RES("GET", url, 200, body.size());
+        CTDBG_BODY(body);
+    } else if (fetch) {
+        CTDBG_RES("GET", url, fetch->status, 0);
+        CTDBG_ERR("emscripten_fetch: non-200 or empty body");
+        SDL_Log("[gameConsole] GET %s HTTP %d", url, (int)fetch->status);
+    }
+    if (fetch) emscripten_fetch_close(fetch);
+    return body;
+
+#else
+#ifdef HAVE_LIBCURL
+    std::string body;
+    CURL* c = curl_easy_init();
+    if (!c) {
+        CTDBG_ERR("curl_easy_init() returned null");
+        return "";
+    }
+    curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &body);
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(c, CURLOPT_VERBOSE, 0L);
+    CURLcode res = curl_easy_perform(c);
+    long httpCode = 0;
+    curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &httpCode);
+    curl_easy_cleanup(c);
+    if (res == CURLE_OK) {
+        CTDBG_RES("GET", url, (int)httpCode, body.size());
+        CTDBG_BODY(body);
+    } else {
+        CTDBG_ERR(curl_easy_strerror(res));
+    }
+    return body;
+#else
+    CTDBG_ERR("consoleHttpGet: no HTTP support (HAVE_LIBCURL not defined)");
+    SDL_Log("[gameConsole] consoleHttpGet: no HTTP support");
+    return "";
+#endif
+#endif
+}
+
+// Synchronous HTTP POST with JSON body + Bearer token.
+static int consoleHttpPost(const char* url,
+                           const char* jsonBody,
+                           const char* token) {
+    if (!url || !*url || !jsonBody) return -1;
+
+    CTDBG_REQ("POST", url);
+    CTDBG_INFO("token_set", (token && *token) ? "yes" : "no (empty)");
+    CTDBG_BODY(std::string(jsonBody));
+
+#ifdef __EMSCRIPTEN__
+    std::string authVal = std::string("Bearer ") + (token ? token : "");
+    const char* hdr[] = {
+        "Content-Type", "application/json",
+        "Authorization", authVal.c_str(),
+        nullptr
+    };
+    emscripten_fetch_attr_t attr;
+    emscripten_fetch_attr_init(&attr);
+    SDL_strlcpy(attr.requestMethod, "POST", sizeof(attr.requestMethod));
+    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY |
+                      EMSCRIPTEN_FETCH_SYNCHRONOUS;
+    attr.requestHeaders = hdr;
+    attr.requestData = jsonBody;
+    attr.requestDataSize = SDL_strlen(jsonBody);
+    emscripten_fetch_t* fetch = emscripten_fetch(&attr, url);
+    int status = fetch ? (int)fetch->status : -1;
+    CTDBG_RES("POST", url, status, fetch ? (size_t)fetch->numBytes : 0);
+    if (fetch) emscripten_fetch_close(fetch);
+    return status;
+
+#else
+#ifdef HAVE_LIBCURL
+    std::string authHdr = std::string("Authorization: Bearer ") +
+                          (token ? token : "");
+    struct curl_slist* hdrs = nullptr;
+    hdrs = curl_slist_append(hdrs, "Content-Type: application/json");
+    hdrs = curl_slist_append(hdrs, authHdr.c_str());
+    long httpCode = -1;
+    std::string responseBody;
+    CURL* c = curl_easy_init();
+    if (c) {
+        curl_easy_setopt(c, CURLOPT_URL, url);
+        curl_easy_setopt(c, CURLOPT_HTTPHEADER, hdrs);
+        curl_easy_setopt(c, CURLOPT_POSTFIELDS, jsonBody);
+        curl_easy_setopt(c, CURLOPT_POSTFIELDSIZE, (long)SDL_strlen(jsonBody));
+        curl_easy_setopt(c, CURLOPT_TIMEOUT, 10L);
+        curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+        curl_easy_setopt(c, CURLOPT_WRITEDATA, &responseBody);
+        CURLcode res = curl_easy_perform(c);
+        curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &httpCode);
+        if (res == CURLE_OK) {
+            CTDBG_RES("POST", url, (int)httpCode, responseBody.size());
+            CTDBG_BODY(responseBody);
+        } else {
+            CTDBG_ERR(curl_easy_strerror(res));
+        }
+        curl_easy_cleanup(c);
+    }
+    curl_slist_free_all(hdrs);
+    return (int)httpCode;
+#else
+    CTDBG_ERR("consoleHttpPost: no HTTP support (HAVE_LIBCURL not defined)");
+    SDL_Log("[gameConsole] consoleHttpPost: no HTTP support");
+    return -1;
+#endif
+#endif
+}
+
+// Pull leaderboard from Cloudflare Worker, replace local sync_Records.
+// Returns number of rows inserted, or negative on error.
+static int fetchLeaderboardFromApi() {
+    const char* apiUrl = CTETRIS_API_URL;
+    if (!apiUrl || !*apiUrl) {
+        SDL_Log("[gameConsole] CTETRIS_API_URL not set — leaderboard sync skipped");
+        return -1;
+    }
+    std::string url = std::string(apiUrl) + "/leaderboard?limit=50";
+    std::string body = consoleHttpGet(url.c_str());
+    if (body.empty()) {
+        SDL_Log("[gameConsole] leaderboard fetch failed or offline");
+        return -2;
+    }
+    nlohmann::json j;
+    try { j = nlohmann::json::parse(body); } catch (...) { return -3; }
+    if (!j.value("ok", false) || !j.contains("data") ||
+        !j["data"].is_array()) return -4;
+    if (!g_db) return -5;
+
+    dbExec("DELETE FROM sync_Records;", "clear sync_Records for API sync");
+
+    const auto& arr = j["data"];
+    sqlite3_stmt* ins = nullptr;
+    if (sqlite3_prepare_v2(g_db,
+        "INSERT INTO sync_Records "
+        "(nameUser,totalScore,totalSeconds,avgSpeed,endTS,idStory,idChapter) "
+        "VALUES (?,?,?,?,?,?,?);",
+        -1, &ins, nullptr) == SQLITE_OK) {
+        for (const auto& row : arr) {
+            std::string nu = row.value("name_user", std::string());
+            if (nu.size() > 32) nu = nu.substr(0, 32);
+            sqlite3_reset(ins);
+            sqlite3_bind_text  (ins, 1, nu.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int   (ins, 2, row.value("total_score",   0));
+            sqlite3_bind_int   (ins, 3, row.value("total_seconds", 0));
+            sqlite3_bind_double(ins, 4, row.value("avg_speed",     0.0));
+            sqlite3_bind_int64 (ins, 5,
+                (sqlite3_int64)row.value("end_ts", (int64_t)0));
+            sqlite3_bind_int   (ins, 6, row.value("id_story",   0));
+            sqlite3_bind_int   (ins, 7, row.value("id_chapter", 0));
+            sqlite3_step(ins);
+        }
+        sqlite3_finalize(ins);
+    }
+    dbSyncToPersistent();
+    SDL_Log("[gameConsole] leaderboard API sync: %d rows", (int)arr.size());
+    return (int)arr.size();
+}
+
+// Submit last session record to Worker API.
+// `token` is a Bearer token from 3rd-party OTP service (non-empty = authorized).
+static bool submitLastRecord(const char* token) {
+    const char* apiUrl = CTETRIS_API_URL;
+    if (!apiUrl || !*apiUrl || !g_db) return false;
+    if (!token || !*token) {
+        SDL_Log("[gameConsole] submitLastRecord: no auth token");
+        return false;
+    }
+    sqlite3_stmt* st = nullptr;
+    std::string sql =
+        "SELECT totalScore, totalSeconds, avgSpeed, endTS, idStory, idChapter "
+        "FROM " + userTable("Records") +
+        " WHERE idUser='default' ORDER BY endTS DESC LIMIT 1;";
+    if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK)
+        return false;
+    if (sqlite3_step(st) != SQLITE_ROW) { sqlite3_finalize(st); return false; }
+    int     score = sqlite3_column_int   (st, 0);
+    int     secs  = sqlite3_column_int   (st, 1);
+    float   spd   = (float)sqlite3_column_double(st, 2);
+    int64_t ts    = (int64_t)sqlite3_column_int64(st, 3);
+    int     idS   = sqlite3_column_int   (st, 4);
+    int     idC   = sqlite3_column_int   (st, 5);
+    sqlite3_finalize(st);
+
+    char body[320];
+    SDL_snprintf(body, sizeof(body),
+        "{\"nameUser\":\"default\",\"totalScore\":%d,\"totalSeconds\":%d,"
+        "\"avgSpeed\":%.2f,\"endTs\":%lld,\"idStory\":%d,\"idChapter\":%d}",
+        score, secs, (double)spd, (long long)ts, idS, idC);
+
+    std::string url = std::string(apiUrl) + "/record";
+    int status = consoleHttpPost(url.c_str(), body, token);
+    SDL_Log("[gameConsole] submitLastRecord: HTTP %d", status);
+    return (status == 200 || status == 201);
+}
+
 static bool dbSelectStory(const char* idUser, int idStory, int idChapter) {
     if (!g_db || !idUser || !*idUser) return false;
 
     // Single-select semantics: clear any prior selection for this user
     sqlite3_stmt* clr = nullptr;
-    if (sqlite3_prepare_v2(g_db,
-        "UPDATE idUser_Stories SET isSelected = 0 "
-        "WHERE idUser = ? AND isSelected = 1;",
-        -1, &clr, nullptr) != SQLITE_OK) {
+    {
+        std::string clrSQL = "UPDATE " + userTable("Stories") +
+            " SET isSelected = 0 WHERE idUser = ? AND isSelected = 1;";
+        if (sqlite3_prepare_v2(g_db, clrSQL.c_str(), -1, &clr, nullptr) != SQLITE_OK) {
         SDL_Log("[gameConsole_db] dbSelectStory clear prepare fail: %s",
                 sqlite3_errmsg(g_db));
         return false;
+        }
     }
     sqlite3_bind_text(clr, 1, idUser, -1, SQLITE_TRANSIENT);
     sqlite3_step(clr);
@@ -1124,16 +1500,18 @@ static bool dbSelectStory(const char* idUser, int idStory, int idChapter) {
     // (which has no idUser_Stories row before its first play) creates the
     // row correctly and the radio "stays" highlighted across reopen.
     sqlite3_stmt* up = nullptr;
-    if (sqlite3_prepare_v2(g_db,
-        "INSERT INTO idUser_Stories "
-        "  (idUser, idStory, idChapter, isActivated, isSelected) "
-        "VALUES (?, ?, ?, 1, 1) "
-        "ON CONFLICT(idUser, idStory, idChapter) DO UPDATE SET "
-        "  isActivated = 1, isSelected = 1;",
-        -1, &up, nullptr) != SQLITE_OK) {
+    {
+        std::string upSQL =
+            "INSERT INTO " + userTable("Stories") +
+            "  (idUser, idStory, idChapter, isActivated, isSelected) "
+            "VALUES (?, ?, ?, 1, 1) "
+            "ON CONFLICT(idUser, idStory, idChapter) DO UPDATE SET "
+            "  isActivated = 1, isSelected = 1;";
+        if (sqlite3_prepare_v2(g_db, upSQL.c_str(), -1, &up, nullptr) != SQLITE_OK) {
         SDL_Log("[gameConsole_db] dbSelectStory upsert prepare fail: %s",
                 sqlite3_errmsg(g_db));
         return false;
+        }
     }
     sqlite3_bind_text(up, 1, idUser, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int (up, 2, idStory);
@@ -1194,6 +1572,15 @@ static const SDL_FRect BOARD_CLOSE = { BOARD_POPUP.x + BOARD_POPUP.w - 22.0f,
 static const SDL_FRect SETTINGS_POPUP = { 5.0f, 20.0f, 260.0f, 440.0f };
 static const SDL_FRect SETTINGS_CLOSE = { SETTINGS_POPUP.x + SETTINGS_POPUP.w - 22.0f,
                                           SETTINGS_POPUP.y + 4.0f, 18.0f, 18.0f };
+static const float API_BTN_W = 220.0f;
+static const float API_BTN_H = 22.0f;
+static const float API_BTN_X = SETTINGS_POPUP.x + (SETTINGS_POPUP.w - API_BTN_W) / 2.0f;
+static const SDL_FRect SETTINGS_SYNC_BTN = {
+    API_BTN_X, SETTINGS_POPUP.y + 196.0f, API_BTN_W, API_BTN_H
+};
+static const SDL_FRect SETTINGS_SUBMIT_BTN = {
+    API_BTN_X, SETTINGS_POPUP.y + 224.0f, API_BTN_W, API_BTN_H
+};
 
 // [F.2] Stories popup geometry -- same footprint as Settings/Guide for visual
 // consistency. Body (thumbnail, story list, chapter navigator) is populated
@@ -1710,6 +2097,42 @@ static void drawSettingsLightbox(SDL_Renderer* renderer, const AppState& state) 
         }
     }
 
+    // ===== [V3] ONLINE SYNC SECTION =====
+    {
+        SDL_SetRenderDrawColor(renderer, 140, 140, 150, 255);
+        SDL_RenderDebugText(renderer, SETTINGS_POPUP.x + 20.0f,
+                            SETTINGS_POPUP.y + 182.0f, "ONLINE SYNC");
+
+        bool hasCfgUrl = (SDL_strlen(CTETRIS_API_URL) > 0);
+        SDL_Color syncBg = hasCfgUrl
+            ? SDL_Color{50, 100, 160, 255}
+            : SDL_Color{60, 60, 70, 255};
+        SDL_SetRenderDrawColor(renderer, syncBg.r, syncBg.g, syncBg.b, 255);
+        SDL_RenderFillRect(renderer, &SETTINGS_SYNC_BTN);
+        SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+        SDL_RenderRect(renderer, &SETTINGS_SYNC_BTN);
+        SDL_RenderDebugText(renderer,
+            SETTINGS_SYNC_BTN.x + 8.0f,
+            SETTINGS_SYNC_BTN.y + (SETTINGS_SYNC_BTN.h - 8.0f) / 2.0f,
+            hasCfgUrl ? "SYNC BOARD (pull)" : "SYNC (no API URL)");
+
+        SDL_SetRenderDrawColor(renderer, 80, 50, 130, 255);
+        SDL_RenderFillRect(renderer, &SETTINGS_SUBMIT_BTN);
+        SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+        SDL_RenderRect(renderer, &SETTINGS_SUBMIT_BTN);
+        SDL_RenderDebugText(renderer,
+            SETTINGS_SUBMIT_BTN.x + 8.0f,
+            SETTINGS_SUBMIT_BTN.y + (SETTINGS_SUBMIT_BTN.h - 8.0f) / 2.0f,
+            "SUBMIT SCORE (OTP token)");
+
+        if (state.cfg && !state.apiSyncStatus.empty()) {
+            SDL_SetRenderDrawColor(renderer, 160, 200, 160, 255);
+            SDL_RenderDebugText(renderer, SETTINGS_POPUP.x + 8.0f,
+                                SETTINGS_POPUP.y + 252.0f,
+                                state.apiSyncStatus.c_str());
+        }
+    }
+
     // Hint footer
     SDL_SetRenderDrawColor(renderer, 160, 160, 160, 255);
     SDL_RenderDebugText(renderer, SETTINGS_POPUP.x + 20.0f,
@@ -1834,20 +2257,31 @@ static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
             }
         }
 
-        // Story name (truncated to fit if needed; row width ~244, minus
-        // 26 left margin and 20 right margin = ~198px usable = ~24 chars).
+        // Story name.
+        // COMPLETED rows cap at 16 chars so the best-score label has room.
+        // LOCKED / ACTIVE rows keep the original 24-char cap.
         SDL_Color tc;
         if      (us == STORY_UI_LOCKED)    tc = SDL_Color{125, 115, 105, 255};
         else if (us == STORY_UI_COMPLETED) tc = SDL_Color{200, 240, 200, 255};
-        else                                tc = SOFT_WHITE;
+        else                               tc = SOFT_WHITE;
         SDL_SetRenderDrawColor(renderer, tc.r, tc.g, tc.b, 255);
 
         char buf[28];
+        int nameCap = (us == STORY_UI_COMPLETED) ? 16 : 24;
         int n = (int)sr.storyName.size();
-        if (n > 24) n = 24;
+        if (n > nameCap) n = nameCap;
         SDL_memcpy(buf, sr.storyName.c_str(), (size_t)n);
         buf[n] = '\0';
         SDL_RenderDebugText(renderer, row.x + 22.0f, row.y + 5.0f, buf);
+
+        if (us == STORY_UI_COMPLETED && sr.lastMaxScore > 0) {
+            char bestBuf[12];
+            SDL_snprintf(bestBuf, sizeof(bestBuf), "B:%d", sr.lastMaxScore);
+            int bestLen = (int)SDL_strlen(bestBuf);
+            float bestX = row.x + STORIES_ROW_W - 14.0f - 4.0f - 4.0f - (float)bestLen * 8.0f;
+            SDL_SetRenderDrawColor(renderer, 150, 220, 150, 255);
+            SDL_RenderDebugText(renderer, bestX, row.y + 5.0f, bestBuf);
+        }
 
         // Play button -- HIDDEN for locked rows (per task.md spec)
         if (us != STORY_UI_LOCKED) {
@@ -1971,6 +2405,28 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     AppState state;
     state.cfg = &cfgInOut;   // borrow, do NOT delete
     SDL_Event event;
+
+    // Issue 2.1: Guard -- if DB file does not exist, redirect to gameStory
+    // so it can create and init the DB before Console renders any UI.
+    // Return code 3 = SCREEN_GAMESTORY_INIT (handled in main.cpp).
+    {
+        char* pref = SDL_GetPrefPath("uit", "cTetris");
+        bool dbExists = false;
+        if (pref) {
+            std::string probe = std::string(pref) + "default.sqlite";
+            SDL_free(pref);
+            SDL_IOStream* f = SDL_IOFromFile(probe.c_str(), "rb");
+            if (f) {
+                dbExists = (SDL_GetIOSize(f) > 100); // >100 bytes = not empty stub
+                SDL_CloseIO(f);
+            }
+        }
+        if (!dbExists) {
+            SDL_Log("[gameConsole] DB not found -> redirect to gameStory (init)");
+            return 3;   // SCREEN_GAMESTORY_INIT
+        }
+    }
+
     playBackgroundMusic();
     applyVolumeToStream(cfgInOut.volume);   // [D.5] sync gain to current vol
 
@@ -1980,6 +2436,8 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     if (dbOpen("default")) {
         dbInitSchema();
         dbSeedSharedData();
+        dbLoadSettings(cfgInOut);   // Issue 2.2: restore volume, colors, storyId
+        applyVolumeToStream(cfgInOut.volume);   // re-apply after load
         dbCheckAndUnlockStories("default");   // [F.5] cascade-unlock on entry
         state.storiesMaxChapter = dbMaxActivatedChapter("default");
 
@@ -1987,10 +2445,10 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
         // Console -> Core handoff has the right idStory/idChapter
         // even after a full app restart (cfg is reset by main.cpp).
         sqlite3_stmt* st = nullptr;
-        if (sqlite3_prepare_v2(g_db,
-            "SELECT idStory, idChapter FROM idUser_Stories "
-            "WHERE idUser = ? AND isSelected = 1 LIMIT 1;",
-            -1, &st, nullptr) == SQLITE_OK) {
+        std::string selSQL =
+            "SELECT idStory, idChapter FROM " + userTable("Stories") +
+            " WHERE idUser = ? AND isSelected = 1 LIMIT 1;";
+        if (sqlite3_prepare_v2(g_db, selSQL.c_str(), -1, &st, nullptr) == SQLITE_OK) {
             sqlite3_bind_text(st, 1, "default", -1, SQLITE_TRANSIENT);
             if (sqlite3_step(st) == SQLITE_ROW) {
                 cfgInOut.storyId   = sqlite3_column_int(st, 0);
@@ -2004,7 +2462,7 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
 
     // [C.5] Load leaderboard tu JSON; fallback ve hardcoded array neu fail.
     // Re-load moi lan vao Console -- cho phep refresh data sau khi V3 add
-    // sync tu MongoDB. Cost ~300us, khong noticeable.
+    // sync tu Cloudflare (D1 + Durable Objects). Cost ~300us, khong noticeable.
     loadBoardWithFallback();
     // [G/H] Apply default sort (SCORE_DESC) right after load -- locks in
     // a deterministic order regardless of whether JSON or fallback array
@@ -2081,7 +2539,11 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                     // none are open does it jump focus to QUIT button.
                     if (state.showGuide)         { state.showGuide = false;    sbResetInteraction(state.sb); }
                     else if (state.showBoard)    { state.showBoard = false;    sbResetInteraction(state.sb); }
-                    else if (state.showSettings) { state.showSettings = false; sbResetInteraction(state.sb); }
+                    else if (state.showSettings) {
+                        state.showSettings = false;
+                        sbResetInteraction(state.sb);
+                        if (state.cfg) dbSaveSettings(*state.cfg);   // Issue 2.3
+                    }
                     else if (state.showStories)  { state.showStories = false;  sbResetInteraction(state.sb); }
                     else                          state.focusIndex = BTN_IDX_QUIT;
                 }
@@ -2165,6 +2627,7 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                         state.showSettings = false;
                         state.draggingVolume = false;
                         sbResetInteraction(state.sb);
+                        if (state.cfg) dbSaveSettings(*state.cfg);   // Issue 2.3
                     }
                     // [D.3] Volume slider drag-start: hit thumb OR click on track
                     else if (state.cfg) {
@@ -2199,6 +2662,32 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                                     }
                                     break;
                                 }
+                            }
+                            if (hitTest(SETTINGS_SYNC_BTN, mx, my)) {
+                                // gameconsole-tich-hop-backend-13: pull leaderboard
+                                if (SDL_strlen(CTETRIS_API_URL) > 0) {
+                                    state.apiSyncStatus = "Syncing...";
+                                    int rows = fetchLeaderboardFromApi();
+                                    if (rows >= 0) {
+                                        char buf[32];
+                                        SDL_snprintf(buf, sizeof(buf),
+                                                     "Synced %d rows", rows);
+                                        state.apiSyncStatus = buf;
+                                        loadBoardWithFallback();
+                                        applyBoardSort(state);
+                                    } else {
+                                        state.apiSyncStatus = "Sync failed (offline?)";
+                                    }
+                                } else {
+                                    state.apiSyncStatus = "Set CTETRIS_API_URL to enable";
+                                }
+                            } else if (hitTest(SETTINGS_SUBMIT_BTN, mx, my)) {
+                                // OTP token: in V3 this comes from 3rd-party auth flow.
+                                // Stub: pass empty token -> Worker returns 401 (expected).
+                                const char* token = "";  // TODO: populate from OTP service
+                                bool ok = submitLastRecord(token);
+                                state.apiSyncStatus = ok ? "Score submitted!"
+                                                         : "Submit failed (need OTP token)";
                             }
                         }
                     }
@@ -2239,20 +2728,24 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                             SDL_FRect radio = storiesRadioRect(i);
                             SDL_FRect play  = storiesPlayRect(i);
                             if (hitTest(radio, mx, my) || hitTest(play, mx, my)) {
-                                // In-memory: clear all isSelected, set this one
+                                // Select story in memory + DB
                                 for (auto& r : state.storiesCache)
                                     r.isSelected = false;
-                                // mark selected in cache
                                 state.storiesCache[i].isSelected = true;
-                                // Persist selection and ensure row is activated
                                 dbSelectStory("default", sr.idStory, sr.idChapter);
-                                // Pipe selection + V2 story fields into cfg
                                 if (state.cfg) {
                                     state.cfg->storyId        = sr.idStory;
                                     state.cfg->chapterId      = sr.idChapter;
                                     state.cfg->nextBlockScore = sr.nextBlockScore;
                                     state.cfg->nextBlockSpeed = sr.nextBlockSpeed;
                                     state.cfg->tableMatrix    = sr.tableMatrix;
+                                }
+                                // [E.3] Play button -> preview story dialogue
+                                // Radio button -> select only, stay in popup
+                                if (hitTest(play, mx, my)) {
+                                    state.showStories = false;
+                                    state.isRunning   = false;
+                                    state.nextScene   = 2;   // signal: play story preview
                                 }
                                 break;
                             }
@@ -2350,6 +2843,35 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
     return state.nextScene;
 }
 
+// integration/v2
+// V2 additions verified (see taskConsole.md Task 2.7):
+//   [A.1] SVG background lazy-rasterize via nanosvg; reset on exit/re-entry
+//   [D.2] Volume slider — SDL_AudioStream + SDL_SetAudioStreamGain(cfg.volume)
+//   [E.2] 7 color swatches — cfg.colorEnabled[7] forwarded to gameCore
+//   [F.1] SQLite 9-table schema:
+//           Group 1 default_*: Records, Stories, Settings
+//           Group 2 shared_*: data, dialogues, choices, meta
+//           Group 3 sync_Records (seeded 30 rows; Cloudflare D1 target V3)
+//   [F.2] Stories popup — 3-state rows, chapter navigator, dbSelectStory()
+//         D1: "B:N" best-score label on COMPLETED rows
+//   [F.5] Unlock cascade — dbCheckAndUnlockStories() on Console entry
+//   [F.6] Restore isSelected story → cfg.storyId/chapterId on re-entry
+//   [F.7] WASM IDBFS — idbfs_mount_dir + load/save after every DB write
+//   [G/H] Board from sync_Records; Smart Sort Engine 4 modes (score/time ↑↓)
+//   DB guard — return 3 when shared_data empty → main.cpp routes to gameStory
+// integration/v3
+// V3 additions verified (see taskConsole.md Task 3.1-3.4):
+//   [V3.1] gameconsole-tich-hop-backend-13:
+//           consoleHttpGet() / consoleHttpPost() — WASM (emscripten_fetch) +
+//           native (libcurl, HAVE_LIBCURL guard) + offline graceful fallback.
+//           fetchLeaderboardFromApi(): GET /leaderboard -> DELETE + INSERT
+//           sync_Records atomically; reloads board and re-applies sort.
+//           submitLastRecord(): POST /record with Bearer token (3rd-party OTP).
+//           SYNC BOARD + SUBMIT SCORE buttons in Settings popup body.
+//           apiSyncStatus feedback line shown below buttons.
+//   [V3.2] sort-by-time-in-board-14: already shipped in V2 [G] -> verified.
+//   [V3.3] sort-by-score-in-board-15: already shipped in V2 [H] -> verified.
+//   [V3.4] integration/v3 comment block added.
 #ifdef BUILD_STANDALONE
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;

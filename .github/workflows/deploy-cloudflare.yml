@@ -1,0 +1,108 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - '.github/workflows/deploy-cloudflare.yml'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy ctetris-api to Cloudflare Workers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Healthcheck: verify required secrets exist before any wrangler call ─
+      - name: Validate Cloudflare secrets
+        env:
+          CF_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          fail=false
+          if [ -z "$CF_API_TOKEN" ]; then
+            echo "::error::Secret CLOUDFLARE_API_TOKEN is not set."
+            echo "  Go to: Settings → Secrets and variables → Actions → New repository secret"
+            echo "  Create token at: https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
+            fail=true
+          fi
+          if [ -z "$CF_ACCOUNT_ID" ]; then
+            echo "::error::Secret CLOUDFLARE_ACCOUNT_ID is not set."
+            echo "  Go to: Settings → Secrets and variables → Actions → New repository secret"
+            echo "  Find your Account ID at: https://dash.cloudflare.com/ (right sidebar)"
+            fail=true
+          fi
+          [ "$fail" = "true" ] && exit 1
+          echo "Secrets OK — CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set."
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: api
+        run: npm ci
+
+      # ── Apply D1 migrations before deploying ──────────────────────────────
+      - name: Apply D1 migrations (remote)
+        working-directory: api
+        env:
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -f "migrations/sync-board.sql" ]; then
+            echo "Applying sync-board.sql migration..."
+            npx wrangler d1 execute DB \
+              --remote \
+              --file migrations/sync-board.sql \
+              --yes 2>&1 || echo "Migration may already be applied — continuing"
+          fi
+
+      # ── Deploy Worker ──────────────────────────────────────────────────────
+      - name: Deploy to Cloudflare Workers
+        working-directory: api
+        env:
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+      # ── Echo Worker URL + health verify ───────────────────────────────────
+      - name: Echo Worker URL
+        if: always()
+        run: |
+          url=$(grep '^CTETRIS_API_URL=' app/.env 2>/dev/null \
+                | cut -d'=' -f2- | tr -d '[:space:]' || true)
+          echo "=============================================="
+          echo "CTETRIS_API_URL = ${url:-<not set in app/.env>}"
+          echo "=============================================="
+          echo "::notice title=CTETRIS_API_URL::${url:-not configured in app/.env}"
+          if [ -n "$url" ] && ! echo "$url" | grep -qE 'OWNER|<'; then
+            echo "Verifying deployed Worker health..."
+            http=$(curl -sf -o /dev/null -w "%{http_code}" \
+                        --max-time 10 "$url/health" 2>/dev/null || echo "000")
+            if [ "$http" = "200" ]; then
+              echo "::notice title=Worker Health::OK — $url/health returned 200"
+              echo "Worker health: OK"
+            else
+              echo "::warning title=Worker Health::$url/health returned HTTP $http"
+              echo "Worker may still be propagating — check manually in ~30s"
+            fi
+          fi

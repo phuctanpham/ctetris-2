@@ -1,4 +1,4 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
@@ -6,23 +6,659 @@
 \IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
 \IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
 \usepackage{docmute}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc,matrix}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{pifont} % Dùng để lấy icon checkmark và cross
+\usepackage{colortbl}
 \hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - Công nghệ nền tảng}}
+
+% ── Color palette (aligned with SDS docs) ──────────────────────────────────
+\definecolor{pillarBlue}{RGB}{30,90,160}
+\definecolor{versionGreen}{RGB}{20,130,80}
+\definecolor{versionAmber}{RGB}{190,120,10}
+\definecolor{versionRed}{RGB}{170,40,40}
+\definecolor{boxGray}{RGB}{240,242,245}
+\definecolor{frontendColor}{RGB}{25,118,210}
+\definecolor{backendColor}{RGB}{46,125,50}
+\definecolor{dbColor}{RGB}{123,31,162}
+\definecolor{devopsColor}{RGB}{183,28,28}
+\definecolor{sharedColor}{RGB}{230,81,0}
+
+\tikzset{
+  techBox/.style={rectangle, rounded corners=4pt, draw=#1, fill=#1!10,
+                  thick, align=center, font=\small\bfseries,
+                  inner sep=6pt, minimum height=0.9cm},
+  techBoxSm/.style={rectangle, rounded corners=3pt, draw=#1!70, fill=#1!8,
+                    align=center, font=\scriptsize, inner sep=4pt,
+                    minimum height=0.65cm, text width=2.2cm},
+  layerBar/.style={rectangle, draw=#1!70, fill=#1!12, rounded corners=3pt,
+                   minimum width=11cm, minimum height=0.85cm,
+                   align=center, font=\small\bfseries},
+  sdsArrow/.style={-{Stealth[length=5pt]}, thick, #1},
+  vTag/.style={rectangle, rounded corners=2pt, fill=#1, text=white,
+               font=\footnotesize\bfseries, inner sep=3pt},
+}
+
+% ── Platform matrix cell macros ─────────────────────────────────────────────
+\newcommand{\Yes}{\cellcolor{versionGreen!12}\textcolor{versionGreen}{\ding{51}}}
+\newcommand{\No}{\cellcolor{red!8}\textcolor{versionRed}{\ding{55}}}
+\newcommand{\Par}{\cellcolor{versionAmber!12}\textcolor{versionAmber}{\textbf{\sim}}}
 
 \begin{document}
 \providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
 \StandaloneSectionSetup{15-technologyAdoption.tex}{LastPageTechnologyAdoption}
 \onehalfspacing
+
 \section{Công nghệ nền tảng}
 
-\subsection{Công nghệ Frontend}
-// tự viết thêm: 
+% ── TỔNG QUAN KIẾN TRÚC ────────────────────────────────────────────────────
+\subsection{Tổng quan kiến trúc kỹ thuật}
 
+\textbf{cTetris} được xây dựng theo triết lý \textit{``một nguồn mã, đa nền tảng''}: cùng một codebase C++17 biên dịch thành native executable (macOS / Windows / Ubuntu) và WebAssembly bundle (trình duyệt), không có nhánh logic riêng cho từng nền tảng.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.4cm]
+  % Layer 5 — DevOps / Toolchain
+  \node[layerBar=devopsColor]
+    (L5) at (0,0)
+    {DevOps \& Toolchain --- CMake · build.sh/ps1 · Emscripten/emsdk · GitHub Actions · Docker};
+  % Layer 4 — Database
+  \node[layerBar=dbColor, below=of L5]
+    (L4)
+    {Database --- SQLite3 (embedded) · Cloudflare D1 (edge) · IDBFS (WASM persist)};
+  % Layer 3 — Backend / Services
+  \node[layerBar=backendColor, below=of L4]
+    (L3)
+    {Backend / Services --- C++17 Game Logic · libcurl · emscripten\_fetch · GitHub Gist · Cloudflare Worker};
+  % Layer 2 — Shared Libs
+  \node[layerBar=sharedColor, below=of L3]
+    (L2)
+    {Shared Libraries --- nlohmann/json · nanosvg/rast · sqlite3 amalgamation};
+  % Layer 1 — Frontend
+  \node[layerBar=frontendColor, below=of L2]
+    (L1)
+    {Frontend / Rendering --- SDL3 · SDL3\_ttf · nanosvg · WebAssembly (Emscripten)};
+  % Arrows
+  \foreach \a/\b in {L5/L4, L4/L3, L3/L2, L2/L1}{
+    \draw[sdsArrow=gray!50](\a)--(\b);
+  }
+  % Version badges on right
+  \node[vTag=versionGreen, right=0.3cm of L1] {V1};
+  \node[vTag=versionAmber, right=0.3cm of L3] {V2};
+  \node[vTag=versionRed,   right=0.3cm of L4] {V3};
+\end{tikzpicture}
+\end{center}
+
+% ── FRONTEND ────────────────────────────────────────────────────────────────
+\subsection{Công nghệ Frontend}
+
+\subsubsection{Tổng quan}
+Frontend của cTetris không dùng framework UI truyền thống mà dựa hoàn toàn vào \textbf{SDL3} làm lớp trừu tượng đa nền tảng cho window, renderer, sự kiện và âm thanh. Toàn bộ đồ hoạ được vẽ thủ công bằng các lệnh procedural (\texttt{SDL\_RenderFillRect}, \texttt{SDL\_RenderDebugText}, hình học SDL), loại bỏ phụ thuộc vào bất kỳ engine nào.
+
+\begin{center}
+\begin{tikzpicture}[
+  comp/.style={techBoxSm=frontendColor, text width=2.4cm},
+  arrow/.style={sdsArrow=frontendColor!70}
+]
+  % Row 1 — Entry
+  \node[techBox=frontendColor, text width=9cm]
+    (entry) at (0,0)
+    {SDL3 --- Window · Renderer · EventLoop · AudioStream};
+
+  % Row 2 — Sub-systems
+  \node[comp] (svg)  at (-4.5,-1.8) {nanosvg\\+ nanosvgrast\\SVG rasterize};
+  \node[comp] (draw) at (-1.8,-1.8) {Procedural\\Drawing\\(no bitmaps)};
+  \node[comp] (dbg)  at (1.0,-1.8)  {SDL\_Render\\DebugText\\(built-in font)};
+  \node[comp] (aud)  at (3.6,-1.8)  {SDL\_Audio\\Stream +\\SetAudioGain};
+
+  % Row 3 — WASM
+  \node[techBox=versionAmber, text width=9cm]
+    (wasm) at (0,-3.4)
+    {WebAssembly Target --- Emscripten · Asyncify · IDBFS · shell.html};
+
+  \foreach \c in {svg,draw,dbg,aud}{
+    \draw[arrow](entry)--(\c.north);
+    \draw[arrow](\c.south)--(wasm.north -| \c);
+  }
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Bảng chi tiết thư viện Frontend}
+
+\begin{tabularx}{\linewidth}{|l|l|X|}
+  \hline
+  \textbf{Thư viện / Công cụ} & \textbf{Phiên bản} & \textbf{Vai trò trong dự án} \\
+  \hline
+  \textbf{SDL3}       & main (git)   & Window, renderer 2D, event loop, \texttt{SDL\_AudioStream}; target link \texttt{SDL3::SDL3}; cross-platform native + WASM. \\
+  \hline
+  \textbf{SDL3\_ttf}  & bundled      & Render font TrueType cho dialogue text; fallback \texttt{SDL\_RenderDebugText} khi không có font file. \\
+  \hline
+  \textbf{nanosvg}    & single-header & Parse SVG string $\rightarrow$ \texttt{NSVGimage}; impl compiled một lần trong \texttt{nanosvg\_impl.cpp}; dùng cho logo, background, credit. \\
+  \hline
+  \textbf{nanosvgrast}& single-header & Rasterize \texttt{NSVGimage} $\rightarrow$ pixel buffer $\rightarrow$ \texttt{SDL\_Texture}; lazy-init 1 lần/session. \\
+  \hline
+  \textbf{Emscripten} & emsdk 3.1.x  & Biên dịch C++ thành \texttt{.wasm} + \texttt{.js} + \texttt{.html}; \texttt{-sASYNCIFY=1} cho vòng lặp đồng bộ; \texttt{-sALLOW\_MEMORY\_GROWTH=1}. \\
+  \hline
+  \textbf{IDBFS}      & Emscripten   & Ánh xạ \texttt{SDL\_GetPrefPath} sang IndexedDB của trình duyệt; \texttt{FS.syncfs(false)} sau mỗi write để flush. \\
+  \hline
+  \textbf{shell.html} & custom       & HTML wrapper: favicon SVG, title \texttt{cTetris ©}, canvas centering; không có PWA manifest để giảm phụ thuộc. \\
+  \hline
+\end{tabularx}
+
+\subsubsection{Quy trình render mỗi frame}
+
+\begin{center}
+\begin{tikzpicture}[
+  b/.style={techBoxSm=frontendColor, text width=2.0cm},
+  a/.style={sdsArrow=frontendColor}
+]
+  \node[b](p1){SDL\_PollEvent\\(input layer)};
+  \node[b,right=0.5cm of p1](p2){State\\Update\\(logic)};
+  \node[b,right=0.5cm of p2](p3){SDL\_Render\\Clear};
+  \node[b,right=0.5cm of p3](p4){Draw\\Background\\(SVG tex)};
+  \node[b,right=0.5cm of p4](p5){Draw\\Modules\\(board/UI)};
+  \node[b,right=0.5cm of p5](p6){SDL\_Render\\Present\\(60 FPS)};
+  \foreach \x/\y in {p1/p2,p2/p3,p3/p4,p4/p5,p5/p6}
+    {\draw[a](\x)--(\y);}
+\end{tikzpicture}
+\end{center}
+
+\noindent\textbf{Tỉ lệ màn hình:} 270$\times$480 px (9:16 portrait) cố định cho tất cả 3 module; không responsive --- tránh layout drift giữa Desktop và WASM canvas.
+
+% ── BACKEND ─────────────────────────────────────────────────────────────────
 \subsection{Công nghệ Backend}
-// tự viết thêm:  
+
+\subsubsection{Tổng quan}
+``Backend'' của cTetris là toàn bộ \textbf{game logic C++17} chạy cục bộ cộng với hai kênh kết nối mạng: \textbf{GitHub Gist} (content delivery, V2) và \textbf{Cloudflare Worker + D1} (leaderboard cloud, V3).
+
+\begin{center}
+\begin{tikzpicture}[
+  box/.style={techBoxSm=backendColor, text width=2.6cm},
+  cloud/.style={techBoxSm=devopsColor, text width=2.6cm},
+  arrow/.style={sdsArrow=backendColor!70},
+  darrow/.style={sdsArrow=devopsColor!70,dashed}
+]
+  % Core C++
+  \node[techBox=backendColor, text width=10cm]
+    (core) at (0,0)
+    {C++17 Game Engine --- gameStory · gameConsole · gameCore};
+
+  % sub-components
+  \node[box](gs)  at (-4.5,-1.8) {gameStory\\Sync + Dialogue\\Engine};
+  \node[box](gc)  at (-1.5,-1.8) {gameConsole\\Hub + Settings\\+ Stories};
+  \node[box](gr)  at (1.5,-1.8)  {gameCore\\Physics Loop\\+ DB write};
+  \node[box](http) at (4.5,-1.8) {HTTP Layer\\libcurl (native)\\emsc\_fetch (web)};
+
+  % External services
+  \node[cloud](gist)   at (-4.5,-3.6) {GitHub Gist\\manifest.json\\chapter JSON};
+  \node[cloud](cfwork) at (1.5,-3.6)  {Cloudflare\\Worker\\REST proxy};
+  \node[cloud](d1)     at (4.5,-3.6)  {Cloudflare D1\\Edge SQLite\\leaderboard};
+
+  \foreach \c in {gs,gc,gr,http}{\draw[arrow](core)--(\c.north);}
+  \draw[darrow](gs.south)--(gist.north)
+    node[midway,right,font=\tiny]{SHA-diff sync};
+  \draw[darrow](http.south)--(cfwork.north)
+    node[midway,right,font=\tiny]{POST record};
+  \draw[darrow](cfwork.east)--(d1.west)
+    node[midway,above,font=\tiny]{D1 write};
+
+  \node[font=\tiny,vTag=versionAmber] at (-4.5,-4.3){V2};
+  \node[font=\tiny,vTag=versionRed]   at (1.5,-4.3){V3};
+  \node[font=\tiny,vTag=versionRed]   at (4.5,-4.3){V3};
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Bảng chi tiết Backend}
+
+\begin{tabularx}{\linewidth}{|l|l|X|}
+  \hline
+  \textbf{Công nghệ} & \textbf{Version} & \textbf{Vai trò} \\
+  \hline
+  \textbf{C++17}           & GCC/Clang/MSVC & Ngôn ngữ chính; zero dynamic alloc trong game loop; static matrix board; RAII cho DB connection. \\
+  \hline
+  \textbf{CMake}           & $\geq$3.21     & Build system; \texttt{find\_package(SDL3 REQUIRED CONFIG)}; \texttt{option(BUILD\_WASM)} switch; \texttt{SHELL:} prefix cho Emscripten link args. \\
+  \hline
+  \textbf{nlohmann/json}   & 3.x header     & Parse manifest JSON và chapter JSON từ Gist; \texttt{json::parse(body)} với exception guard. \\
+  \hline
+  \textbf{libcurl}         & system (native)& Blocking HTTP GET trong \texttt{httpGetSync()}; guard \texttt{\#ifdef HAVE\_LIBCURL}; dùng khi startup sync (acceptable blocking). \\
+  \hline
+  \textbf{emscripten\_fetch}& emsdk bundled & HTTP GET/POST cho WASM; kết hợp \texttt{-sASYNCIFY=1} để giữ synchronous API surface giống libcurl. \\
+  \hline
+  \textbf{GitHub Gist}     & REST API v3    & Content delivery channel: \texttt{manifest.json} chứa SHA per chapter; SHA-diff $\rightarrow$ chỉ fetch chapter có nội dung mới; không full-replace DB. \\
+  \hline
+  \textbf{Cloudflare Worker}& V3            & REST proxy: \texttt{POST /api/records} nhận game record JSON $\rightarrow$ ghi vào D1; \texttt{GET /api/records} cho Board popup. \\
+  \hline
+  \textbf{Cloudflare D1}   & V3 (edge SQLite)& Global leaderboard; schema \texttt{sync\_Records}; 1-way sync: local SQLite là source of truth, D1 là read-only replica cho public board. \\
+  \hline
+  \textbf{Cloudflare DO}   & V3 (Durable Objects)& Rate limiting + OTP session cho auth flow; không persist game state. \\
+  \hline
+\end{tabularx}
+
+\subsubsection{Luồng đồng bộ nội dung V2 (Gist SHA-diff)}
+
+\begin{center}
+\begin{tikzpicture}[
+  proc/.style={techBoxSm=backendColor, text width=3.0cm, minimum height=0.7cm},
+  dec/.style={diamond, draw=versionAmber!80, fill=versionAmber!8,
+              aspect=2.4, align=center, font=\scriptsize, inner sep=1pt},
+  arr/.style={sdsArrow=backendColor}
+]
+  \node[proc](p0){GET manifest\\JSON từ Gist};
+  \node[proc,right=0.6cm of p0](p1){Parse\\versions[latest]};
+  \node[dec,right=0.6cm of p1](d0){SHA\\match?};
+  \node[proc,right=0.6cm of d0](p2){Skip\\chapter};
+  \node[proc,below=0.8cm of d0](p3){GET chapter\\JSON};
+  \node[proc,left=0.6cm of p3](p4){applyChapter\\Json() + UPSERT};
+  \node[proc,left=0.6cm of p4](p5){metaSetSha()\\+ FS.syncfs};
+
+  \draw[arr](p0)--(p1); \draw[arr](p1)--(d0);
+  \draw[arr](d0)--node[above,font=\tiny]{yes}(p2);
+  \draw[arr](d0)--node[right,font=\tiny]{no}(p3);
+  \draw[arr](p3)--(p4); \draw[arr](p4)--(p5);
+  \draw[arr,gray,dashed](p2.south)--++(0,-0.5)-|(p5.south);
+\end{tikzpicture}
+\end{center}
+
+% ── DATABASE ─────────────────────────────────────────────────────────────────
 \subsection{Công nghệ Database}
-// tự viết thêm: 
-\subsection{Công nghệ Devops}
-// tự viết thêm: 
+
+\subsubsection{Tổng quan}
+cTetris dùng ba lớp lưu trữ: \textbf{SQLite3 nhúng} (local, mọi phiên bản), \textbf{IDBFS} (browser persistence cho WASM), và \textbf{Cloudflare D1} (global leaderboard, V3). Local SQLite là \textit{source of truth} --- D1 chỉ là bản sao read-only phục vụ board toàn cầu.
+
+\begin{center}
+\begin{tikzpicture}[
+  grp/.style={rectangle, draw=#1!60, fill=#1!8, rounded corners=4pt,
+              thick, align=center, font=\scriptsize, inner sep=6pt},
+  tbl/.style={rectangle, draw=#1!50, fill=#1!5, rounded corners=2pt,
+              align=left, font=\scriptsize, inner sep=4pt, text width=3.0cm},
+  arrow/.style={sdsArrow=gray!60, dashed}
+]
+  % Group 1
+  \node[grp=pillarBlue, minimum width=3.6cm, minimum height=4.8cm,
+        label=above:{\small\bfseries\color{pillarBlue}Group 1 — Per-user R/W}]
+    (g1box) at (-4.5,0) {};
+  \node[tbl=pillarBlue] (rec) at (-4.5,1.2)
+    {\textbf{default\_Records}\\id, idUser, startTS\\endTS, totalScore\\totalSeconds, avgSpeed\\retryNo, idStory};
+  \node[tbl=pillarBlue] (sto) at (-4.5,-0.5)
+    {\textbf{default\_Stories}\\idUser, idStory\\isActivated, isSelected\\lastMaxScore\\lastMaxSpeed};
+  \node[tbl=pillarBlue] (set) at (-4.5,-2.1)
+    {\textbf{default\_Settings}\\key TEXT PK\\value TEXT\\(10 rows: volume\\color0-6, storyId\\chapterId)};
+
+  % Group 2
+  \node[grp=dbColor, minimum width=3.6cm, minimum height=4.8cm,
+        label=above:{\small\bfseries\color{dbColor}Group 2 — Shared Catalogue}]
+    (g2box) at (0,0) {};
+  \node[tbl=dbColor] (sd) at (0,1.4)
+    {\textbf{shared\_data}\\idStory, idChapter\\storyName, minScore\\minSpeed, tableMatrix\\requiredStories};
+  \node[tbl=dbColor] (sdlg) at (0,-0.3)
+    {\textbf{shared\_dialogues}\\idStory, idChapter\\nodeId, speaker\\text, imageUrl\\nextNodeId};
+  \node[tbl=dbColor] (scho) at (0,-1.8)
+    {\textbf{shared\_choices}\\nodeId, choiceIdx\\label, nextNodeId};
+  \node[tbl=dbColor] (smet) at (0,-3.0)
+    {\textbf{shared\_meta}\\chapter\_id PK\\sha, updated\_at\\media\_base\_url};
+
+  % Group 3
+  \node[grp=devopsColor, minimum width=3.4cm, minimum height=2.0cm,
+        label=above:{\small\bfseries\color{devopsColor}Group 3 — D1 Sink}]
+    (g3box) at (4.5,0.8) {};
+  \node[tbl=devopsColor] (sync) at (4.5,0.8)
+    {\textbf{sync\_Records}\\nameUser, totalScore\\totalSeconds, avgSpeed\\endTS, idStory\\seed: 30 fallback rows};
+
+  % IDBFS node
+  \node[grp=versionAmber, minimum width=3.4cm, minimum height=1.2cm]
+    (idbfs) at (4.5,-1.5)
+    {\textbf{IDBFS (WASM only)}\\IndexedDB \texttt{FS.syncfs}\\flush sau mỗi write};
+
+  % Arrows
+  \draw[arrow](rec.east)--(sync.west)
+    node[midway,above,font=\tiny]{leaderboard seed};
+  \draw[arrow](g2box.east)--(g3box.west)
+    node[midway,above,font=\tiny,align=center]{D1 sync\\(V3)};
+  \draw[sdsArrow=versionAmber,dashed](g1box.south east)--++(0,-0.5)-|(idbfs.south);
+
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Bảng chi tiết Database}
+
+\begin{tabularx}{\linewidth}{|l|l|X|}
+  \hline
+  \textbf{Công nghệ} & \textbf{Mode} & \textbf{Vai trò \& đặc điểm kỹ thuật} \\
+  \hline
+  \textbf{SQLite3}        & Embedded     & File duy nhất \texttt{default.sqlite}; path = \texttt{SDL\_GetPrefPath("uit","cTetris")} + \texttt{<idUser>.sqlite}; compile flag \texttt{-DSQLITE\_THREADSAFE=0} (WASM single-thread); \texttt{CREATE TABLE IF NOT EXISTS} idempotent schema init; 8 bảng, 3 nhóm ownership. \\
+  \hline
+  \textbf{IDBFS}          & WASM only    & Emscripten \texttt{idbfs\_mount\_dir} ánh xạ \texttt{SDL\_GetPrefPath} sang IndexedDB; \texttt{idbfs\_load\_from\_idb()} trước \texttt{sqlite3\_open}; \texttt{idbfs\_save\_to\_idb()} sau mỗi write transaction. Native: \texttt{dbSyncToPersistent()} là compile-time no-op. \\
+  \hline
+  \textbf{Cloudflare D1}  & V3 / Edge    & Serverless SQLite trên Cloudflare edge; schema \texttt{sync\_Records}; 1-way sink từ local → D1 sau game-over; Board popup \texttt{GET /api/records} ORDER BY score DESC. \\
+  \hline
+  \textbf{Cloudflare D1 + Durable Objects}  & V3 / Optional& Dự phòng cho user profile store và session data nếu D1 Durable Objects không đủ; driver: C++ Driver via REST (không dùng native C++ SDK để tránh WASM incompatibility). \\
+  \hline
+\end{tabularx}
+
+\subsubsection{Vòng đời kết nối SQLite (DB Lifecycle Contract)}
+
+\begin{center}
+\begin{tikzpicture}[
+  proc/.style={techBoxSm=dbColor, text width=2.4cm, minimum height=0.65cm},
+  arr/.style={sdsArrow=dbColor}
+]
+  \node[proc](p1){gameConsole\\dbOpen +\\dbInitSchema};
+  \node[proc,right=0.5cm of p1](p2){Event loop\\R/W Settings\\Stories, Board};
+  \node[proc,right=0.5cm of p2](p3){runGameCore\\(separate sqlite3*)};
+  \node[proc,right=0.5cm of p3](p4){onGameOver:\\dbOpen→INSERT\\→UPSERT→Close};
+  \node[proc,right=0.5cm of p4](p5){Console\\re-entry:\\dbOpen lại};
+
+  \foreach \x/\y in {p1/p2,p2/p3,p3/p4,p4/p5}{\draw[arr](\x)--(\y);}
+
+  \node[font=\tiny,draw=red!40,fill=red!5,rounded corners,inner sep=2pt,
+        below=0.4cm of p4, align=center]
+    {gameOverRecorded guard\\chỉ ghi đúng 1 lần/session};
+  \node[font=\tiny,draw=blue!40,fill=blue!5,rounded corners,inner sep=2pt,
+        below=0.4cm of p3, align=center]
+    {Hai sqlite3* độc lập\\không double-open conflict};
+\end{tikzpicture}
+\end{center}
+
+% ── DEVOPS ──────────────────────────────────────────────────────────────────
+\subsection{Công nghệ DevOps}
+
+\subsubsection{Tổng quan}
+Pipeline build của cTetris hỗ trợ \textbf{4 target} từ một codebase: \texttt{native-desktop} (macOS/Windows/Ubuntu), \texttt{WASM} (Web), và \texttt{standalone} (từng module độc lập để test). Mọi onboarding member chỉ cần chạy một lệnh \texttt{bash build.sh} hoặc \texttt{pwsh build.ps1} --- script tự probe và hướng dẫn cài đặt dependency còn thiếu.
+
+\begin{center}
+\begin{tikzpicture}[
+  b/.style={techBoxSm=devopsColor, text width=2.6cm},
+  outBox/.style={techBoxSm=versionGreen, text width=2.4cm},
+  arr/.style={sdsArrow=devopsColor!70}
+]
+  % Source
+  \node[techBox=pillarBlue, text width=5.5cm]
+    (src) at (0,3) {C++ Source + CMakeLists.txt};
+
+  % Build scripts
+  \node[b](bs)  at (-2.5,1.5) {build.sh\\build.ps1\\(interactive menu)};
+  \node[b](cmake) at (0,1.5) {CMake\\find\_package\\+ CPM};
+  \node[b](emsdk) at (2.5,1.5) {Emscripten\\emsdk\\3.1.x};
+
+  % Outputs (đã đổi tên style thành outBox để tránh đụng từ khóa 'out')
+  \node[outBox](nat) at (-3.5,-0.2) {cTetris\\(.exe/.app)\\native};
+  \node[outBox](wasm) at (-1.2,-0.2){cTetris.html\\+ .js + .wasm};
+  \node[outBox](sa)  at (1.2,-0.2)  {gameStory\\gameConsole\\gameCore (standalone)};
+  \node[outBox](ci)  at (3.5,-0.2)  {GitHub Actions\\CI artifact};
+
+  \draw[arr](src)--(bs); \draw[arr](src)--(cmake); \draw[arr](src)--(emsdk);
+  \draw[arr](bs)--(nat); \draw[arr](cmake)--(nat); \draw[arr](cmake)--(sa);
+  \draw[arr](emsdk)--(wasm); \draw[arr](cmake)--(wasm);
+  \draw[arr](cmake)--(ci);
+\end{tikzpicture}
+\end{center}
+
+\subsubsection{Bảng chi tiết DevOps}
+
+\begin{tabularx}{\linewidth}{|l|l|X|}
+  \hline
+  \textbf{Công cụ} & \textbf{Version} & \textbf{Vai trò \& cấu hình quan trọng} \\
+  \hline
+  \textbf{CMake}         & $\geq$3.21  & Build system chính; \texttt{option(BUILD\_WASM "..." OFF)} làm switch platform; \texttt{CMAKE\_FIND\_ROOT\_PATH\_MODE\_PACKAGE BOTH} để \texttt{find\_package} hoạt động với Emscripten toolchain. \\
+  \hline
+  \textbf{build.sh}      & bash 5+     & macOS/Linux; probe \texttt{cmake}, \texttt{git}, \texttt{python}, \texttt{curl}, \texttt{emsdk}; 3 chế độ build dir; tự build SDL3 tĩnh vào \texttt{libs/\$OS/downloads/sdl3-wasm/} cho WASM. \\
+  \hline
+  \textbf{build.ps1}     & PowerShell 7& Windows; feature-parity với build.sh; xử lý đặc thù \texttt{rc.exe} (resource compiler) với path forward-slash để tránh C escape sequence. \\
+  \hline
+  \textbf{Emscripten}    & emsdk 3.1.x & \texttt{-sASYNCIFY=1} · \texttt{-sALLOW\_MEMORY\_GROWTH=1} · \texttt{--shell-file web/shell.html}; output \texttt{cTetris.html}; không dùng port tự động \texttt{-sUSE\_SDL=3} mà tự build SDL3 từ source. \\
+  \hline
+  \textbf{SDL3}          & git main     & Dùng branch \texttt{main} để có symbol \texttt{\scriptsize SDL\_PROP\_WINDOW\_CREATE\_}\allowbreak\texttt{\scriptsize EMSCRIPTEN\_CANVAS\_ID\_STRING}; \texttt{SDL\_Init} trả về \texttt{bool} (API mới). \\
+  \hline
+  \textbf{GitHub Actions}& ubuntu-latest& CI: build native + WASM; artifact upload \texttt{cTetris.html} bundle; trigger: push to main và PR. \\
+  \hline
+  \textbf{Docker}        & 24.x         & Container chuẩn hoá môi trường build; image: \texttt{emscripten/emsdk:3.1.x} cho WASM CI; không dùng cho runtime game. \\
+  \hline
+  \textbf{GitHub}        & ---          & Source control; convention branch \texttt{<name>-<task>}; GitHub Gist làm content delivery channel (manifest + chapter JSON) cho V2. \\
+  \hline
+  \textbf{Cloudflare}    & V3           & Worker + D1 + Durable Objects; deploy \texttt{wrangler} CLI; \texttt{wrangler.toml} config D1 binding. \\
+  \hline
+\end{tabularx}
+
+\subsubsection{Ma trận hỗ trợ đa nền tảng}
+
+\begin{tabularx}{\linewidth}{|X|c|c|c|c|}
+  \hline
+  \rowcolor{pillarBlue!18}
+  \textbf{Feature} & \textbf{macOS} & \textbf{Windows} & \textbf{Ubuntu} & \textbf{Web (WASM)} \\
+  \hline
+  SDL3 Render (window + 2D)     & \Yes & \Yes & \Yes & \Yes \\
+  \hline
+  SDL3 AudioStream              & \Yes & \Yes & \Yes & \Par \\
+  \hline
+  SQLite3 R/W local             & \Yes & \Yes & \Yes & \Par \\
+  \hline
+  IDBFS browser persist         & \No  & \No  & \No  & \Yes \\
+  \hline
+  libcurl HTTP (native)         & \Yes & \Yes & \Yes & \No  \\
+  \hline
+  emscripten\_fetch (WASM)      & \No  & \No  & \No  & \Yes \\
+  \hline
+  MACOSX\_BUNDLE + .icns        & \Yes & \No  & \No  & \No  \\
+  \hline
+  .rc resource compiler         & \No  & \Yes & \No  & \No  \\
+  \hline
+  SVG icon runtime              & \Par & \Par & \Yes & \Yes \\
+  \hline
+  \multicolumn{5}{l}{\scriptsize
+    \textcolor{versionGreen}{\ding{51}} = đầy đủ \quad
+    \textcolor{versionAmber}{\textbf{\sim}} = một phần / stub \quad
+    \textcolor{versionRed}{\ding{55}} = không áp dụng} \\
+\end{tabularx}
+
+\subsubsection{Chuỗi phụ thuộc dependency (Dependency Chain)}
+
+\begin{center}
+\begin{tikzpicture}[
+  pkg/.style={techBoxSm=devopsColor, text width=2.2cm},
+  from/.style={techBoxSm=pillarBlue, text width=2.2cm},
+  arr/.style={sdsArrow=gray!60},
+]
+  \node[from](sdl3){SDL3\\(git main\\self-build)};
+  \node[pkg,right=0.5cm of sdl3](nano){nanosvg\\nanosvgrast\\(single-header)};
+  \node[pkg,right=0.5cm of nano](sq){sqlite3\\amalgamation\\(-DSQLITE\_\\THREADSAFE=0)};
+  \node[pkg,right=0.5cm of sq](json){nlohmann\\json\\(header-only)};
+  \node[pkg,right=0.5cm of json](curl){libcurl\\(system) /\\emsc\_fetch};
+
+  \node[techBox=pillarBlue, text width=11cm, below=0.8cm of json]
+    (app) {cTetris executable / cTetris.html bundle};
+
+  \foreach \x in {sdl3,nano,sq,json,curl}
+    {\draw[arr](\x)--(app.north -| \x);}
+\end{tikzpicture}
+\end{center}
+
+% ── CI/CD ───────────────────────────────────────────────────────────────────
+\subsubsection{Quy trình CI/CD (GitHub Actions --- 3 workflows)}
+
+Hệ thống CI/CD gồm 3 workflow độc lập, mỗi cái bảo vệ một khía cạnh khác nhau của dự án:
+
+\vspace{4pt}
+\begin{tabularx}{\linewidth}{|l|l|X|X|}
+  \hline
+  \rowcolor{devopsColor!15}
+  \textbf{Workflow} & \textbf{Trigger} & \textbf{Mục tiêu} & \textbf{Runner} \\
+  \hline
+  \texttt{deploy-pages.yml}   & push \texttt{main}/\texttt{test} + path \texttt{app/**} & Build WASM $\rightarrow$ deploy GitHub Pages & Configurable: ubuntu / windows / macos \\
+  \hline
+  \texttt{sync-chapters.yml}  & push \texttt{main}/\texttt{test} + path \texttt{chapters/src/**} & Validate JSON $\rightarrow$ upsert Gist $\rightarrow$ rebuild manifest & ubuntu-latest \\
+  \hline
+  \texttt{test-build.yml}     & push nhánh khác main/test + path \texttt{app/**} & Build native + WASM trên 3 OS song song & matrix: windows / ubuntu / macos \\
+  \hline
+\end{tabularx}
+
+% ── Workflow 1: deploy-pages ─────────────────────────────────────────────────
+\vspace{6pt}
+\noindent\textbf{Workflow 1: \texttt{deploy-pages.yml} --- Build WASM \& Deploy to GitHub Pages}
+
+\begin{center}
+\begin{tikzpicture}[
+  job/.style={techBoxSm=devopsColor, text width=2.6cm, minimum height=1.0cm},
+  trig/.style={techBoxSm=pillarBlue, text width=2.4cm},
+  outBox/.style={techBoxSm=versionGreen, text width=2.4cm},
+  cSide/.style={rectangle, draw=gray!50, fill=gray!6, rounded corners=2pt,
+               font=\tiny, align=center, inner sep=3pt, text width=2.2cm},
+  arr/.style={sdsArrow=devopsColor!70},
+  darr/.style={sdsArrow=gray!50, dashed}
+]
+  
+  \node[trig](trig) at (-5.5,0)
+    {push\\main / test\\path: app/**};
+  \node[job](cfg) at (-2.6,0)
+    {\textbf{Job 0: config}\\Resolve runner\\via BUILD\_OS env};
+  \node[job](bld) at (0.8,0)
+    {\textbf{Job 1: build}\\WASM on runner\\Upload Pages artifact};
+  \node[job](dep) at (4.2,0)
+    {\textbf{Job 2: deploy}\\actions/deploy-pages\\Pages URL output};
+  \node[outBox](url) at (4.2,-1.8)
+    {GitHub Pages\\cTetris.html\\live URL};
+  \node[cSide](cache) at (0.8,-1.8)
+    {Cache:\\libs/\{OS\}/downloads\\SDL3 + emsdk};
+  \node[cSide](art) at (0.8,1.6)
+    {Artifact:\\build.log\\retention 7d};
+
+  \draw[arr](trig)--(cfg);
+  \draw[arr](cfg)--(bld) node[above,font=\tiny,midway]{runner};
+  \draw[arr](bld)--(dep);
+  \draw[arr](dep)--(url);
+  \draw[darr](cache)--(bld);
+  \draw[darr](bld)--(art);
+\end{tikzpicture}
+\end{center}
+
+\begin{tabularx}{\linewidth}{|l|X|}
+  \hline
+  \rowcolor{devopsColor!10}
+  \textbf{Điểm thiết kế} & \textbf{Chi tiết} \\
+  \hline
+  Runner linh hoạt & \texttt{BUILD\_OS} env var (ubuntu / windows / macos) quyết định runner qua job \texttt{config}; đổi 1 dòng để build trên OS khác. \\
+  \hline
+  Cache SDL3 + emsdk & Key: \texttt{libs-\{OS\}-\{hash(build.sh|build.ps1)\}}; restore-key prefix-match --- tái dụng khi script chưa đổi. \\
+  \hline
+  Concurrency guard & \texttt{group: pages, cancel-in-progress: true} --- chỉ 1 deploy chạy tại một thời điểm, push mới huỷ deploy cũ. \\
+  \hline
+  Cleanup artifacts & Job deploy sau khi thành công gọi \texttt{gh api DELETE} tất cả artifact không phải cache để tiết kiệm storage. \\
+  \hline
+\end{tabularx}
+
+% ── Workflow 2: sync-chapters ────────────────────────────────────────────────
+\vspace{6pt}
+\noindent\textbf{Workflow 2: \texttt{sync-chapters.yml} --- Đồng bộ Chapter JSON lên GitHub Gist}
+
+\begin{center}
+\begin{tikzpicture}[
+  cStep/.style={techBoxSm=backendColor, text width=2.8cm, minimum height=0.95cm},
+  trig/.style={techBoxSm=pillarBlue, text width=2.4cm},
+  cSide/.style={rectangle, draw=gray!50, fill=gray!6, rounded corners=2pt,
+               font=\tiny, align=center, inner sep=3pt, text width=2.8cm},
+  arr/.style={sdsArrow=backendColor!70},
+  darr/.style={sdsArrow=gray!50, dashed}
+]
+  \node[trig](trig) at (-5.2,0)
+    {push main/test\\chapters/src/\\**/*.json};
+  \node[cStep](s0) at (-2.0,0)
+    {\textbf{Step 0}\\Read \texttt{app/.env}\\Extract Gist ID};
+  \node[cStep](s1) at (1.2,0)
+    {\textbf{Step 1}\\Validate JSON\\(\texttt{jq has("shared\_data")})};
+  \node[cStep](s2) at (4.4,0)
+    {\textbf{Step 2}\\Upsert chapter Gists\\find-or-create + PATCH};
+  \node[cStep](s3) at (7.6,0)
+    {\textbf{Step 3}\\Rebuild manifest\\Gist + version \texttt{vXX.YY}};
+  \node[cSide](ver) at (7.6,-1.8)
+    {Version scheme:\\chapter\_count $\rightarrow$ XX\\commit++ $\rightarrow$ YY};
+  \node[cSide](sha) at (4.4,-1.8)
+    {Per-chapter SHA:\\latestCommitId\\gistUrl, mediaBaseUrl};
+
+  \draw[arr](trig)--(s0); \draw[arr](s0)--(s1);
+  \draw[arr](s1)--(s2);   \draw[arr](s2)--(s3);
+  \draw[darr](s3)--(ver);
+  \draw[darr](s2)--(sha);
+\end{tikzpicture}
+\end{center}
+
+\begin{tabularx}{\linewidth}{|l|X|}
+  \hline
+  \rowcolor{backendColor!10}
+  \textbf{Điểm thiết kế} & \textbf{Chi tiết} \\
+  \hline
+  Manifest URL từ \texttt{app/.env} & \texttt{MANIFEST\_GIST\_URL} được parse từ repo --- không hardcode trong workflow; Gist ID extract bằng \texttt{awk -F'/'}. \\
+  \hline
+  SHA-diff versioning & Manifest lưu \texttt{latest: "vXX.YY"}; XX = số chapter, YY tăng dần mỗi push; client so SHA trước khi tải chapter JSON. \\
+  \hline
+  find-or-create Gist & Tìm Gist theo filename trong 100 Gist đầu; tạo mới nếu chưa tồn tại; PATCH content nếu đã có --- idempotent. \\
+  \hline
+  Không ghi vào repo & \texttt{permissions: contents: read} --- workflow chỉ đọc repo, toàn bộ output đẩy lên Gist; không có commit ngược. \\
+  \hline
+\end{tabularx}
+
+% ── Workflow 3: test-build ───────────────────────────────────────────────────
+\vspace{6pt}
+\noindent\textbf{Workflow 3: \texttt{test-build.yml} --- Cross-platform Build Matrix}
+
+\begin{center}
+\begin{tikzpicture}[
+  cStep/.style={techBoxSm=dbColor, text width=2.4cm, minimum height=0.95cm},
+  os/.style={rectangle, draw=dbColor!60, fill=dbColor!8, rounded corners=3pt,
+             font=\scriptsize\bfseries, align=center, inner sep=5pt,
+             minimum width=2.0cm, minimum height=0.7cm},
+  trig/.style={techBoxSm=pillarBlue, text width=2.4cm},
+  arr/.style={sdsArrow=dbColor!70},
+  darr/.style={sdsArrow=gray!50, dashed}
+]
+  \node[trig](trig) at (0,0)
+    {push non-main\\non-test\\path: app/**};
+  % Matrix fan-out
+  \node[os](win)  at (3.0, 1.2) {windows-latest};
+  \node[os](ubu)  at (3.0, 0.0) {ubuntu-latest};
+  \node[os](mac)  at (3.0,-1.2) {macos-latest};
+
+  % Steps (shared across all OS)
+  \node[cStep](setup) at (5.8,0)
+    {\textbf{Setup}\\Ninja / dev libs\\per OS};
+  \node[cStep](nat)   at (8.6,0)
+    {\textbf{Build native}\\build.ps1 native\\/ build.sh native};
+  \node[cStep](wasm)  at (11.4,0)
+    {\textbf{Build WASM}\\emsdk 3.1.72\\build.sh/ps1 wasm};
+  % Fan-in + result
+  \node[rectangle, draw=gray!50, fill=gray!6, rounded corners=2pt,
+        font=\tiny, align=center, inner sep=3pt, text width=2.2cm,
+        right=0.5cm of wasm] (res)
+    {Upload logs\\on failure\\retention 7d};
+  % Trigger → matrix
+  \foreach \os in {win,ubu,mac}{
+    \draw[arr](trig)--(\os);
+    \draw[arr](\os)--(setup);
+  }
+  \draw[arr](setup)--(nat);
+  \draw[arr](nat)--(wasm);
+  \draw[darr](wasm)--(res);
+\end{tikzpicture}
+\end{center}
+
+\begin{tabularx}{\linewidth}{|l|X|}
+  \hline
+  \rowcolor{dbColor!10}
+  \textbf{Điểm thiết kế} & \textbf{Chi tiết} \\
+  \hline
+  Matrix \texttt{fail-fast: false} & Cả 3 OS chạy độc lập; 1 OS fail không dừng 2 OS còn lại --- đảm bảo báo cáo đầy đủ cross-platform. \\
+  \hline
+  Native trước, WASM sau & Trong 1 job, native build xong mới chạy WASM; chia sẻ SDL3 cache (key \texttt{libs-\{os\}-\{hash\}}) giữa cả 2 bước. \\
+  \hline
+  Ubuntu dev libs cache & \texttt{awalsh128/cache-apt-pkgs-action@v1.5.3} cache toàn bộ \texttt{libx11-dev}, \texttt{libgl1-mesa-dev}\ldots; không cài lại khi cache hit. \\
+  \hline
+  Trigger path filter & Chỉ chạy khi \texttt{app/**} thay đổi; push doc/chore không trigger --- tiết kiệm CI minutes. \\
+  \hline
+  Timeout 60 phút & Mỗi job có \texttt{timeout-minutes: 60}; emsdk download + SDL3 compile lần đầu chiếm $\sim$20 phút, cache hit còn $\sim$5 phút. \\
+  \hline
+\end{tabularx}
 
 \label{LastPageTechnologyAdoption}
 \end{document}

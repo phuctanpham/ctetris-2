@@ -1,4 +1,4 @@
-% !TEX TS-program = xelatex
+% !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
@@ -7,7 +7,7 @@
 \IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
 \usepackage{docmute}
 \usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, trees}
 \usepackage{tabularx}
 \usepackage{enumitem}
 
@@ -37,15 +37,12 @@ Phân hệ \textbf{gameStory} đóng vai trò là màn hình khởi động và 
 \node[entity, left=3cm of gamestory] (player) {Người chơi};
 \node[entity, right=3cm of gamestory] (os) {API Cloud /\\ OS / Browser};
 \node[entity, below=1.5cm of gamestory] (gameconsole) {Module\\ gameConsole};
-
 % Tách biệt luồng Người chơi <-> gameStory bằng yshift
 \draw[arrow] ($(player.east)+(0,0.3)$) -- node[above, font=\scriptsize, align=center] {Khởi chạy \&\\ Tương tác} ($(gamestory.west)+(0,0.3)$);
 \draw[arrow] ($(gamestory.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Hiển thị UI/Story} ($(player.east)-(0,0.3)$);
-
 % Tách biệt luồng gameStory <-> API Cloud bằng yshift
 \draw[arrow] ($(gamestory.east)+(0,0.3)$) -- node[above, font=\scriptsize] {Yêu cầu Asset} ($(os.west)+(0,0.3)$);
 \draw[arrow] ($(os.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Cung cấp Media} ($(gamestory.east)-(0,0.3)$);
-
 % Luồng gameStory -> gameConsole
 \draw[arrow] (gamestory) -- node[right, font=\scriptsize] {Tín hiệu kết thúc} (gameconsole);
 \end{tikzpicture}
@@ -87,39 +84,330 @@ Phân hệ \textbf{gameStory} đóng vai trò là màn hình khởi động và 
     \item \textbf{Tiêu chí thành công (user acceptance criteria):} Hệ thống tự động chuyển Menu đúng 8.0s; Không vỡ đồ họa SVG.
 \end{itemize}
 
-\subsection{Yêu cầu Phiên bản V2: Cốt truyện Tương tác}
-\begin{itemize}[leftmargin=*]
-    \item \textbf{Mục tiêu cốt lõi:} Giới thiệu bối cảnh và tăng tính gắn kết thông qua hội thoại tương tác và lựa chọn phân nhánh.
-    \item \textbf{Đặc tả Giao diện \& Hiệu ứng:} Dialogue Box mờ nửa dưới; Hiệu ứng chữ máy đánh chữ; BGM đồng bộ cốt truyện.
-    \item \textbf{Luồng tương tác sử dụng (userflow):}
-    \begin{center}
-    \begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, start/.style={circle, draw, fill=green!20}, end/.style={circle, draw, fill=red!20, double}, process/.style={rectangle, draw, fill=orange!10}, decision/.style={diamond, draw, fill=blue!5, aspect=2}]
-        \node (s) [start] {Start};
-        \node (p1) [process, below=0.6cm of s] {Hiện hội thoại};
-        \node (d1) [decision, below=0.6cm of p1] {Skip?};
-        \node (p2) [process, below=0.6cm of d1] {Chọn Nhánh};
-        \node (e) [end, right=1.5cm of d1] {End};
-        \draw [->] (s) -- (p1); \draw [->] (p1) -- (d1);
-        \draw [->] (d1) -- node[left] {No} (p2); \draw [->] (d1) -- node[above] {Yes} (e);
-        \draw [->] (p2.east) -| (e.south);
-    \end{tikzpicture}
-    \end{center}
-    \item \textbf{Sơ đồ tình huống sử dụng (usecase):}
-    \begin{center}
-    \begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10}, usecase/.style={ellipse, draw, fill=white, minimum width=2.2cm}]
-        \draw (0,0) rectangle (5,-3.5); \node at (2.5,-0.3) {\textbf{System V2}};
-        \node (p) [actor] at (-1.5, -1.75) {Player};
-        \node (u1) [usecase] at (2.5,-1) {Đọc hội thoại};
-        \node (u2) [usecase] at (2.5,-1.8) {Chọn Route A/B};
-        \node (u3) [usecase] at (2.5,-2.6) {Bấm Skip};
-        \draw [->] (p) -- (u1); \draw [->] (p) -- (u2); \draw [->] (p) -- (u3);
-    \end{tikzpicture}
-    \end{center}
-    \item \textbf{Yêu cầu Chức năng:} Hỗ trợ Enter/Space chuyển thoại; Phím TAB điều hướng Option; Logic xử lý Skip nhịp nhàng.
-    \item \textbf{Yêu cầu Phi Chức năng:} Phản hồi phím < 50ms; Âm thanh dừng ngay khi chuyển cảnh.
-    \item \textbf{Yêu cầu Kỹ thuật:} State Machine quản lý Route; Tích hợp SDL\_Mixer xử lý nhạc nền.
-    \item \textbf{Tiêu chí thành công (user acceptance criteria):} Người chơi hoàn thành đủ các nhánh truyện; Skip không gây lỗi logic.
+% ============================================================
+% PATCH V2 — insert after V1 subsection, before V3 subsection
+% in 02-gameStoryRequirements.tex
+% ============================================================
+% Requires existing preamble packages: tikz, tabularx, enumitem
+% Add to preamble if not present:
+%   \usetikzlibrary{shapes.geometric,arrows.meta,positioning,calc,fit,backgrounds,trees}
+
+\subsection{Yêu cầu Phiên bản V2: Cốt truyện Tương tác \& Đồng bộ Dữ liệu}
+
+\subsubsection{Tổng quan nâng cấp so với V1}
+
+\begin{tabularx}{\linewidth}{|l|X|X|}
+    \hline
+    \textbf{Khía cạnh} & \textbf{V1 (baseline)} & \textbf{V2 (delta)} \\
+    \hline
+    Chế độ vận hành & Fully automatic (8s timer) & Dual-mode: intro + dialogue\\
+    \hline
+    Signature & \texttt{runGameStory(win, ren)} & + \texttt{storyId, chapterId} \\
+    \hline
+    Tương tác & Không & Skip / ENTER / TAB / Click choice \\
+    \hline
+    Dữ liệu & Không có DB & SQLite read-only (\texttt{shared\_dialogues}, \texttt{shared\_choices}) \\
+    \hline
+    Network & Không & Gist manifest SHA-diff sync $\rightarrow$ SQLite \\
+    \hline
+    Loading bar & Linear time fill & Blended: \texttt{max(syncProgress, timeProgress)} \\
+    \hline
+    Âm thanh & Không & BGM stub (log URL, playback V3) \\
+    \hline
+    Post-entry flow & Auto $\rightarrow$ Console & Condition check $\rightarrow$ run / prompt unlock \\
+    \hline
+\end{tabularx}
+
+% ---- Two-phase State Machine ----
+\subsubsection{Sơ đồ Trạng thái V2 (Two-phase State Machine)}
+
+\noindent \texttt{storyId = 0} (entry từ \texttt{main.cpp}) kích hoạt Phase 1+2. \texttt{storyId > 0} (từ Console) nhảy thẳng vào Dialogue mode.
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=2.0cm,
+    state/.style={circle, draw=blue!60, fill=blue!5, thick,
+                  minimum size=1.8cm, align=center, font=\scriptsize},
+    sync/.style={rectangle, draw=orange!70, fill=orange!5, thick,
+                 rounded corners, minimum width=2.2cm,
+                 minimum height=0.6cm, align=center, font=\scriptsize},
+    arrow/.style={-{Stealth[scale=1.1]}, thick},
+    darrow/.style={-{Stealth[scale=1.1]}, thick, dashed, gray}
+]
+    % Sync states (top row)
+    \node[sync] (sidle)   at (0, 3.5)    {SYNC\_IDLE};
+    \node[sync] (sfetch)  at (2.8, 3.5)  {SYNC\_FETCHING};
+    \node[sync] (supd)    at (5.6, 3.5)  {SYNC\_UPDATING\\\_DB};
+    \node[sync] (sdone)   at (8.4, 3.5)  {SYNC\_DONE};
+    \node[sync, draw=red!60, fill=red!5]
+               (soff)    at (5.6, 2.4)  {SYNC\_OFFLINE};
+    \draw[arrow] (sidle)  -- node[above,font=\tiny]{start} (sfetch);
+    \draw[arrow] (sfetch) -- node[above,font=\tiny]{manifest ok} (supd);
+    \draw[arrow] (supd)   -- node[above,font=\tiny]{all done} (sdone);
+    \draw[arrow] (sfetch.south) -- node[right,font=\tiny]{fail/timeout} (soff.north west);
+    \draw[arrow] (supd.south)   -- node[right,font=\tiny]{fetch fail} (soff.north);
+    % Phase 2 states (middle row)
+    \node[state] (logo)  at (2.0, 0)   {PHASE\\LOGO};
+    \node[state] (diag)  at (5.6, 0)   {DIALOGUE\\ENGINE};
+    \node[state, draw=green!60, fill=green!5]
+                (done)  at (8.8, 0)   {PHASE\\DONE};
+    % sync $\rightarrow$ logo (both done and offline)
+    \draw[arrow] (sdone.south) -- ++(0,-0.8) -| node[below,font=\tiny,pos=0.25]{sync complete} (logo.north);
+    \draw[arrow] (soff.south)  -- ++(0,-0.3) -|
+        node[below,font=\tiny,pos=0.1]{offline} (logo.north west);
+    % logo $\rightarrow$ dialogue (post-sync condition check)
+    \draw[arrow] (logo.east) -- node[above,font=\tiny,align=center]{8s / Skip\\$\rightarrow$ postSyncCheck()} (diag.west);
+    \draw[arrow] (diag.east) -- node[above,font=\tiny]{END / Skip} (done.west);
+    \draw[darrow] (logo.east) to[bend right=20]
+        node[below,font=\tiny]{nextStory=0} (done.south);
+    % Dialogue direct entry (storyId > 0)
+    \node[font=\scriptsize, draw=blue!30, fill=white, rounded corners,
+          inner sep=3pt] (ext) at (5.6, -2.0)
+        {Direct entry: \texttt{storyId > 0}};
+    \draw[arrow, blue!60] (ext.north) -- (diag.south);
+    % Phase labels
+    \node[draw=orange!40, dashed, rounded corners, fill=orange!3,
+          fit=(sidle)(sfetch)(supd)(sdone)(soff),
+          label=left:{\small\textbf{Phase 1}}] {};
+    \node[draw=blue!40, dashed, rounded corners, fill=blue!3,
+          fit=(logo)(diag)(done),
+          label=left:{\small\textbf{Phase 2}}] {};
+\end{tikzpicture}
+\end{center}
+
+% ---- Gist Sync Architecture ----
+\subsubsection{Kiến trúc Đồng bộ Dữ liệu V2 (Gist \texorpdfstring{$\rightarrow$}{->} SQLite)}
+
+\noindent V2 dùng GitHub Gist làm \emph{content delivery channel} (SHA-diff, không full replace). V3 sẽ migration sang Cloudflare D1 / Durable Objects.
+
+\begin{center}
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    box/.style={rectangle, draw=black, thick, fill=white,
+                inner sep=5pt, align=left, minimum width=3.0cm},
+    arrow/.style={-{Stealth[scale=1.1]}, thick},
+    darrow/.style={-{Stealth[scale=1.1]}, thick, dashed}
+]
+    \node[box, fill=yellow!10] (gist) at (0, 0) {
+        \textbf{GitHub Gist}\\
+        \rule{2.6cm}{0.4pt}\\
+        \texttt{manifest.json}\\
+        \quad \texttt{latest: "v2"}\\
+        \quad \texttt{v2.c001: \{sha, gistUrl\}}\\
+        \quad \texttt{v2.c002: \{sha, gistUrl\}}\\
+        \texttt{chapter\_c001.json}\\
+        \texttt{chapter\_c002.json}
+    };
+    \node[box, fill=orange!10, right=2.2cm of gist] (sync) {
+        \textbf{syncFromGist()}\\
+        \rule{2.6cm}{0.4pt}\\
+        1. GET manifest\\
+        2. Compare SHA vs\\
+        \quad \texttt{shared\_meta}\\
+        3. GET changed\\
+        \quad chapter JSONs\\
+        4. \texttt{applyChapterJson()}\\
+        5. \texttt{metaSetSha()}\\
+        6. IDBFS syncfs
+    };
+    \node[box, fill=blue!10, right=2.2cm of sync] (db) {
+        \textbf{SQLite (default.sqlite)}\\
+        \rule{2.6cm}{0.4pt}\\
+        \texttt{shared\_data}\\
+        \texttt{shared\_dialogues}\\
+        \texttt{shared\_choices}\\
+        \texttt{shared\_meta}\\
+        \quad (chapter\_id, sha,\\
+        \quad  media\_base\_url)
+    };
+    \draw[arrow] (gist.east) -- node[above]{httpGetSync} (sync.west);
+    \draw[arrow] (sync.east) -- node[above,align=center]{INSERT OR\\REPLACE} (db.west);
+    \draw[darrow, gray] (db.south) -- ++(0,-0.5)
+        node[below, draw=gray!40, fill=gray!5, rounded corners, inner sep=2pt]
+        {\scriptsize V3: migrate to Cloudflare D1 / Durable Objects};
+    % SHA check
+    \draw[darrow, blue!50] (db.north) to[bend left=30]
+        node[above, font=\tiny]{local SHA lookup} (sync.north east);
+\end{tikzpicture}
+\end{center}
+
+% ---- Dialogue Engine ----
+\subsubsection{Dialogue Engine Architecture (Phase D)}
+\textit{Kiến trúc nội tại của Dialogue Engine (component diagram, dataflow,
+sequence diagram giữa \texttt{storyDb*()}, \texttt{dialRunLoop()},
+\texttt{drawDialoguePage()}) được đặc tả đầy đủ trong
+\textbf{SDS §05-gameStoryEngineering, mục 2.3--2.4}.}
+
+Yêu cầu chức năng của Phase D (input routing, choice branching, terminal
+condition) được phát biểu trong §\ref{subsec:v2-func} dưới đây.
+
+% ---- Dialogue Layout Diagram ----
+\subsubsection{Bố cục màn hình Dialogue Engine (270×480)}\label{subsec:v2-func}
+\textit{Pixel-map layout (IMG\_AREA, text-box, choice rects, SKIP\_BTN toạ độ
+chính xác) được vẽ trong \textbf{SDS §05-gameStoryEngineering, mục 3.1 (V1
+screen layout)}.
+SRS chỉ phát biểu ràng buộc giao diện:}
+\begin{itemize}[nosep]
+  \item Ảnh scene chiếm $260\times196\,\text{px}$ vùng trên (y=27..223).
+  \item Text-box $260\times244\,\text{px}$ vùng dưới, nền bán trong suốt
+        (\texttt{alpha=235}).
+  \item Nút Skip luôn hiển thị ở góc trên phải; ẩn hoàn toàn trong phase sync.
 \end{itemize}
+
+% ---- Post-sync Condition Flow ----
+\subsubsection{Luồng Kiểm tra Điều kiện Sau Đồng bộ (\texttt{postSyncConditionCheck})}
+
+\begin{center}
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    proc/.style={rectangle, draw=black, fill=orange!10, thick,
+                 minimum width=4.2cm, minimum height=0.55cm, align=center},
+    dec/.style={diamond, draw=black, fill=green!10, thick,
+                aspect=2.5, align=center},
+    term/.style={rectangle, rounded corners, draw=black, fill=red!10, thick,
+                 minimum width=3.0cm, minimum height=0.55cm, align=center},
+    arrow/.style={-{Stealth[scale=1.1]}, thick}
+]
+    \node[proc]  (q) {Query: \texttt{idUser\_Stories WHERE isSelected=1}};
+    \node[dec,   below=0.5cm of q]  (d1) {story\\selected?};
+    \node[proc,  below=0.5cm of d1] (fs) {use first story in \texttt{shared\_data ch=1}};
+    \node[dec,   below=0.5cm of fs] (d2) {next story\\conditions met?};
+    \node[term,  right=1.8cm of d2] (unlock) {return $-$nextId\\(prompt YES/NO)};
+    \node[term,  below=0.5cm of d2] (replay) {return +currentId\\(replay)};
+    \node[term,  right=1.8cm of d1] (skip)   {return 0\\($\rightarrow$ Console)};
+    \draw[arrow] (q) -- (d1);
+    \draw[arrow] (d1) -- node[left]{no} (fs);
+    \draw[arrow] (d1) -- node[above,align=center]{no rows\\at all} (skip);
+    \draw[arrow] (fs) -- (d2);
+    \draw[arrow] (d2) -- node[above]{yes} (unlock);
+    \draw[arrow] (d2) -- node[left]{no} (replay);
+\end{tikzpicture}
+\end{center}
+
+% ---- Sơ đồ Use Case V2 ----
+\subsubsection{Sơ đồ Ca sử dụng V2}
+
+\begin{center}
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    actor/.style={circle, draw, fill=gray!10, minimum size=0.6cm},
+    usecase/.style={ellipse, draw, fill=white, minimum width=2.8cm, align=center}
+]
+    % Đã mở rộng khung viền một chút sang phải để chứa đường cong
+    \draw (0,0) rectangle (7.5,-5.2);
+    \node at (3.75,-0.3) {\textbf{gameStory V2}};
+    
+    \node (p)   [actor] at (-1.6, -2.5)  {Player};
+    \node (net) [actor, draw=blue!60] at (9.1, -2.5) {Gist / CDN};
+    
+    \node (u1) [usecase] at (3.75,-0.9) {Xem Intro + Skip};
+    \node (u2) [usecase] at (3.75,-1.8) {Đọc Hội thoại};
+    \node (u3) [usecase] at (3.75,-2.7) {Chọn Nhánh (A/B)};
+    \node (u4) [usecase] at (3.75,-3.6) {Xem Prompt Unlock};
+    \node (u5) [usecase, draw=blue!60] at (3.75,-4.6) {Sync Manifest SHA};
+    
+    \draw [->] (p) -- (u1); 
+    \draw [->] (p) -- (u2);
+    \draw [->] (p) -- (u3); 
+    \draw [->] (p) -- (u4);
+    \draw [->, blue!60] (net) -- (u5);
+    
+    % Hiệu chỉnh: Sử dụng vòng cung (bend right) nối từ rìa phải để không đâm xuyên các khối
+    \draw [->, dashed] (u5.east) to[bend right=50] (u2.east);
+\end{tikzpicture}
+\end{center}
+
+% ---- Feature Tree V2 ----
+\subsubsection{Cây tính năng V2 (Feature Tree — delta)}
+
+\begin{center}
+\begin{tikzpicture}[
+    grow=right,
+    level 1/.style={sibling distance=3.8cm, level distance=4.5cm},
+    level 2/.style={sibling distance=1.3cm, level distance=4.0cm},
+    edge from parent fork right,
+    every node/.style={rectangle, draw=black, rounded corners,
+                       fill=gray!10, thick, align=center, font=\scriptsize, text width=2.2cm},
+    root/.style={fill=orange!20, font=\small\bfseries, text width=2.0cm}
+]
+\node[root] {V2 Delta}
+    child { node[fill=blue!10] {Sync Layer}
+        child { node {Gist SHA\\diff} }
+        child { node {applyChapter\\Json()} }
+        child { node {shared\_meta\\tracking} }
+    }
+    child { node[fill=yellow!15] {Dialogue\\Engine}
+        child { node {DialogueNode\\state machine} }
+        child { node {Choice\\branching} }
+        child { node {BGM stub\\per node} }
+    }
+    child { node[fill=green!10] {Post-sync\\Logic}
+        child { node {Condition\\check} }
+        child { node {Unlock\\prompt} }
+        child { node {Story\\selection} }
+    }
+    child { node[fill=red!10] {UI V2}
+        child { node {Skip btn\\(logo phase)} }
+        child { node {Sync status\\bar} }
+    };
+\end{tikzpicture}
+\end{center}
+
+% ---- Yêu cầu chức năng V2 ----
+\subsubsection{Yêu cầu Chức năng V2}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Dual-mode entry:} \texttt{storyId=0} $\rightarrow$ intro + sync; \texttt{storyId>0} $\rightarrow$ dialogue trực tiếp (từ Console Play/Stories popup). Backward-compatible với \texttt{main.cpp} V1 call.
+    \item \textbf{Gist SHA-diff sync:} so sánh \texttt{shared\_meta.sha} vs manifest; chỉ fetch và apply chapters có SHA mới. Offline $\rightarrow$ \texttt{SYNC\_OFFLINE}, tiếp tục dùng local data.
+    \item \textbf{applyChapterJson():} DELETE stories no longer in JSON $\rightarrow$ UPSERT \texttt{shared\_data} + \texttt{shared\_dialogues} + \texttt{shared\_choices} trong một transaction. Không full-replace để bảo toàn user progress.
+    \item \textbf{Dialogue engine:} load nodes bulk $\rightarrow$ \texttt{dialRunLoop()} state machine; choices loaded on-demand per node. Terminal: \texttt{nextNodeId=0} $\rightarrow$ exit.
+    \item \textbf{Skip button:} visible ONLY trong PHASE\_LOGO (sync đã hoàn thành); ẩn trong phase sync để tránh user bỏ qua DB write.
+    \item \textbf{Progress bar V2:} \texttt{fill = max(syncProgress, timeProgress)}; status line hiển thị chapter đang sync / ``Offline'' / ``Up to date''.
+    \item \textbf{Post-sync condition check:} return 0=Console, +N=replay, $-$N=prompt unlock.
+\end{itemize}
+
+\subsubsection{Yêu cầu Phi Chức năng V2}
+\begin{itemize}[noitemsep, leftmargin=*]
+    \item \textbf{HTTP:} native = libcurl blocking (startup sync acceptable); WASM = \texttt{emscripten\_fetch} sync mode qua Asyncify (\texttt{-sASYNCIFY=1}).
+    \item \textbf{SQLite:} gameStory chỉ \emph{đọc} \texttt{shared\_dialogues/choices}; \emph{ghi} chỉ vào \texttt{shared\_meta} (SHA tracking) và \texttt{idUser\_Stories} (story selection). Không ghi \texttt{idUser\_Records}.
+    \item \textbf{WASM persistence:} \texttt{EM\_ASM(\{Module.FS.syncfs(false,\ldots)\})} sau mỗi chapter apply và sau story selection update.
+    \item \textbf{Offline degradation:} \texttt{MANIFEST\_GIST\_URL} rỗng hoặc fetch fail $\rightarrow$ \texttt{SYNC\_OFFLINE} $\rightarrow$ tiếp tục bình thường với local SQLite data.
+\end{itemize}
+
+\subsubsection{Tiêu chí Thành công V2}
+\begin{tabularx}{\linewidth}{|l|X|}
+    \hline
+    \textbf{Kịch bản kiểm thử} & \textbf{Kết quả mong đợi} \\
+    \hline
+    SHA trùng khớp cho tất cả chapters & Bar fill 100\% ngay; log ``all chapters up to date''; không có HTTP request cho chapter JSONs \\
+    \hline
+    SHA thay đổi cho 1 chapter & Status line ``Syncing c001...''; \texttt{shared\_data} updated; \texttt{shared\_meta.sha} updated; IDBFS flushed \\
+    \hline
+    Mất mạng (MANIFEST\_GIST\_URL fail) & ``Offline - using local data''; intro tiếp tục bình thường; dialogue dùng cached DB \\
+    \hline
+    \texttt{storyId>0} từ Console & Bypass intro/sync; load dialogue trực tiếp; Skip $\rightarrow$ return về Console \\
+    \hline
+    Dialogue branching (hasChoices=true) & TAB cycle choices; ENTER / click chọn; nextNodeId đúng branch được load \\
+    \hline
+    nextStory unlock (postSyncCheck $< 0$) & Prompt YES/NO hiện; YES $\rightarrow$ DB update isSelected + IDBFS flush + run story; NO $\rightarrow$ replay current \\
+    \hline
+    WASM: sync chapter $\rightarrow$ đóng tab $\rightarrow$ mở lại & \texttt{shared\_meta.sha} vẫn còn; sync bỏ qua chapter đã cập nhật \\
+    \hline
+\end{tabularx}
+
+\IfFileExists{02-gameStoryRequirements-v2-screenshot.png}{
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.55\textwidth]{02-gameStoryRequirements-v2-screenshot}
+    \\[6pt]
+    \textit{\small Hình V2.1: gameStory V2 — dialogue engine, text box bán trong suốt, choice buttons, skip button góc trên phải.}
+\end{figure}
+}{
+\begin{center}\framebox[0.55\textwidth]{\rule{0pt}{8cm}[Screenshot: 02-gameStoryRequirements]}\end{center}
+}
+
+% ============================================================
+% END PATCH V2 — 02-gameStoryRequirements.tex
+% ============================================================
 
 \subsection{Yêu cầu Phiên bản V3: Tích hợp API \& Lưu trữ Đám mây}
 \begin{itemize}[leftmargin=*]

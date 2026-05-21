@@ -90,6 +90,7 @@ $Sdl3Version       = '3.2.18'   # default pin
 $DetectedSdl3Version = ''        # se duoc set boi Initialize-Sdl3Native
 $SqliteVersion     = '3460100'   # SQLite 3.46.1
 $SqliteYear        = '2024'
+$CurlVersion       = '8.10.1'   # libcurl, built with Schannel (no OpenSSL dep)
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -394,6 +395,136 @@ function Initialize-Sqlite {
 }
 
 # =============================================================================
+# Validate-Endpoints -- check MANIFEST_GIST_URL + CTETRIS_API_URL + media
+# Mirrors game loading-bar progress: [N/total] per media file check (HEAD).
+# Stops the build (throw) on first failure.
+# =============================================================================
+function Validate-Endpoints {
+    Write-Info "=== Endpoint & Media Validation ==="
+
+    $envFile = Join-Path $AppDir '.env'
+    if (-not (Test-Path $envFile)) {
+        Write-Err ".env not found at $envFile - create it with MANIFEST_GIST_URL and CTETRIS_API_URL"
+        throw "Missing app/.env"
+    }
+
+    $envContent = Get-Content $envFile -Raw
+
+    $manifestUrl = ''
+    $apiUrl = ''
+    if ($envContent -match '(?m)^MANIFEST_GIST_URL=(.+)$') { $manifestUrl = $Matches[1].Trim() }
+    if ($envContent -match '(?m)^CTETRIS_API_URL=(.+)$') { $apiUrl = $Matches[1].Trim() }
+
+    Write-Info ('[1/3] MANIFEST_GIST_URL: ' + $manifestUrl)
+    if ([string]::IsNullOrWhiteSpace($manifestUrl) -or $manifestUrl -match 'GIST_ID|OWNER|<') {
+        Write-Err 'MANIFEST_GIST_URL is a placeholder. Set real Gist URL in app/.env.'
+        throw 'MANIFEST_GIST_URL not configured'
+    }
+    try {
+        $r = Invoke-WebRequest -Uri $manifestUrl -Method Get -TimeoutSec 15 -UseBasicParsing -ErrorAction Stop
+        if ($r.StatusCode -ne 200) { throw ('HTTP ' + $r.StatusCode) }
+        Write-Ok ('MANIFEST_GIST_URL OK (HTTP ' + $r.StatusCode + ')')
+    } catch {
+        Write-Err ('MANIFEST_GIST_URL unreachable: ' + $_)
+        Write-Err ('  URL: ' + $manifestUrl)
+        throw 'MANIFEST_GIST_URL validation failed'
+    }
+
+    Write-Info ('[2/3] CTETRIS_API_URL: ' + $apiUrl)
+    if ([string]::IsNullOrWhiteSpace($apiUrl) -or $apiUrl -match 'OWNER|<your') {
+        Write-Err 'CTETRIS_API_URL is a placeholder. Deploy Cloudflare Worker and set real URL.'
+        throw 'CTETRIS_API_URL not configured'
+    }
+    try {
+        $apiHealthUrl = $apiUrl + '/health'
+        $r = Invoke-WebRequest -Uri $apiHealthUrl -Method Get -TimeoutSec 15 -UseBasicParsing -ErrorAction Stop
+        if ($r.StatusCode -ne 200) { throw ('HTTP ' + $r.StatusCode) }
+        Write-Ok ('CTETRIS_API_URL OK (HTTP ' + $r.StatusCode + ')')
+    } catch {
+        Write-Err ('CTETRIS_API_URL/health unreachable: ' + $_)
+        Write-Err ('  URL: ' + $apiUrl + '/health')
+        throw 'CTETRIS_API_URL validation failed'
+    }
+
+    Write-Info '[3/3] Checking media files online...'
+
+    $remoteUrl = & git -C $AppDir remote get-url origin 2>$null
+    if ([string]::IsNullOrWhiteSpace($remoteUrl)) {
+        Write-Warn 'No git remote - skipping media checks'
+        return
+    }
+
+    $owner = ''
+    $repo = ''
+    if ($remoteUrl -match 'github\.com[:/]([^/]+)/([^/.]+)(\.git)?$') {
+        $owner = $Matches[1]
+        $repo = $Matches[2]
+    }
+    if (-not $owner -or -not $repo) {
+        Write-Warn ('Cannot parse owner/repo from ' + $remoteUrl + ' - skipping media checks')
+        return
+    }
+
+    $chaptersDir = Join-Path $AppDir '..\chapters\src'
+    if (-not (Test-Path $chaptersDir)) {
+        Write-Warn 'chapters\src not found - skipping media checks'
+        return
+    }
+
+    $mediaItems = @()
+    foreach ($jsonFile in Get-ChildItem -Path $chaptersDir -Recurse -Filter 'c*.json' | Where-Object { $_.FullName -match 'c\d+\\c\d+\.json$' }) {
+        $chapterId = $jsonFile.Directory.Name
+        $mediaBase = 'https://raw.githubusercontent.com/' + $owner + '/' + $repo + '/main/chapters/src/' + $chapterId + '/media/'
+        $content = Get-Content $jsonFile.FullName -Raw
+        $pattern = '\x22(?:thumbnailPath|imageUrl)\x22\s*:\s*\x22(.+?\.(?:png|jpg|jpeg|gif|webp|svg))\x22'
+
+        [regex]::Matches($content, $pattern) | ForEach-Object {
+            $fn = $_.Groups[1].Value
+            if ($fn) {
+                $url = $mediaBase + $fn
+                if (-not ($mediaItems | Where-Object { $_.Url -eq $url })) {
+                    $mediaItems += [PSCustomObject]@{ Url = $url; Label = $chapterId + '/' + $fn }
+                }
+            }
+        }
+    }
+
+    $total = $mediaItems.Count
+    if ($total -eq 0) {
+        Write-Warn 'No media file references found - skipping'
+        return
+    }
+
+    $doneN = 0
+    $failN = 0
+    foreach ($item in $mediaItems) {
+        $doneN++
+        Write-Host ('  [{0}/{1}] {2} ' -f $doneN, $total, $item.Label) -NoNewline
+        try {
+            $r = Invoke-WebRequest -Uri $item.Url -Method Head -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
+            if ($r.StatusCode -eq 200) {
+                Write-Host 'OK' -ForegroundColor Green
+            } else {
+                Write-Host ('HTTP ' + $r.StatusCode) -ForegroundColor Red
+                $failN++
+            }
+        } catch {
+            Write-Host 'MISSING' -ForegroundColor Red
+            Write-Warn ('  -> ' + $item.Url)
+            $failN++
+        }
+    }
+
+    if ($failN -gt 0) {
+        Write-Err ($failN.ToString() + '/' + $total + ' media files not found on GitHub (' + $owner + '/' + $repo + ').')
+        Write-Err 'Commit and push missing files to chapters/src/<chapter>/media/ before building.'
+        throw ('Media validation failed: ' + $failN + ' missing files')
+    }
+
+    Write-Ok ('All ' + $total + ' media files confirmed online (' + $owner + '/' + $repo + ')')
+}
+
+# =============================================================================
 # nanosvg -- shared headers in libs\downloads\nanosvg -> download if missing
 # =============================================================================
 function Initialize-Nanosvg {
@@ -427,9 +558,11 @@ function Import-EmsdkEnv {
         return
     }
     Write-Info "Source emsdk env tu $bat..."
-    cmd /c "call `"$bat`" > nul 2>&1 && set" | ForEach-Object {
-        if ($_ -match '^([^=]+)=(.*)$') {
-            [System.Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+    $cmd = 'call "' + $bat + '" > nul 2>&1 & set'
+    cmd /c $cmd | ForEach-Object {
+        $parts = $_.Split('=', 2)
+        if ($parts.Count -eq 2) {
+            [System.Environment]::SetEnvironmentVariable($parts[0], $parts[1], 'Process')
         }
     }
 }
@@ -448,13 +581,16 @@ function Initialize-Emsdk {
 
     # Priority 1: em++ tren PATH
     if (Get-Command em++ -ErrorAction SilentlyContinue) {
-        $cur = (em++ --version 2>$null | Select-Object -First 1) `
-                -replace '.*?(\d+\.\d+\.\d+).*','$1'
+        $cur = $null
+        $versionLine = & em++ --version 2>$null | Select-Object -First 1
+        if ($versionLine -match '(\d+\.\d+\.\d+)') {
+            $cur = $Matches[1]
+        }
         if ((Test-VersionGE $cur $EmsdkVersion)) {
             Write-Ok "em++ tren PATH version $cur >= $EmsdkVersion (skip)"
             return
         }
-        Write-Warn "em++ tren PATH version $cur < $EmsdkVersion"
+        Write-Warn ('em++ tren PATH version ' + $cur + ' < ' + $EmsdkVersion)
     }
 
     # Priority 2: ~/emsdk
@@ -464,13 +600,16 @@ function Initialize-Emsdk {
         Write-Info "Phat hien $userEmsdk -- dung emsdk cua user"
         Import-EmsdkEnv $userEmsdk
         if (Get-Command em++ -ErrorAction SilentlyContinue) {
-            $cur = (em++ --version 2>$null | Select-Object -First 1) `
-                    -replace '.*?(\d+\.\d+\.\d+).*','$1'
+            $cur = $null
+            $versionLine = & em++ --version 2>$null | Select-Object -First 1
+            if ($versionLine -match '(\d+\.\d+\.\d+)') {
+                $cur = $Matches[1]
+            }
             if (Test-VersionGE $cur $EmsdkVersion) {
-                Write-Ok "~/emsdk version $cur >= $EmsdkVersion (skip)"
+                Write-Ok ('~/emsdk version ' + $cur + ' >= ' + $EmsdkVersion + ' (skip)')
                 return
             }
-            Write-Info "Update ~/emsdk len $EmsdkVersion..."
+            Write-Info ('Update ~/emsdk len ' + $EmsdkVersion + '...')
             Push-Location $userEmsdk
             try {
                 & .\emsdk.bat install $EmsdkVersion
@@ -497,10 +636,13 @@ function Initialize-Emsdk {
         Write-Info "Phat hien managed emsdk tai $managed"
         Import-EmsdkEnv $managed
         if (Get-Command em++ -ErrorAction SilentlyContinue) {
-            $cur = (em++ --version 2>$null | Select-Object -First 1) `
-                    -replace '.*?(\d+\.\d+\.\d+).*','$1'
+            $cur = $null
+            $versionLine = & em++ --version 2>$null | Select-Object -First 1
+            if ($versionLine -match '(\d+\.\d+\.\d+)') {
+                $cur = $Matches[1]
+            }
             if (Test-VersionGE $cur $EmsdkVersion) {
-                Write-Ok "managed emsdk version $cur >= $EmsdkVersion (skip)"
+                Write-Ok ('managed emsdk version ' + $cur + ' >= ' + $EmsdkVersion + ' (skip)')
                 return
             }
         }
@@ -542,7 +684,7 @@ function Initialize-Emsdk {
     if (-not (Get-Command emcmake -ErrorAction SilentlyContinue)) {
         throw "emcmake not available after emsdk activation. emsdk may not be properly installed."
     }
-    Write-Ok "emsdk active: $(em++ --version | Select-Object -First 1)"
+    Write-Ok ('emsdk active: ' + ((& em++ --version | Select-Object -First 1)))
 }
 
 # =============================================================================
@@ -662,6 +804,78 @@ function Build-Sdl3FromSource {
     & cmake --install $sdlBuild
     if ($LASTEXITCODE -ne 0) { throw "SDL3 $Target install failed" }
     Write-Ok "SDL3 $Version ($Target) da install vao $InstallPrefix"
+}
+
+# =============================================================================
+# libcurl native (Windows) -- build from source with Schannel backend.
+# Schannel = Windows native SSL/TLS, no OpenSSL dependency.
+# Output: libs\windows\downloads\curl-native\ with CURLConfig.cmake + DLL.
+# =============================================================================
+function Initialize-Curl {
+    $curlInstall = Join-Path $DownloadDir 'curl-native'
+
+    # Cache HIT: skip if CURLConfig.cmake already present
+    foreach ($cand in @(
+        (Join-Path $curlInstall 'lib\cmake\CURL'),
+        (Join-Path $curlInstall 'lib\cmake')
+    )) {
+        if (Test-Path (Join-Path $cand 'CURLConfig.cmake')) {
+            Write-Ok "libcurl native cache HIT: $cand"
+            return
+        }
+    }
+
+    Write-Info "Building libcurl $CurlVersion (Schannel) -> $curlInstall..."
+
+    Import-VsEnv
+
+    $tag     = 'curl-' + ($CurlVersion -replace '\.', '_')
+    $curlSrc = Join-Path $DownloadDir "curl-$CurlVersion"
+    $curlBld = Join-Path $curlSrc 'build-msvc'
+
+    New-Item -ItemType Directory -Force -Path $DownloadDir | Out-Null
+    if (-not (Test-Path (Join-Path $curlSrc '.git'))) {
+        if (Test-Path $curlSrc) { Remove-Item -Recurse -Force $curlSrc }
+        Write-Info "Clone curl $tag vao $curlSrc..."
+        git clone --depth 1 --branch $tag https://github.com/curl/curl.git $curlSrc
+        if ($LASTEXITCODE -ne 0) { throw "git clone curl $tag failed" }
+    } else {
+        Write-Ok "curl source da co tai $curlSrc"
+    }
+
+    if (Test-Path $curlBld) { Remove-Item -Recurse -Force $curlBld }
+
+    $cfg = @(
+        '-S', $curlSrc,
+        '-B', $curlBld,
+        '-G', 'Ninja',
+        '-DCMAKE_BUILD_TYPE=Release',
+        "-DCMAKE_INSTALL_PREFIX=$curlInstall",
+        '-DBUILD_SHARED_LIBS=ON',
+        '-DCURL_USE_SCHANNEL=ON',
+        '-DCURL_USE_OPENSSL=OFF',
+        '-DCURL_USE_LIBSSH2=OFF',
+        '-DCURL_ZLIB=OFF',
+        '-DCURL_BROTLI=OFF',
+        '-DCURL_ZSTD=OFF',
+        '-DUSE_NGHTTP2=OFF',
+        '-DBUILD_TESTING=OFF',
+        '-DBUILD_CURL_EXE=OFF',
+        '-DBUILD_LIBCURL_DOCS=OFF',
+        '-DBUILD_MISC_DOCS=OFF',
+        '-DENABLE_CURL_MANUAL=OFF',
+        '-DCURL_DISABLE_LDAP=ON',
+        '-DCURL_DISABLE_LDAPS=ON',
+        '-DENABLE_UNICODE=ON'
+    )
+    & cmake @cfg
+    if ($LASTEXITCODE -ne 0) { throw "curl configure failed (exit $LASTEXITCODE)" }
+    & cmake --build $curlBld -j
+    if ($LASTEXITCODE -ne 0) { throw "curl build failed (exit $LASTEXITCODE)" }
+    & cmake --install $curlBld
+    if ($LASTEXITCODE -ne 0) { throw "curl install failed (exit $LASTEXITCODE)" }
+
+    Write-Ok "libcurl $CurlVersion installed -> $curlInstall"
 }
 
 
@@ -997,6 +1211,7 @@ function Build-Native {
     Initialize-Nanosvg
     Initialize-Nlohmann   # FIX: gameConsole/app.cpp requires nlohmann/json.hpp
     Initialize-Sqlite   # FIX 2.6.1: SQLite for Stories DB
+    Initialize-Curl     # libcurl Schannel build for native HTTP sync (manifest + API)
 
     # Copy icon from brandkit to build output
     Copy-DesktopIcon -OutDir $BuildNativeDir
@@ -1025,13 +1240,18 @@ function Build-Native {
     }
 
     New-Item -ItemType Directory -Force -Path $BuildNativeDir | Out-Null
+    # CMAKE_PREFIX_PATH: semicolon-separated list so find_package(SDL3) +
+    # find_package(CURL) both resolve. CMake parses ';' even on Windows.
+    $curlInstall = Join-Path $DownloadDir 'curl-native'
+    $prefixList  = @($sdlInstall, $curlInstall) -join ';'
+
     $nativeArgs = @(
         '-S', $AppDir,
         '-B', $BuildNativeDir,
         '-DCMAKE_BUILD_TYPE=Release',
         '-DBUILD_WASM=OFF',
         '-G', 'Ninja',
-        "-DCMAKE_PREFIX_PATH=$sdlInstall",
+        "-DCMAKE_PREFIX_PATH=$prefixList",
         "-DNANOSVG_INCLUDE_DIR=$(Join-Path $DownloadDir 'nanosvg')",
         "-DNLOHMANN_INCLUDE_DIR=$(Join-Path $DownloadDir 'nlohmann')",
         "-DSQLITE_DIR=$(Join-Path $DownloadDir 'sqlite')"
@@ -1081,7 +1301,7 @@ function Build-Wasm {
         }
     }
     if (-not $sdlDir) {
-        Write-Err "Khong tim thay SDL3Config.cmake trong $sdlInstall\lib*\cmake\SDL3\"
+        Write-Err ('Khong tim thay SDL3Config.cmake trong ' + $sdlInstall + '\lib*\cmake\SDL3\')
         throw 'SDL3 WASM build incomplete'
     }
     Write-Info "SDL3_DIR = $sdlDir"
@@ -1144,7 +1364,7 @@ switch ($Mode) {
         Write-Info 'Don dep build/ (giu lai libs/ cache)...'
         $b = Join-Path $AppDir 'build'
         if (Test-Path $b) { Remove-Item -Recurse -Force $b }
-        Write-Ok "Da xoa build/ (libs\$OS_NAME\downloads\ van con)"
+        Write-Ok ('Da xoa build/ (libs\' + $OS_NAME + '\downloads\ van con)')
     }
     'deepclean' {
         Write-Info 'Don dep TOAN BO (build/ + libs/)...'

@@ -1,0 +1,79 @@
+% --- body.tex ---
+\usepackage{pdfpages}
+\usepackage{fontspec}
+% Prefer Times New Roman when available; fall back in container environments.
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+}{
+  \setmainfont{Liberation Serif}
+}
+\usepackage[vietnamese]{babel}
+
+% Page layout and spacing
+\usepackage[left=3cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+\usepackage{titlesec}
+\usepackage{setspace}
+
+% Silence noisy warnings
+\usepackage{silence}
+\WarningFilter{transparent}{Loading aborted}
+\WarningFilter{hyperref}{The anchor of a bookmark and its parent's}
+
+% Core packages
+\usepackage{float}
+\usepackage{svg}
+\usepackage{graphicx}
+\graphicspath{{assets/}{../assets/}{../../assets/}}
+\svgpath{{assets/}{../assets/}{../../assets/}}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage[table]{xcolor}
+\usepackage{ulem}
+\usepackage{xurl}
+
+% ====== THÊM 2 GÓI NÀY ĐỂ FIX LỖI ADJUSTBOX VÀ FOREST ======
+\usepackage{adjustbox}
+\usepackage[edges]{forest}
+% ============================================================
+
+% TikZ
+\usepackage{tikz}
+
+% ====== BỔ SUNG FIT, BACKGROUNDS, TREES VÀO DANH SÁCH ======
+\usetikzlibrary{calc, arrows.meta, shapes.geometric, positioning, fit, backgrounds, trees}
+
+% Table tuning
+\renewcommand{\tabularxcolumn}[1]{m{#1}}
+\hbadness=10000
+\hfuzz=10000pt
+
+% Shared commands
+\newcommand{\subsecheading}[1]{%
+    \par\vspace{2pt}%
+    \hspace{1.5em}\textbf{#1}%
+    \par\vspace{2pt}%
+}
+\newcommand{\introtext}[1]{%
+    \par\hspace{3.0em}#1\par%
+}
+\newcommand{\StandaloneDocumentSetup}[2]{%
+  \pagenumbering{arabic}%
+  \ApplyStandardFooter{#1}{#2}%
+}
+\newcommand{\StandaloneSectionSetup}[2]{%
+  \ApplyStandardFooter{#1}{#2}%
+}
+
+% Math
+\usepackage{amsmath}
+
+% Hyperref
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=magenta,
+    urlcolor=blue,
+}

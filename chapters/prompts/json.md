@@ -34,9 +34,9 @@ Chapter IDs are zero-padded 3-digit: `c001`, `c002`, `c003`, …
 
 ---
 
-## Single SQLite table — `shared_data`
+## SQLite tables
 
-This is the table gameConsole's `dbSeedSharedData()` populates. One row per story.
+### `shared_data` — story catalogue (consumed by gameConsole)
 
 ```sql
 CREATE TABLE IF NOT EXISTS shared_data (
@@ -58,6 +58,44 @@ CREATE TABLE IF NOT EXISTS shared_data (
 ```
 
 > Schema mirrors `app/src/gameConsole/app.cpp::dbInitSchema()`. Do not rename or reorder columns without updating the C++ side.
+
+### `story_dialogues` — per-node dialogue (consumed by gameStory V2)
+
+```sql
+CREATE TABLE IF NOT EXISTS story_dialogues (
+    rowId      INTEGER PRIMARY KEY AUTOINCREMENT,
+    idStory    INTEGER NOT NULL,
+    idChapter  INTEGER NOT NULL,
+    nodeId     INTEGER NOT NULL,
+    speaker    TEXT    DEFAULT '',
+    text       TEXT    DEFAULT '',
+    imageUrl   TEXT    DEFAULT '',
+    bgmUrl     TEXT    DEFAULT '',
+    sfxUrl     TEXT    DEFAULT '',
+    nextNodeId INTEGER DEFAULT 0,
+    hasChoices INTEGER DEFAULT 0,
+    UNIQUE(idStory, idChapter, nodeId)
+);
+```
+
+> Created by `app/src/gameConsole/app.cpp::dbInitSchema()`. Read by gameStory V2 via `storyDbLoadDialogue()`.
+
+### `story_choices` — branching choices per node (consumed by gameStory V2)
+
+```sql
+CREATE TABLE IF NOT EXISTS story_choices (
+    rowId      INTEGER PRIMARY KEY AUTOINCREMENT,
+    idStory    INTEGER NOT NULL,
+    idChapter  INTEGER NOT NULL,
+    nodeId     INTEGER NOT NULL,
+    choiceIdx  INTEGER NOT NULL,
+    label      TEXT    DEFAULT '',
+    nextNodeId INTEGER DEFAULT 0,
+    UNIQUE(idStory, idChapter, nodeId, choiceIdx)
+);
+```
+
+> Created by `app/src/gameConsole/app.cpp::dbInitSchema()`. Read by gameStory V2 via `storyDbLoadChoices()`.
 
 ---
 
@@ -83,14 +121,29 @@ Every `c{id}.json` is one object with a single top-level key `shared_data` (arra
       "nextBlockSpeed":  <float, threshold for gameCore nextBlock_III>,
 
       "tableMatrix":     "<serialized initial board state, may be ''>",
-      "xmlDialogue":     "<dialogue script, may be ''>",
-      "thumbnailPath":   "<filename only, e.g. 'THUMB_001_*.png'>"
+      "xmlDialogue":     "<legacy XML dialogue, may be '' — use dialogues[] instead>",
+      "thumbnailPath":   "<filename only, e.g. 'THUMB_001_*.png'>",
+
+      "dialogues": [
+        {
+          "nodeId":     <int, 1-based, unique per story>,
+          "speaker":    "<character name, e.g. 'T-Spin', 'Cyan', 'Zed', 'MC'>",
+          "text":       "<dialogue line, max ~200 chars for display box>",
+          "imageUrl":   "<filename only, e.g. 'THUMB_001_FALLING_SKY.png', or ''>",
+          "bgmUrl":     "<filename only, e.g. 'story001_bgm.mp3', or ''>",
+          "sfxUrl":     "<filename only, e.g. 'intro_sfx.mp3', or ''>",
+          "nextNodeId": <int, next node to advance to; 0 = end of dialogue>,
+          "choices":    [
+            { "label": "<option text>", "nextNodeId": <int> }
+          ]
+        }
+      ]
     }
   ]
 }
 ```
 
-### Field semantics
+### Field semantics — shared_data
 
 | Field | Type | Notes |
 |---|---|---|
@@ -101,34 +154,62 @@ Every `c{id}.json` is one object with a single top-level key `shared_data` (arra
 | `minScore` | int | Player must reach this on each `requiredStories` parent before unlocking this row. |
 | `minSpeed` | float | Same as above for speed (score/seconds). |
 | `minRetries` | int | Same as above for retry count. |
-| `requiredStories` | str | CSV of parent `idStory` values. Empty string = always available (e.g. story 1 intro). |
-| `nextBlockScore` | int | gameCore unlock threshold for `nextBlock_II`. 0 = always shown / N/A for endings. |
-| `nextBlockSpeed` | float | gameCore unlock threshold for `nextBlock_III`. 0 = always / N/A. |
-| `tableMatrix` | str | Serialized initial board for gameCore. **May be empty** in V2 — populated later. |
-| `xmlDialogue` | str | Dialogue script for gameStory. **May be empty** in V2 — populated when the dialogue engine lands. |
-| `thumbnailPath` | str | **Filename only** (no path prefix). Runtime resolves against the chapter's `media/` dir. |
+| `requiredStories` | str | CSV of parent `idStory` values. Empty = always available. |
+| `nextBlockScore` | int | gameCore unlock threshold for `nextBlock_II`. 0 = always shown. |
+| `nextBlockSpeed` | float | gameCore unlock threshold for `nextBlock_III`. 0 = always. |
+| `tableMatrix` | str | Serialized initial board for gameCore. May be empty. |
+| `xmlDialogue` | str | Legacy XML dialogue. Deprecated in V2 — use `dialogues[]`. May be empty. |
+| `thumbnailPath` | str | **Filename only** (no path prefix). |
+
+### Field semantics — dialogues[]
+
+| Field | Type | Notes |
+|---|---|---|
+| `nodeId` | int | 1-based, unique within the story. |
+| `speaker` | str | Character name displayed in dialogue box header. |
+| `text` | str | Dialogue text. Max ~200 chars recommended for display box fit. |
+| `imageUrl` | str | Filename only. Resolved against chapter `media/` dir at runtime. May be empty. |
+| `bgmUrl` | str | Filename only. May be empty. |
+| `sfxUrl` | str | Filename only. May be empty. |
+| `nextNodeId` | int | ID of next dialogue node. `0` = end dialogue and return to caller. |
+| `choices` | array | Empty array `[]` = linear flow (use `nextNodeId`). Non-empty = branch; `nextNodeId` is ignored. |
+
+### Field semantics — choices[]
+
+| Field | Type | Notes |
+|---|---|---|
+| `label` | str | Button text shown to player. |
+| `nextNodeId` | int | Node to jump to when this choice is selected. |
 
 ---
 
 ## Media file naming
 
-- Thumbnails: `THUMB_{idStory:03d}_{TAG}.png` — e.g. `THUMB_001_FALLING_SKY.png`. Matches the format currently in use.
-- Audio (when added in V2+): suffix `_bgm` for loops, `_sfx` for one-shots.
+- Thumbnails: `THUMB_{idStory:03d}_{TAG}.png` — e.g. `THUMB_001_FALLING_SKY.png`.
+- Audio (V2+): suffix `_bgm` for loops, `_sfx` for one-shots.
 - All media files live under `chapters/src/c{id}/media/`.
-- The `thumbnailPath` field stores only the basename. The runtime adds the directory prefix when loading.
+- URL fields (`imageUrl`, `bgmUrl`, `sfxUrl`) store **filename only**. Runtime adds the directory prefix.
 
 ---
 
 ## Validation rules enforced by `parse.py`
 
+### shared_data rows
 1. Root JSON has exactly one key `shared_data` (non-empty array).
-2. Every row has all required fields with correct types.
+2. Every row has all required shared_data fields with correct types.
 3. `idChapter` of every row matches the chapter folder number.
 4. `idStory` values are unique within the chapter.
 5. Every value in `requiredStories` CSV references an `idStory` that exists in the **same chapter**, or the field is empty.
 6. `thumbnailPath` does not contain a `/` or `\` (filename only).
 7. Numeric fields are numbers (not stringified).
 
-Fields **allowed to be empty strings** (deferred for later population): `tableMatrix`, `xmlDialogue`. The parser emits `''` for these as-is.
+### dialogues[] (optional per story)
+8. `dialogues` field, if present, must be an array (empty array is valid).
+9. Each dialogue node must have all required dialogue fields with correct types.
+10. `nodeId` values must be unique within the story's dialogue array.
+11. `nextNodeId` must reference a valid `nodeId` within the same story, or be `0`.
+12. Each choice must have `label` (str) and `nextNodeId` (int).
+13. `imageUrl`, `bgmUrl`, `sfxUrl` must not contain path separators (filename only), or be empty string.
 
-If any rule fails, `parse.py` exits non-zero and CI fails the workflow.
+Fields **allowed to be empty strings**: `tableMatrix`, `xmlDialogue`, `imageUrl`, `bgmUrl`, `sfxUrl`.
+`dialogues` field **allowed to be absent** (defaults to empty list — no dialogue for that story).

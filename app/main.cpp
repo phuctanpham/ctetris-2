@@ -18,8 +18,10 @@
 #include <SDL3/SDL.h>
 #include "gameConsole_layout.h"   // [D.6] SettingsConfig contract
 #include "logger.h"               // File logging system
+#include "ctetris_debug.h"        // HTTP debug logging
 
-extern int runGameStory  (SDL_Window* window, SDL_Renderer* renderer);
+extern int runGameStory  (SDL_Window* window, SDL_Renderer* renderer,
+                          int storyId = 0, int chapterId = 0);
 extern int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                           SettingsConfig& cfgInOut);
 extern int runGameCore   (SDL_Window* window, SDL_Renderer* renderer,
@@ -27,6 +29,8 @@ extern int runGameCore   (SDL_Window* window, SDL_Renderer* renderer,
 
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
+
+    CTDBG_INIT();   // Initialize HTTP debug log (ctetris.log on native, no-op on WASM)
     
     Logger& logger = Logger::getInstance();
     logger.log("=== cTetris Application Started ===");
@@ -61,9 +65,35 @@ int main(int argc, char* argv[]) {
 
     while (true) {
         int next = runGameConsole(window, renderer, cfg);
-        if (next != 1) {
+
+        if (next == 0) {
             logger.log("User quit from console menu");
             break;
+        }
+
+        // nextScene=2: user clicked Play in Stories popup -> preview dialogue
+        // then loop back to Console without going to gameCore.
+        if (next == 2) {
+            if (cfg.storyId > 0) {
+                logger.logEvent("STORY", "Preview dialogue story=%d chapter=%d",
+                                cfg.storyId, cfg.chapterId);
+                runGameStory(window, renderer, cfg.storyId, cfg.chapterId);
+            }
+            continue;   // back to Console
+        }
+
+        if (next == 3) {
+            // DB not found in Console -> go to gameStory to init + sync
+            logger.logEvent("STORY", "DB missing -> gameStory init");
+            runGameStory(window, renderer, 0, 0);
+            continue;
+        }
+
+        // nextScene=1: PLAY button -> show story dialogue then enter gameCore
+        if (cfg.storyId > 0) {
+            logger.logEvent("STORY", "Playing dialogue story=%d chapter=%d",
+                            cfg.storyId, cfg.chapterId);
+            runGameStory(window, renderer, cfg.storyId, cfg.chapterId);
         }
         
         int back = runGameCore(window, renderer, cfg);

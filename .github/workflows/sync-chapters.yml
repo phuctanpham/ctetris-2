@@ -1,94 +1,298 @@
-name: Sync chapters
+name: Sync chapters to Gist manifest
 
 on:
   push:
-    branches:
-      - main
-      - test
-    paths:
-      - 'chapters/src/**/*.json'
-      - 'chapters/src/**/media/**'
-      - 'chapters/scripts/**'
-      - 'chapters/prompts/json.md'
-      - '.github/workflows/sync-chapters.yml'
+    branches: [main, test]
+    paths: ['chapters/src/**/*.json', '.github/workflows/sync-chapters.yml']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: sync-chapters-${{ github.ref }}
-  cancel-in-progress: false   # let an in-flight sync finish before the next
+  cancel-in-progress: false
 
 jobs:
   sync:
-    name: Parse JSON → SQL + manifest
-    # Loop guard: skip if this push was made by the bot itself.
-    # Belt-and-braces: also skip if the commit message carries [skip ci].
-    if: >
-      github.actor != 'github-actions[bot]'
-      && !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    env:
+      GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+
     steps:
-      - name: Checkout (full history for git log)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Parse each chapter JSON → SQL
-        env:
-          GITHUB_OWNER:  ${{ github.repository_owner }}
-          GITHUB_REPO:   ${{ github.event.repository.name }}
-          GITHUB_BRANCH: ${{ github.ref_name }}
+      # ── 0. Validate GIST_TOKEN: must be classic PAT with 'gist' WRITE scope ─
+      # GET /gists returns 200 even without 'gist' scope (public endpoint).
+      # x-oauth-scopes header is the only reliable way to confirm write access.
+      - name: Validate GIST_TOKEN
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          count=0
-          for jsonfile in chapters/src/c*/c*.json; do
-            echo "::group::parsing $jsonfile"
-            python3 chapters/scripts/parse.py "$jsonfile"
-            echo "::endgroup::"
-            count=$((count + 1))
+          [ -z "$GIST_TOKEN" ] && {
+            echo "::error::GIST_TOKEN secret is not set."
+            echo "  Go to: Settings → Secrets and variables → Actions"
+            echo "  Create a classic PAT at: https://github.com/settings/tokens?type=classic"
+            echo "  Required scope: gist"
+            exit 1
+          }
+
+          # Fetch response headers — x-oauth-scopes lists granted scopes
+          headers=$(curl -sI --max-time 10 \
+                    -H "Authorization: token $GIST_TOKEN" \
+                    "https://api.github.com/gists?per_page=1")
+
+          http=$(echo "$headers" | grep -i '^HTTP/' | tail -1 | awk '{print $2}')
+          scopes=$(echo "$headers" | grep -i '^x-oauth-scopes:' | cut -d':' -f2- | tr -d '[:space:]')
+
+          echo "HTTP status  : $http"
+          echo "OAuth scopes : $scopes"
+
+          if [ "$http" != "200" ]; then
+            echo "::error::GIST_TOKEN rejected by GitHub API (HTTP $http)."
+            echo "  Must be a CLASSIC PAT — fine-grained PATs do NOT support Gist API."
+            echo "  Create one at: https://github.com/settings/tokens?type=classic"
+            exit 1
+          fi
+
+          if ! echo "$scopes" | grep -q 'gist'; then
+            echo "::error::GIST_TOKEN is missing 'gist' scope (found: '$scopes')."
+            echo "  Edit your classic PAT and enable the 'gist' checkbox."
+            echo "  https://github.com/settings/tokens?type=classic"
+            exit 1
+          fi
+
+          echo "GIST_TOKEN OK — classic PAT with 'gist' scope confirmed"
+
+      # ── 1. Read config from app/.env ──────────────────────────────────────
+      - name: Read manifest Gist config
+        id: cfg
+        run: |
+          set -euo pipefail
+          owner="${{ github.repository_owner }}"
+          repo="${{ github.event.repository.name }}"
+
+          env_url=$(grep '^MANIFEST_GIST_URL=' app/.env 2>/dev/null \
+                    | cut -d'=' -f2- | tr -d '[:space:]' || true)
+          mid=$(echo "$env_url" | awk -F'/' '{print $5}' || true)
+
+          # Detect placeholder — workflow will CREATE the manifest Gist below
+          is_placeholder=false
+          echo "$mid" | grep -qE '^GIST_ID$|^$' && is_placeholder=true
+
+          echo "owner=$owner"                   >> "$GITHUB_OUTPUT"
+          echo "repo=$repo"                     >> "$GITHUB_OUTPUT"
+          echo "manifest_id=$mid"               >> "$GITHUB_OUTPUT"
+          echo "is_placeholder=$is_placeholder" >> "$GITHUB_OUTPUT"
+          echo "owner=$owner  repo=$repo  manifest_id=$mid  is_placeholder=$is_placeholder"
+
+      # ── 2. Validate chapter JSON files ────────────────────────────────────
+      - name: Validate chapter JSON files
+        run: |
+          set -euo pipefail
+          fail=false
+          for f in $(find chapters/src -maxdepth 2 -name "c*.json" \
+                     | grep -E 'chapters/src/c[0-9]+/c[0-9]+\.json' | sort); do
+            jq 'has("shared_data")' "$f" > /dev/null 2>&1 \
+              || { echo "::error::$f is invalid JSON or missing shared_data"; fail=true; }
           done
-          echo "Parsed $count chapter(s)."
-          if [ "$count" = "0" ]; then
-            echo "::warning::No chapter JSON files found under chapters/src/c*/"
-          fi
+          [ "$fail" = false ] || exit 1
+          echo "All chapter JSON files valid"
 
-      - name: Rebuild manifest.json
-        run: python3 chapters/scripts/build_manifest.py
-
-      - name: Show generated artifacts
-        run: |
-          echo "=== manifest.json ==="
-          cat chapters/manifest.json
-          echo
-          echo "=== SQL files ==="
-          ls -la chapters/src/*/*.sql 2>/dev/null || echo "(none yet)"
-
-      - name: Commit & push (if changed)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # ── 3. Upsert chapter Gists ───────────────────────────────────────────
+      - name: Upsert chapter Gists
         run: |
           set -euo pipefail
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          owner="${{ steps.cfg.outputs.owner }}"
+          repo="${{ steps.cfg.outputs.repo }}"
 
-          git add chapters/manifest.json
-          # SQL files may not exist if there are no chapters yet
-          git add chapters/src/*/*.sql 2>/dev/null || true
+          # find_or_create: locate Gist by filename or create it.
+          # Captures full curl response before piping to jq to avoid
+          # exit-code-3 from jq receiving empty stdin on curl failure.
+          find_or_create() {
+            local fname="$1"
+            local content="$2"
+            local resp gid payload
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
+            resp=$(curl -sf --max-time 15 \
+                     -H "Authorization: token $GIST_TOKEN" \
+                     "https://api.github.com/gists?per_page=100" 2>/dev/null) || resp="[]"
+
+            gid=$(echo "$resp" \
+                  | jq -r --arg fn "$fname" \
+                    '.[] | select(.files | has($fn)) | .id' 2>/dev/null \
+                  | head -1 || true)
+
+            if [ -z "$gid" ]; then
+              # Build payload separately — avoids exit-code-3 from jq inside curl -d "$()"
+              payload=$(jq -n --arg fn "$fname" --arg fc "$content" \
+                        '{"public":false,"files":{($fn):{"content":$fc}}}') || {
+                echo "::error::jq failed to build payload for $fname (jq exit $?)" >&2
+                exit 1
+              }
+              resp=$(curl -sf --max-time 30 -X POST \
+                       -H "Authorization: token $GIST_TOKEN" \
+                       -H "Accept: application/vnd.github.v3+json" \
+                       -d "$payload" \
+                       "https://api.github.com/gists") || {
+                echo "::error::POST /gists failed for $fname" >&2
+                exit 1
+              }
+              gid=$(echo "$resp" | jq -r '.id' 2>/dev/null || true)
+              if [ -z "$gid" ] || [ "$gid" = "null" ]; then
+                echo "::error::Gist creation returned no ID for $fname" >&2
+                echo "  API response: $(echo "$resp" | head -c 300)" >&2
+                exit 1
+              fi
+              echo "Created Gist for $fname: $gid" >&2   # stderr — not captured by $()
+            fi
+            echo "$gid"   # stdout only — clean capture by gid=$(find_or_create ...)
+          }
+
+          for jsonfile in $(find chapters/src -maxdepth 2 -name "c*.json" \
+                           | grep -E 'chapters/src/c[0-9]+/c[0-9]+\.json' | sort); do
+            chapter_id=$(basename "$(dirname "$jsonfile")")
+            fname="${chapter_id}.json"
+            content=$(cat "$jsonfile")
+            gid=$(find_or_create "$fname" "$content")
+
+            # Build PATCH payload separately for same reason
+            patch_payload=$(jq -n --arg fn "$fname" --arg fc "$content" \
+                            '{"files":{($fn):{"content":$fc}}}') || {
+              echo "::error::jq failed building PATCH payload for $fname"; exit 1
+            }
+            http=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 30 -X PATCH \
+                     -H "Authorization: token $GIST_TOKEN" \
+                     -H "Accept: application/vnd.github.v3+json" \
+                     -d "$patch_payload" \
+                     "https://api.github.com/gists/$gid")
+            [ "$http" = "200" ] || { echo "::error::PATCH $fname HTTP $http"; exit 1; }
+            echo "$gid" > "/tmp/gist_${chapter_id}.id"
+            echo "OK $chapter_id → $gid"
+          done
+
+      # ── 4. Bootstrap or update manifest Gist ─────────────────────────────
+      # Self-bootstrapping: if app/.env still has placeholder GIST_ID,
+      # CREATE the manifest Gist and write its ID to GITHUB_OUTPUT.
+      # On subsequent runs the ID is stable — only content is PATCHed.
+      - name: Rebuild manifest Gist
+        id: manifest
+        run: |
+          set -euo pipefail
+          mid="${{ steps.cfg.outputs.manifest_id }}"
+          is_placeholder="${{ steps.cfg.outputs.is_placeholder }}"
+          owner="${{ steps.cfg.outputs.owner }}"
+          repo="${{ steps.cfg.outputs.repo }}"
+          now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          # ── Build version entry ──────────────────────────────────────────
+          ver_entry="{}"
+          for jsonfile in $(find chapters/src -maxdepth 2 -name "c*.json" \
+                           | grep -E 'chapters/src/c[0-9]+/c[0-9]+\.json' | sort); do
+            chapter_id=$(basename "$(dirname "$jsonfile")")
+            sha=$(git log -1 --format=%H -- "$jsonfile" 2>/dev/null || echo "uncommitted")
+            gid=$(cat "/tmp/gist_${chapter_id}.id" 2>/dev/null || echo "")
+            gist_url="https://gist.githubusercontent.com/${owner}/${gid}/raw/${chapter_id}.json"
+            media_url="https://raw.githubusercontent.com/${owner}/${repo}/main/chapters/src/${chapter_id}/media/"
+            ver_entry=$(echo "$ver_entry" | jq \
+              --arg cid "$chapter_id" --arg sha "$sha" \
+              --arg gu  "$gist_url"   --arg mu  "$media_url" --arg dt "$now" \
+              '.[$cid] = {latestCommitId:$sha, gistUrl:$gu, mediaBaseUrl:$mu, updatedDate:$dt}')
+          done
+
+          # ── Create or PATCH manifest Gist ────────────────────────────────
+          if [ "$is_placeholder" = "true" ]; then
+            # First run: CREATE manifest Gist
+            echo "Manifest Gist not configured — creating new one..."
+            initial=$(jq -n \
+              --arg note "AUTO-GENERATED by sync-chapters.yml. Do not store in repo." \
+              --arg ver  "v01.01" \
+              --argjson entry "$ver_entry" \
+              '._note=$note | .latest=$ver | .["v01.01"]=$entry')
+            resp=$(curl -sf --max-time 15 -X POST \
+                     -H "Authorization: token $GIST_TOKEN" \
+                     -H "Accept: application/vnd.github.v3+json" \
+                     -d "$(jq -n --arg fc "$initial" \
+                           '{"public":false,"files":{"manifest.json":{"content":$fc}}}')" \
+                     "https://api.github.com/gists") || {
+              echo "::error::Failed to create manifest Gist"
+              exit 1
+            }
+            mid=$(echo "$resp" | jq -r '.id')
+            echo "Created manifest Gist: $mid"
+          else
+            # Subsequent runs: PATCH existing manifest
+            current=$(curl -sf --max-time 15 \
+                        -H "Authorization: token $GIST_TOKEN" \
+                        "https://api.github.com/gists/$mid" \
+                      | jq -r '.files["manifest.json"].content // "{}"')
+
+            latest=$(echo "$current" | jq -r '.latest // ""')
+            if [ -z "$latest" ]; then old_xx=0; old_yy=0
+            else
+              old_xx=$((10#${latest:1:2}))
+              old_yy=$((10#${latest:4:2}))
+            fi
+            chapter_count=$(find chapters/src -maxdepth 2 -name "c*.json" \
+              | grep -cE 'chapters/src/c[0-9]+/c[0-9]+\.json' || echo 0)
+            if [ "$chapter_count" -gt "$old_xx" ]; then
+              new_xx=$chapter_count; new_yy=1
+            else
+              new_xx=$old_xx; new_yy=$((old_yy + 1))
+            fi
+            new_ver=$(printf "v%02d.%02d" $new_xx $new_yy)
+
+            new_manifest=$(echo "$current" | jq \
+              --arg note "AUTO-GENERATED by sync-chapters.yml. Do not store in repo." \
+              --arg ver  "$new_ver" \
+              --argjson entry "$ver_entry" \
+              '._note=$note | .latest=$ver | .[$ver]=$entry')
+
+            http=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 15 -X PATCH \
+                     -H "Authorization: token $GIST_TOKEN" \
+                     -H "Accept: application/vnd.github.v3+json" \
+                     -d "$(jq -n --arg mc "$new_manifest" \
+                           '{"files":{"manifest.json":{"content":$mc}}}')" \
+                     "https://api.github.com/gists/$mid")
+            [ "$http" = "200" ] || { echo "::error::Manifest PATCH HTTP $http"; exit 1; }
+            echo "OK manifest $new_ver"
           fi
 
-          git commit -m "[skip ci] sync chapters: regenerate SQL + manifest"
-          git push origin HEAD:${{ github.ref_name }}
+          echo "final_manifest_id=$mid" >> "$GITHUB_OUTPUT"
+
+      # ── 5. Echo manifest Gist URL — always runs, self-sufficient ─────────
+      # Constructs URL from workflow outputs (never reads app/.env).
+      # On first run, shows the new ID to copy-paste into app/.env.
+      - name: Echo manifest Gist URL
+        if: always()
+        run: |
+          owner="${{ github.repository_owner }}"
+          mid="${{ steps.manifest.outputs.final_manifest_id }}"
+
+          # Fallback: if manifest step didn't run (earlier failure),
+          # try to read what we have from app/.env
+          if [ -z "$mid" ]; then
+            env_url=$(grep '^MANIFEST_GIST_URL=' app/.env 2>/dev/null \
+                      | cut -d'=' -f2- | tr -d '[:space:]' || true)
+            mid=$(echo "$env_url" | awk -F'/' '{print $5}' || true)
+          fi
+
+          if [ -n "$mid" ] && ! echo "$mid" | grep -qE '^GIST_ID$|^$'; then
+            url="https://gist.githubusercontent.com/${owner}/${mid}/raw/manifest.json"
+            echo ""
+            echo "=============================================="
+            echo "Copy this line into app/.env:"
+            echo ""
+            echo "MANIFEST_GIST_URL=${url}"
+            echo ""
+            echo "=============================================="
+            echo "::notice title=MANIFEST_GIST_URL::MANIFEST_GIST_URL=${url}"
+          else
+            echo ""
+            echo "=============================================="
+            echo "Manifest Gist was not created (workflow failed)."
+            echo "Fix the errors above, then re-run this workflow."
+            echo "=============================================="
+            echo "::error title=MANIFEST_GIST_URL::Gist not created — fix errors and re-run"
+          fi

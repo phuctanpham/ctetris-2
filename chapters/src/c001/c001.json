@@ -1,94 +1,564 @@
 {
   "shared_data": [
     {
-      "idStory": 1, "storyName": "Falling Sky",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 0, "minSpeed": 0.0, "minRetries": 0,
+      "idStory": 1,
+      "storyName": "Falling Sky",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 0,
+      "minSpeed": 0.0,
+      "minRetries": 0,
       "requiredStories": "",
-      "nextBlockScore": 50, "nextBlockSpeed": 1.0,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_001_FALLING_SKY.png"
+      "nextBlockScore": 50,
+      "nextBlockSpeed": 1.0,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_001_FALLING_SKY.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "T-Spin",
+          "text": "Tỉnh dậy đi, Kiến Trúc Sư. Trận chiến sinh tồn trong 60 giây đầu tiên của cậu trong Ma Trận đã bắt đầu.",
+          "imageUrl": "THUMB_001_FALLING_SKY.png",
+          "bgmUrl": "BGM_001_FALLING_SKY.mp3",
+          "sfxUrl": "SFX_001_BLOCK_DROP.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "T-Spin",
+          "text": "Hãy dùng Kỹ năng A - [Nhãn Lực Gia Tốc]. Duy trì tốc độ phím bấm (APM) lên mức 1.0 thao tác/phút để mở khóa tầm nhìn cho khối thứ 1 sắp rớt.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 3,
+          "choices": []
+        },
+        {
+          "nodeId": 3,
+          "speaker": "T-Spin",
+          "text": "Và Kỹ năng B - [Nhãn Lực Tích Điểm]. Cày đủ 50 điểm Karma trong vòng 60 giây để bẻ khóa khối thứ 2. Chúc may mắn!",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     },
     {
-      "idStory": 2, "storyName": "Holy Sanctum",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 2, "minSpeed": 0.1, "minRetries": 1,
+      "idStory": 2,
+      "storyName": "Holy Sanctum",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 2,
+      "minSpeed": 0.1,
+      "minRetries": 1,
       "requiredStories": "1",
-      "nextBlockScore": 100, "nextBlockSpeed": 1.2,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_002_ORDERCORP_TEMPLE.png"
+      "nextBlockScore": 100,
+      "nextBlockSpeed": 1.2,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_002_ORDERCORP_TEMPLE.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "Cyan",
+          "text": "Lựa chọn sáng suốt. Việc cậu cố gắng sinh tồn bằng cách dọn dẹp gọn gàng ở giai đoạn trước đã chứng minh cậu có tố chất của OrderCorp. Sự hỗn loạn tạm thời được đẩy lùi.",
+          "imageUrl": "THUMB_002_ORDERCORP_TEMPLE.png",
+          "bgmUrl": "BGM_002_ORDERCORP_TEMPLE.mp3",
+          "sfxUrl": "SFX_002_HOLY_CHIME.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "Cyan",
+          "text": "Nhưng ngữ cảnh giờ đã khác. Ma Trận đang tăng tốc độ rơi. Sự hoàn hảo của cậu sẽ bị thử thách dưới áp lực khổng lồ của Thánh Vực.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 3,
+          "choices": []
+        },
+        {
+          "nodeId": 3,
+          "speaker": "Cyan",
+          "text": "Kỹ năng mới của cậu: Kỹ năng A - [Thánh Quang Tốc]. Cậu có 90 giây để đạt mốc > 1.2 thao tác/phút. Ánh sáng sẽ soi rọi khối 'NEXT' đầu tiên cho cậu.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 4,
+          "choices": []
+        },
+        {
+          "nodeId": 4,
+          "speaker": "Cyan",
+          "text": "Kỹ năng B - [Công Đức Tích Tụ]. Xóa dòng để tích lũy đủ 100 EXP trong 90 giây, điểm sáng thứ hai sẽ xuất hiện trên màn hình.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 5,
+          "choices": []
+        },
+        {
+          "nodeId": 5,
+          "speaker": "Cyan",
+          "text": "Tuy nhiên, để thăng hoa thành Thánh Thần ở kiếp sau, hãy chú ý điều kiện ẩn: giữ chuỗi clear sạch và cố gắng đạt mốc 20 điểm cốt truyện tổng. Đừng phạm sai lầm.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     },
     {
-      "idStory": 3, "storyName": "Blood Tower",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 1, "minSpeed": 0.1, "minRetries": 2,
+      "idStory": 3,
+      "storyName": "Blood Tower",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 1,
+      "minSpeed": 0.1,
+      "minRetries": 2,
       "requiredStories": "1",
-      "nextBlockScore": 100, "nextBlockSpeed": 1.2,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_003_UNDERCITY_SLUM.png"
+      "nextBlockScore": 100,
+      "nextBlockSpeed": 1.2,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_003_UNDERCITY_SLUM.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "Zed",
+          "text": "Haha! Quyết định hay đấy! Việc mi hoảng loạn xếp chồng khối lên nhau ở phút trước cho thấy mi thuộc về Tầng Đáy. Sự thanh tẩy chỉ là trò lừa đảo của bọn nhà giàu!",
+          "imageUrl": "THUMB_003_UNDERCITY_SLUM.png",
+          "bgmUrl": "BGM_003_UNDERCITY_SLUM.mp3",
+          "sfxUrl": "SFX_003_ORC_LAUGH.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "Zed",
+          "text": "Chào mừng đến bãi rác. Bầu trời sắp trút xuống những khối hình dị dạng. Áp lực vật lý ở đây sẽ nghiền nát những kẻ chơi chậm chạp.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 3,
+          "choices": []
+        },
+        {
+          "nodeId": 3,
+          "speaker": "Zed",
+          "text": "Kỹ năng A của mi giờ là [Cuồng Nộ Tốc]. Hãy giữ tốc độ tay > 1.2 thao tác/phút trong 90 giây để ngửi thấy mùi khối rác đầu tiên!",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 4,
+          "choices": []
+        },
+        {
+          "nodeId": 4,
+          "speaker": "Zed",
+          "text": "Kỹ năng B - [Huyết Ma Điểm]. Cứ xếp combo bừa bãi! Khi đạt 100 điểm trong 90 giây, mi sẽ ép Server phun ra hình khối thứ hai!",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 5,
+          "choices": []
+        },
+        {
+          "nodeId": 5,
+          "speaker": "Zed",
+          "text": "Nghe cho rõ đây! Để trở thành Chúa Tể thực sự, mi phải kích hoạt điều kiện ẩn: cố tình Game Over đúng lúc, rồi cày nát 20 điểm bạo loạn. Dám làm không?",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     },
     {
-      "idStory": 4, "storyName": "Quantum Leap",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 1, "minSpeed": 1.1, "minRetries": 1,
+      "idStory": 4,
+      "storyName": "Quantum Leap",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 1,
+      "minSpeed": 1.1,
+      "minRetries": 1,
       "requiredStories": "1,2,3",
-      "nextBlockScore": 100, "nextBlockSpeed": 1.2,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_004_SHADOW_ALLEY.png"
+      "nextBlockScore": 100,
+      "nextBlockSpeed": 1.2,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_004_SHADOW_ALLEY.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "T-Spin",
+          "text": "Cậu đã từ chối cả Ánh Sáng lẫn Bóng Tối. Việc cậu cố tình lách qua các góc lag ở màn trước chứng tỏ cậu đã nhìn thấy 'Sự thật' của Ma Trận.",
+          "imageUrl": "THUMB_004_SHADOW_ALLEY.png",
+          "bgmUrl": "BGM_004_SHADOW_ALLEY.mp3",
+          "sfxUrl": "SFX_004_GLITCH_WARP.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "T-Spin",
+          "text": "Bước vào Không Gian Ảo này, lực hấp dẫn không ổn định. Khối hình có thể xuất hiện bất thình lình. Trực giác là thứ duy nhất cứu sống cậu.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 3,
+          "choices": []
+        },
+        {
+          "nodeId": 3,
+          "speaker": "T-Spin",
+          "text": "Dùng Kỹ năng A - [Bóng Mờ Chuyển Động]. Giữ APM > 1.2 trong 90 giây, kẽ hở không gian sẽ cho cậu thấu thị khối thứ nhất.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 4,
+          "choices": []
+        },
+        {
+          "nodeId": 4,
+          "speaker": "T-Spin",
+          "text": "Đồng thời, Kỹ năng B - [Cổ Ngữ Dị Thường]. Khi đạt 100 điểm T-Spin ẩn trong 90 giây, cậu sẽ bẻ khóa khối thứ hai.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 5,
+          "choices": []
+        },
+        {
+          "nodeId": 5,
+          "speaker": "T-Spin",
+          "text": "Đừng tham lam điểm số thông thường. Hãy chú ý điều kiện ẩn: giữ trực giác ổn định, và đạt mốc 20 điểm kỹ thuật. Nếu không thỏa mãn chúng, cậu sẽ kẹt ở đây mãi mãi.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     },
     {
-      "idStory": 5, "storyName": "Sanctified",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 20, "minSpeed": 0.1, "minRetries": 1,
+      "idStory": 5,
+      "storyName": "Sanctified",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 20,
+      "minSpeed": 0.1,
+      "minRetries": 1,
       "requiredStories": "2",
-      "nextBlockScore": 200, "nextBlockSpeed": 1.5,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_005_HEAVEN_MATRIX.png"
+      "nextBlockScore": 200,
+      "nextBlockSpeed": 1.5,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_005_HEAVEN_MATRIX.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "Cyan",
+          "text": "Hành trình trước của cậu kết thúc trong sự sụp đổ của bức tường pixel, nhưng 200 EXP cậu để lại đã thanh tẩy toàn bộ server. Cậu đã chọn tái sinh thành Ánh sáng.",
+          "imageUrl": "THUMB_005_HEAVEN_MATRIX.png",
+          "bgmUrl": "BGM_005_HEAVEN_MATRIX.mp3",
+          "sfxUrl": "SFX_005_ASCEND_BURST.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "MC",
+          "text": "Ngữ cảnh cuối cùng. Mức trọng lực tối đa 20G. Các khối hình sẽ chạm đáy ngay khi xuất hiện. Không còn thời gian để suy nghĩ.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 3,
+          "choices": []
+        },
+        {
+          "nodeId": 3,
+          "speaker": "MC",
+          "text": "Kỹ năng A thăng cấp: [Thần Tốc Tịnh Hóa]. Ta có 20 giây ngắn ngủi để ép APM > 1.5, qua đó hack thẳng vào mã nguồn để thấy khối thứ ba.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 4,
+          "choices": []
+        },
+        {
+          "nodeId": 4,
+          "speaker": "MC",
+          "text": "Kỹ năng B thăng cấp: [Karma Tuyệt Đối]. Dùng 200 EXP, rào cản UI sẽ bị phá vỡ để hiện khối thứ tư.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 5,
+          "choices": []
+        },
+        {
+          "nodeId": 5,
+          "speaker": "Cyan",
+          "text": "Thách thức cuối cùng: Ngài phải duy trì trạng thái này và không vi phạm điều kiện ẩn: giữ nhịp thanh tẩy ổn định. Nếu thất bại, sự Tuyệt Diệt sẽ nuốt chửng chính ngài!",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     },
     {
-      "idStory": 6, "storyName": "Origin Glitch",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 1, "minSpeed": 0.1, "minRetries": 20,
+      "idStory": 6,
+      "storyName": "Origin Glitch",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 1,
+      "minSpeed": 0.1,
+      "minRetries": 20,
       "requiredStories": "3",
-      "nextBlockScore": 200, "nextBlockSpeed": 1.5,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_006_GLITCH_VIRUS.png"
+      "nextBlockScore": 200,
+      "nextBlockSpeed": 1.5,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_006_GLITCH_VIRUS.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "Zed",
+          "text": "Quá tuyệt vời! Mi đã lợi dụng cái chết! 20 lần Game Over ở kiếp trước không giết được mi, mà 200 điểm tích tụ đã biến mi thành một con Virus hoàn chỉnh!",
+          "imageUrl": "THUMB_006_GLITCH_VIRUS.png",
+          "bgmUrl": "BGM_006_GLITCH_VIRUS.mp3",
+          "sfxUrl": "SFX_006_VIRUS_CRASH.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "MC",
+          "text": "Server đang run rẩy. Ngữ cảnh này là Màn Hình Tử Thần (Kill Screen). Mọi khung hình đều đang giật lag vì rác dữ liệu.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 3,
+          "choices": []
+        },
+        {
+          "nodeId": 3,
+          "speaker": "MC",
+          "text": "Kỹ năng A: [Phản Xạ Quỷ Dữ]. Trong 15 giây tích tắc, APM phải vượt 1.5 để ăn cắp mã hex của khối thứ ba trước khi nó load xong.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 4,
+          "choices": []
+        },
+        {
+          "nodeId": 4,
+          "speaker": "MC",
+          "text": "Kỹ năng B: [Điểm Chết Chồng Chất]. Nuốt 200 điểm lỗi hệ thống, ta ép bung bét khối thứ tư!",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 5,
+          "choices": []
+        },
+        {
+          "nodeId": 5,
+          "speaker": "Zed",
+          "text": "Coi chừng! Thách thức của mi là không được để RAM của máy chủ tràn bộ nhớ quá nhanh. Giám sát điều kiện ẩn: không để ngưỡng RAM vượt quá an toàn, nếu không game sẽ văng (Crash) thực sự!",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     },
     {
-      "idStory": 7, "storyName": "Algorithm Master",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 1, "minSpeed": 10.1, "minRetries": 1,
+      "idStory": 7,
+      "storyName": "Algorithm Master",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 1,
+      "minSpeed": 10.1,
+      "minRetries": 1,
       "requiredStories": "4",
-      "nextBlockScore": 200, "nextBlockSpeed": 1.5,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_007_FROZEN_TIME.png"
+      "nextBlockScore": 200,
+      "nextBlockSpeed": 1.5,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_007_FROZEN_TIME.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "T-Spin",
+          "text": "Tuyệt đỉnh. Cậu đã vượt qua kiếp trước bằng cách biến 200 điểm và điều kiện ẩn: độ chính xác tuyệt đối thành chìa khóa bẻ khóa giới hạn xung nhịp CPU. Không ai có thể bắt kịp cậu nữa.",
+          "imageUrl": "THUMB_007_FROZEN_TIME.png",
+          "bgmUrl": "BGM_007_FROZEN_TIME.mp3",
+          "sfxUrl": "SFX_007_TIME_FREEZE.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "MC",
+          "text": "Ngữ cảnh này... Thời gian đã đóng băng. Thuật toán RNG không còn tự sinh ra khối, mà nó chờ ta ra lệnh.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 3,
+          "choices": []
+        },
+        {
+          "nodeId": 3,
+          "speaker": "MC",
+          "text": "Kỹ năng A: [Bước Nhảy Thời Gian]. Chỉ cần 20 mili-giây với APM > 1.5, ta đã đứng ở tương lai và thấy khối thứ ba.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 4,
+          "choices": []
+        },
+        {
+          "nodeId": 4,
+          "speaker": "MC",
+          "text": "Kỹ năng B: [Tích Lũy Hư Vô]. Lượng 200 điểm ẩn xuất ra từ hư không đã bẻ khóa luôn khối thứ tư.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 5,
+          "choices": []
+        },
+        {
+          "nodeId": 5,
+          "speaker": "T-Spin",
+          "text": "Thử thách lớn nhất của Bậc Thầy là sự vô cảm. Hãy giữ điều kiện ẩn: tỷ lệ chính xác tuyệt đối. Một sai lầm nhỏ trong dòng chảy này, thời gian sẽ nghiền nát cậu ngay lập tức.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     },
     {
-      "idStory": 8, "storyName": "Dead Wall",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 1, "minSpeed": 0.1, "minRetries": 1,
+      "idStory": 8,
+      "storyName": "Dead Wall",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 1,
+      "minSpeed": 0.1,
+      "minRetries": 1,
       "requiredStories": "5,6",
-      "nextBlockScore": 0, "nextBlockSpeed": 0.0,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_008_KILL_SCREEN.png"
+      "nextBlockScore": 0,
+      "nextBlockSpeed": 0.0,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_008_KILL_SCREEN.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "T-Spin",
+          "text": "Thử thách 30 giây cuối cùng đã khép lại. Dù họ đạt APM 0.0 hay MAX điểm 0...",
+          "imageUrl": "THUMB_008_KILL_SCREEN.png",
+          "bgmUrl": "BGM_008_KILL_SCREEN.mp3",
+          "sfxUrl": "SFX_008_DEAD_STATIC.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "MC",
+          "text": "...Thì bộ nhớ 8-bit cũng đã cạn kiệt. Mắt ta đọc được thuật toán... nhưng hệ thống đã từ chối phản hồi. Một cái kết được lập trình sẵn cho sự cực đoan.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     },
     {
-      "idStory": 9, "storyName": "Endless Record",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 1, "minSpeed": 0.1, "minRetries": 1,
+      "idStory": 9,
+      "storyName": "Endless Record",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 1,
+      "minSpeed": 0.1,
+      "minRetries": 1,
       "requiredStories": "5,7",
-      "nextBlockScore": 0, "nextBlockSpeed": 0.0,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_009_ENDLESS_LOOP.png"
+      "nextBlockScore": 0,
+      "nextBlockSpeed": 0.0,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_009_ENDLESS_LOOP.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "MC",
+          "text": "Giới hạn sinh tồn vô hạn không còn ý nghĩa. APM 0.0 và Điểm số 0 đã hòa làm một vào trực giác.",
+          "imageUrl": "THUMB_009_ENDLESS_LOOP.png",
+          "bgmUrl": "BGM_009_ENDLESS_LOOP.mp3",
+          "sfxUrl": "SFX_009_FLOW_PULSE.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "T-Spin",
+          "text": "Đúng vậy. Trạng thái Flow State. Cậu không đánh bại trò chơi, cậu đã trở thành vòng lặp của nó. Chế độ Endless bắt đầu.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     },
     {
-      "idStory": 10, "storyName": "Maxout 999999",
-      "idChapter": 1, "chapterName": "The Tetris Matrix",
-      "minScore": 1, "minSpeed": 0.1, "minRetries": 1,
+      "idStory": 10,
+      "storyName": "Maxout 999999",
+      "idChapter": 1,
+      "chapterName": "The Tetris Matrix",
+      "minScore": 1,
+      "minSpeed": 0.1,
+      "minRetries": 1,
       "requiredStories": "5,6,7",
-      "nextBlockScore": 0, "nextBlockSpeed": 0.0,
-      "tableMatrix": "", "xmlDialogue": "",
-      "thumbnailPath": "THUMB_010_GOLDEN_MAXOUT.png"
+      "nextBlockScore": 0,
+      "nextBlockSpeed": 0.0,
+      "tableMatrix": "",
+      "xmlDialogue": "",
+      "thumbnailPath": "THUMB_010_GOLDEN_MAXOUT.png",
+      "dialogues": [
+        {
+          "nodeId": 1,
+          "speaker": "MC",
+          "text": "Đạt mốc 999999 tuyệt đối! Phá vỡ mọi điều kiện ẩn!",
+          "imageUrl": "THUMB_010_GOLDEN_MAXOUT.png",
+          "bgmUrl": "BGM_010_GOLDEN_MAXOUT.mp3",
+          "sfxUrl": "SFX_010_MAXOUT_FANFARE.mp3",
+          "nextNodeId": 2,
+          "choices": []
+        },
+        {
+          "nodeId": 2,
+          "speaker": "MC",
+          "text": "Hệ thống đã bị ép xung đến mức tràn bộ nhớ. Lưới điện ma trận sụp đổ. Chúng ta... cuối cùng đã được tự do khỏi trò chơi này.",
+          "imageUrl": "",
+          "bgmUrl": "",
+          "sfxUrl": "",
+          "nextNodeId": 0,
+          "choices": []
+        }
+      ]
     }
   ]
 }

@@ -166,6 +166,211 @@ ensure_sqlite() {
     log_ok "SQLite amalgamation $SQLITE_VERSION san sang ($((size/1048576)) MB)"
 }
 
+# =============================================================================
+# libcurl -- native HTTP sync (manifest, leaderboard, record submit).
+# Detection first; install via OS package manager only when missing.
+# find_package(CURL) in CMakeLists.txt picks it up on its own (system installs).
+# macOS brew-keg-only path is appended to CMAKE_PREFIX_PATH inside build_native.
+# =============================================================================
+ensure_curl() {
+    if command -v curl-config >/dev/null 2>&1; then
+        local ver
+        ver=$(curl-config --version 2>/dev/null | awk '{print $2}')
+        log_ok "libcurl ${ver:-detected} via curl-config"
+        return 0
+    fi
+    if command -v pkg-config >/dev/null 2>&1 && \
+       pkg-config --exists libcurl 2>/dev/null; then
+        log_ok "libcurl detected via pkg-config"
+        return 0
+    fi
+
+    log_warn "libcurl dev headers not found -- attempting install (OS=$OS_NAME)..."
+    case "$OS_NAME" in
+        macos)
+            if command -v brew >/dev/null 2>&1; then
+                brew install curl || log_warn "brew install curl failed"
+            else
+                log_error "Install Homebrew (https://brew.sh), then: brew install curl"
+                return 1
+            fi
+            ;;
+        ubuntu)
+            if command -v apt-get >/dev/null 2>&1; then
+                sudo apt-get update -qq
+                sudo apt-get install -y libcurl4-openssl-dev || \
+                    log_warn "apt-get install libcurl4-openssl-dev failed"
+            fi
+            ;;
+        fedora)
+            sudo dnf install -y libcurl-devel || \
+                log_warn "dnf install libcurl-devel failed"
+            ;;
+        arch)
+            sudo pacman -S --noconfirm curl || \
+                log_warn "pacman -S curl failed"
+            ;;
+        alpine)
+            sudo apk add curl-dev || log_warn "apk add curl-dev failed"
+            ;;
+        opensuse)
+            sudo zypper install -y libcurl-devel || \
+                log_warn "zypper install libcurl-devel failed"
+            ;;
+        *)
+            log_error "Unknown OS '$OS_NAME' -- install libcurl dev package manually"
+            return 1
+            ;;
+    esac
+
+    if command -v curl-config >/dev/null 2>&1 || \
+       (command -v pkg-config >/dev/null 2>&1 && \
+        pkg-config --exists libcurl 2>/dev/null); then
+        log_ok "libcurl installed successfully"
+    else
+        log_warn "libcurl install finished but detection still failed -- find_package(CURL) may not see it"
+    fi
+    return 0   # do not hard-fail; CMakeLists.txt warns + falls back to offline
+}
+
+# =============================================================================
+# validate_endpoints -- check MANIFEST_GIST_URL + CTETRIS_API_URL + media
+# Mirrors the game's loading-bar progress: shows [N/total] for each file.
+# Stops the build (exit 1) on first failure.
+# =============================================================================
+validate_endpoints() {
+    log_info "=== Endpoint & Media Validation ==="
+
+    local env_file="$APP_DIR/.env"
+    if [ ! -f "$env_file" ]; then
+        log_error ".env not found at $env_file — create it with MANIFEST_GIST_URL and CTETRIS_API_URL"
+        exit 1
+    fi
+
+    local manifest_url api_url
+    manifest_url=$(grep -E '^MANIFEST_GIST_URL=' "$env_file" | cut -d'=' -f2- | tr -d '[:space:]')
+    api_url=$(grep -E '^CTETRIS_API_URL=' "$env_file" | cut -d'=' -f2- | tr -d '[:space:]')
+
+    # ── 1/3: MANIFEST_GIST_URL ────────────────────────────────────────────
+    log_info "[1/3] MANIFEST_GIST_URL: $manifest_url"
+    if [ -z "$manifest_url" ] || echo "$manifest_url" | grep -qE 'GIST_ID|OWNER|<'; then
+        log_error "MANIFEST_GIST_URL is a placeholder. Set real Gist URL in app/.env and push sync-chapters.yml."
+        exit 1
+    fi
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$manifest_url" 2>/dev/null || echo "000")
+    if [ "$code" != "200" ]; then
+        log_error "MANIFEST_GIST_URL returned HTTP $code — Gist may be private or URL wrong."
+        log_error "  URL: $manifest_url"
+        exit 1
+    fi
+    log_ok "MANIFEST_GIST_URL OK (HTTP $code)"
+
+    # ── 2/3: CTETRIS_API_URL ──────────────────────────────────────────────
+    log_info "[2/3] CTETRIS_API_URL: $api_url"
+    if [ -z "$api_url" ] || echo "$api_url" | grep -qE 'OWNER|<your'; then
+        log_error "CTETRIS_API_URL is a placeholder. Deploy Cloudflare Worker and set real URL in app/.env."
+        exit 1
+    fi
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$api_url/health" 2>/dev/null || echo "000")
+    if [ "$code" != "200" ]; then
+        log_error "CTETRIS_API_URL/health returned HTTP $code — Worker may not be deployed."
+        log_error "  URL: $api_url/health"
+        exit 1
+    fi
+    log_ok "CTETRIS_API_URL OK (HTTP $code)"
+
+    # ── 3/3: Media files — HEAD check on GitHub raw ───────────────────────
+    log_info "[3/3] Checking media files online..."
+
+    # Derive owner/repo from git remote (https or ssh)
+    local remote owner repo
+    remote=$(git -C "$APP_DIR" remote get-url origin 2>/dev/null || echo "")
+    if [ -z "$remote" ]; then
+        log_warn "No git remote detected — skipping media file checks"
+        return 0
+    fi
+    owner=$(echo "$remote" | sed -E 's|.*github\.com[:/]([^/]+)/.*|\1|')
+    repo=$(echo "$remote"  | sed -E 's|.*github\.com[:/][^/]+/([^/.]+)(\.git)?$|\1|')
+    if [ -z "$owner" ] || [ -z "$repo" ]; then
+        log_warn "Cannot parse owner/repo from remote '$remote' — skipping media checks"
+        return 0
+    fi
+
+    local chapters_dir="$APP_DIR/../chapters/src"
+    if [ ! -d "$chapters_dir" ]; then
+        log_warn "chapters/src not found at $chapters_dir — skipping media checks"
+        return 0
+    fi
+
+    # Build list: "<url> <chapter_id/filename>" lines into temp file
+    local tmp_list
+    tmp_list=$(mktemp)
+    local json_file chapter_id media_base filename
+
+    for json_file in $(find "$chapters_dir" -maxdepth 2 -name "c*.json" \
+                        | grep -E 'c[0-9]+/c[0-9]+\.json$' | sort); do
+        chapter_id=$(basename "$(dirname "$json_file")")
+        media_base="https://raw.githubusercontent.com/$owner/$repo/main/chapters/src/$chapter_id/media/"
+
+        # Extract thumbnailPath values (non-empty, ending in image extension)
+        grep -oE '"thumbnailPath"[[:space:]]*:[[:space:]]*"[^"]+"' "$json_file" \
+            | sed -E 's/.*"thumbnailPath"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
+            | grep -E '\.(png|jpg|jpeg|gif|webp|svg)$' \
+            | sort -u \
+            | while IFS= read -r fn; do
+                echo "${media_base}${fn} ${chapter_id}/${fn}"
+              done >> "$tmp_list"
+
+        # Extract imageUrl values (non-empty, ending in image extension)
+        grep -oE '"imageUrl"[[:space:]]*:[[:space:]]*"[^"]+"' "$json_file" \
+            | sed -E 's/.*"imageUrl"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
+            | grep -E '\.(png|jpg|jpeg|gif|webp|svg)$' \
+            | sort -u \
+            | while IFS= read -r fn; do
+                echo "${media_base}${fn} ${chapter_id}/${fn}"
+              done >> "$tmp_list"
+    done
+
+    # Deduplicate
+    sort -u "$tmp_list" -o "$tmp_list"
+
+    local total done_n fail_n
+    total=$(grep -c . "$tmp_list" 2>/dev/null || echo 0)
+
+    if [ "$total" -eq 0 ]; then
+        log_warn "No media file references found in chapter JSONs — skipping"
+        rm -f "$tmp_list"
+        return 0
+    fi
+
+    done_n=0
+    fail_n=0
+
+    while IFS=' ' read -r url label; do
+        done_n=$((done_n + 1))
+        printf "  [%d/%d] %s " "$done_n" "$total" "$label"
+        code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -I "$url" 2>/dev/null || echo "000")
+        if [ "$code" = "200" ]; then
+            printf "OK\n"
+        else
+            printf "MISSING (HTTP %s)\n" "$code"
+            log_error "  -> $url"
+            fail_n=$((fail_n + 1))
+        fi
+    done < "$tmp_list"
+
+    rm -f "$tmp_list"
+
+    if [ "$fail_n" -gt 0 ]; then
+        log_error "$fail_n/$total media files not found on GitHub."
+        log_error "Commit and push the missing files to chapters/src/<chapter>/media/ before building."
+        exit 1
+    fi
+
+    log_ok "All $total media files confirmed online ($owner/$repo)"
+}
+
 ensure_emsdk() {
     if command -v emcmake >/dev/null 2>&1 && command -v em++ >/dev/null 2>&1; then
         return 0
@@ -279,12 +484,14 @@ ensure_sdl3_wasm() {
 # =============================================================================
 
 build_native() {
+    validate_endpoints
     log_info "Build NATIVE mode -> $BUILD_NATIVE_DIR"
     # validate_sources (giả định hàm này đã được định nghĩa ở trên)
     ensure_sdl3_native
     ensure_nanosvg
     ensure_nlohmann # [cite: 23]
     ensure_sqlite   # FIX 2.6.1: SQLite for Stories DB
+    ensure_curl     # libcurl for native HTTP sync (manifest + API)
 
     # ... [Xử lý icon và SDL3_DIR giống như file gốc] ...
 
@@ -302,11 +509,25 @@ build_native() {
         fi
     done
 
+    # Build CMAKE_PREFIX_PATH (';'-separated CMake list).
+    # macOS Homebrew curl is keg-only; append its opt prefix when present
+    # so find_package(CURL) discovers it without env vars.
+    local prefix_list="$sdl_install"
+    if [ "$OS_NAME" = "macos" ]; then
+        for cand in /opt/homebrew/opt/curl /usr/local/opt/curl; do
+            if [ -d "$cand" ]; then
+                prefix_list="$prefix_list;$cand"
+                log_info "macOS brew-keg curl: $cand"
+                break
+            fi
+        done
+    fi
+
     mkdir -p "$BUILD_NATIVE_DIR"
     cmake -S "$APP_DIR" -B "$BUILD_NATIVE_DIR" \
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_WASM=OFF \
-          -DCMAKE_PREFIX_PATH="$sdl_install" \
+          -DCMAKE_PREFIX_PATH="$prefix_list" \
           -DNANOSVG_INCLUDE_DIR="$DOWNLOAD_DIR/nanosvg" \
           -DNLOHMANN_INCLUDE_DIR="$DOWNLOAD_DIR/nlohmann" \
           -DSQLITE_DIR="$DOWNLOAD_DIR/sqlite" \
@@ -314,17 +535,10 @@ build_native() {
           "${icon_arg[@]}" # [cite: 8, 9]
 
     cmake --build "$BUILD_NATIVE_DIR" -j
-
-    # [C.3] Copy gameConsole_board.json 
-    if [ -f "$APP_DIR/src/gameConsole/gameConsole_board.json" ]; then
-        cp "$APP_DIR/src/gameConsole/gameConsole_board.json" "$BUILD_NATIVE_DIR/"
-        log_ok "Copy gameConsole_board.json -> $BUILD_NATIVE_DIR/"
-    else
-        log_warn "Khong co gameConsole_board.json -- runtime se fall back hardcoded array"
-    fi
 }
 
 build_wasm() {
+    validate_endpoints
     log_info "Build WASM mode -> $BUILD_WASM_DIR"
     ensure_sdl3_native || true
     ensure_emsdk
