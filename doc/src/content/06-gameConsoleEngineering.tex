@@ -2,68 +2,22 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 \usepackage{docmute}
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
-\usepackage{enumitem}
-\usepackage{tabularx}
-\usepackage{amsmath}
+
 
 % ═══════════════════════════════════════════════════════
 % SDS Framework macros (embedded — no external file)
 % Lesson: DeclareRobustCommand + texorpdfstring; no tikz-uml
 % ═══════════════════════════════════════════════════════
-\definecolor{pillarBlue}{RGB}{30,90,160}
-\definecolor{versionGreen}{RGB}{20,130,80}
-\definecolor{versionAmber}{RGB}{190,120,10}
-\definecolor{versionRed}{RGB}{170,40,40}
-\definecolor{boxGray}{RGB}{240,242,245}
-
-\tikzset{
-  sdsBox/.style={rectangle,rounded corners=3pt,draw=#1,fill=boxGray,
-                 text width=3.0cm,align=center,minimum height=0.85cm,
-                 font=\small\bfseries},
-  sdsArrow/.style={-{Stealth[length=5pt]},thick,#1},
-  vTag/.style={rectangle,rounded corners=2pt,fill=#1,text=white,
-               font=\footnotesize\bfseries,inner sep=3pt},
-  layerBox/.style={rectangle,draw=pillarBlue!50,fill=pillarBlue!8,
-                   rounded corners=4pt,minimum width=9cm,
-                   minimum height=0.7cm,align=center,font=\small},
-}
-\newcommand{\PartPillars}{%
-  \vspace{4pt}%
-  {\color{pillarBlue}\rule{\linewidth}{1.5pt}}\\[2pt]%
-  {\large\bfseries\color{pillarBlue}PHẦN I \quad Trụ cột kỹ thuật (Technical Pillars)}\\[-2pt]%
-  {\color{pillarBlue}\rule{\linewidth}{0.4pt}}\vspace{2pt}}
-\newcommand{\PartVersions}{%
-  \vspace{10pt}%
-  {\color{versionGreen}\rule{\linewidth}{1.5pt}}\\[2pt]%
-  {\large\bfseries\color{versionGreen}PHẦN II \quad Lộ trình phiên bản (Versioned Development)}\\[-2pt]%
-  {\color{versionGreen}\rule{\linewidth}{0.4pt}}\vspace{2pt}}
-\DeclareRobustCommand{\vbadge}[2]{%
-  \tikz[baseline=-2pt]\node[vTag={#1}]{#2};~}
-\newcommand{\Vone}{\texorpdfstring{\vbadge{versionGreen}{V1}}{[V1]}}
-\newcommand{\Vtwo}{\texorpdfstring{\vbadge{versionAmber}{V2}}{[V2]}}
-\newcommand{\Vthree}{\texorpdfstring{\vbadge{versionRed}{V3}}{[V3]}}
-\newcommand{\ThreeLayerArch}[4]{%
-  \begin{center}\begin{tikzpicture}[node distance=0.35cm]
-    \node[layerBox,fill=pillarBlue!18,draw=pillarBlue](L1){#2};
-    \node[layerBox,fill=pillarBlue!8,draw=pillarBlue!40,below=of L1](L2){#3};
-    \node[layerBox,fill=gray!10,draw=gray!50,below=of L2](L3){#4};
-    \node[left=0.18cm of L3,font=\tiny\itshape,text=gray]{Data};
-  \end{tikzpicture}\end{center}}
-\newenvironment{VersionTable}{%
-  \vspace{4pt}\small
-  \begin{tabular}{@{}c p{3cm} p{3.5cm} p{3.5cm}@{}}
-  \hline
-  \rowcolor{pillarBlue!15}
-  \textbf{Ver}&\textbf{Mục tiêu}&\textbf{Công nghệ}&\textbf{Tích hợp}\\
-  \hline}{\hline\end{tabular}\vspace{4pt}}
-% ═══════════════════════════════════════════════════════
-
 \hypersetup{pdftitle={SDS - gameConsole Module}}
 
 \begin{document}
@@ -73,7 +27,7 @@
 
 \section{SDS --- Module \texttt{gameConsole}}
 
-\PartPillars
+\noindent\PartPillars
 
 % ─────────────────────────────────────────────────────────
 \subsection{Trách nhiệm \& Phạm vi}
@@ -94,10 +48,10 @@ giữa \texttt{main.cpp} và \texttt{runGameCore()}.
 \texttt{0} & QUIT click / window close &
   \texttt{break} --- thoát app \\
 \texttt{1} & PLAY click &
-  \texttt{runGameStory(cfg.storyId,cfg.chapterId)} $\rightarrow$
+  \texttt{runGameStory(cfg.storyId,}\allowbreak\texttt{cfg.chapterId)} $\rightarrow$
   \texttt{runGameCore(cfg)} \\
 \texttt{2} & Play btn trong Stories popup &
-  \texttt{runGameStory(cfg.storyId,cfg.chapterId)} $\rightarrow$
+  \texttt{runGameStory(cfg.storyId,}\allowbreak\texttt{cfg.chapterId)} $\rightarrow$
   \texttt{continue} về Console \\
 \texttt{3} & DB file không tồn tại / \texttt{shared\_data} rỗng &
   \texttt{runGameStory(0,0)} (init+sync) $\rightarrow$
@@ -109,7 +63,7 @@ giữa \texttt{main.cpp} và \texttt{runGameCore()}.
 \noindent\textbf{Quyền sở hữu DB:}
 
 \begin{center}\small
-\begin{tabular}{@{}l l l@{}}
+\begin{tabular}{@{}l p{6.0cm} p{4.5cm}@{}}
 \hline
 \textbf{Nhóm} & \textbf{Bảng} & \textbf{Quyền} \\
 \hline
@@ -239,26 +193,30 @@ kiểm soát render độc lập:
 \subsubsection{Smart Sort Router --- \texttt{applyBoardSort()}}
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
-  b/.style={sdsBox=pillarBlue!60,text width=2.5cm},
+  b/.style={sdsBox=pillarBlue!60,text width=3.4cm},
   dec/.style={diamond,draw=versionAmber!80,fill=versionAmber!8,
               aspect=2.6,align=center,font=\scriptsize},
   arr/.style={-{Stealth[length=4pt]},thick}
 ]
   \node[b](in) at (0,0) {BoardSortMode\\enum input};
-  \node[b,right=0.4cm of in](b1){build\\comparator\\lambda};
-  \node[b,right=0.4cm of b1](b2){\texttt{SortEngine}::\\\texttt{sort(arr, n,}\\cmp, CTX\_DEFAULT)};
-  \node[dec,right=0.4cm of b2](d0){$n \leq 64$?};
-  \node[b,above right=0.3cm and 0.4cm of d0](ins){Insertion\\Sort\\near-O(n)};
-  \node[b,below right=0.3cm and 0.4cm of d0](intro){IntroSort\\(Quick+Heap\\+Insertion)};
-  \node[b,right=2.8cm of d0](out){\texttt{boardScroll=0}\\log algo\\name};
+  \node[b,below=0.6cm of in](b1){build\\comparator\\lambda};
+  \node[b,below=0.6cm of b1](b2){\texttt{SortEngine}::\\\texttt{sort(arr, n,}\\cmp, CTX\_DEFAULT)};
+  \node[dec,below=0.6cm of b2](d0){$n \leq 64$?};
+  
+  \node[b,below left=0.6cm and 0.2cm of d0](ins){Insertion\\Sort\\near-O(n)};
+  \node[b,below right=0.6cm and 0.2cm of d0](intro){IntroSort\\(Quick+Heap\\+Insertion)};
+  
+  \node[b,below=2.6cm of d0](out){\texttt{boardScroll=0}\\log algo\\name};
   
   \foreach \x/\y in {in/b1,b1/b2,b2/d0}{\draw[arr](\x)--(\y);}
-  \draw[arr](d0)--node[above,font=\tiny]{yes}(ins);
-  \draw[arr](d0)--node[below,font=\tiny]{no}(intro);
-  \draw[arr](ins.east) -- ++(0.4,0) |- (out.west);
-  \draw[arr](intro.east) -- ++(0.4,0) |- (out.west);
+  \draw[arr] (d0.west) -| node[above, near start, font=\tiny]{yes} (ins.north);
+  \draw[arr] (d0.east) -| node[above, near start, font=\tiny]{no} (intro.north);
+  \draw[arr] (ins.south) |- (out.west);
+  \draw[arr] (intro.south) |- (out.east);
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \noindent Board leaderboard: $n = 30$--$50$ rows $\Rightarrow$ router selects
@@ -266,8 +224,6 @@ kiểm soát render độc lập:
 \texttt{SCORE\_DESC/ASC} compares \texttt{BoardEntry.score};
 \texttt{TIME\_DESC/ASC} compares \texttt{BoardEntry.timeEpoch} (Unix epoch UTC,
 \textbf{not} display string) for correct chronological ordering.
-
-\subsubsection{Story Unlock Cascade --- \texttt{dbCheckAndUnlockStories()}}
 
 \subsubsection{Story Unlock Cascade --- \texttt{dbCheckAndUnlockStories()}}
 
@@ -290,12 +246,12 @@ kiểm soát render độc lập:
   \node[skipbox, right=1.5cm of d0](d1){skip $\rightarrow$ next\\candidate};
   
   \node[dec] (d2) at (0,-7.8){already\\activated?};
-  % Căn lề tự động: Cách mép phải của d2 đúng 1.5cm
-  \node[skipbox, right=1.5cm of d2](d3){skip\\(idempotent)};
+  % Align d3 exactly below d1 for clean vertical paths
+  \node[skipbox] (d3) at (d2 -| d1) {skip\\(idempotent)};
   
   \node[proc](q3) at (0,-10.2){\texttt{INSERT \ldots ON CONFLICT DO UPDATE}\\ \texttt{isActivated=1}};
-  \node[proc](q4) at (0,-11.4){\texttt{unlocked++}};
-  \node[proc](q5) at (0,-12.6){after loop: \texttt{unlocked > 0}\\ $\rightarrow$ \texttt{dbSyncToPersistent()}};
+  \node[proc](q4) at (0,-11.8){\texttt{unlocked++}};
+  \node[proc](q5) at (0,-13.4){after loop: \texttt{unlocked > 0}\\ $\rightarrow$ \texttt{dbSyncToPersistent()}};
 
   % --- NỐI CÁC KHỐI TRỤC DỌC ---
   \draw[arr](q0)--(q1); \draw[arr](q1)--(q2); \draw[arr](q2)--(d0);
@@ -305,10 +261,9 @@ kiểm soát render độc lập:
   \draw[arr](d2)--node[left,font=\footnotesize]{no}(q3);
   \draw[arr](q3)--(q4); \draw[arr](q4)--(q5);
 
-  % --- NỐI CÁC KHỐI SKIP VÒNG NGƯỢC LÊN Q1 ---
-  % ++(0.5,0) và ++(1.0,0) tạo ra 2 đường song song không đè lên nhau
-  \draw[arr,gray,dashed](d1.east) -- ++(0.5,0) |- node[pos=0.25,right,font=\footnotesize]{next ch} (q1.east);
-  \draw[arr,gray,dashed](d3.east) -- ++(1.0,0) |- node[pos=0.25,right,font=\footnotesize]{next ch} (q1.east);
+ % --- NỐI CÁC KHỐI SKIP VÒNG NGƯỢC LÊN Q1 ---
+  \draw[arr,gray,dashed](d1.east) -- ++(0.6,0) |- node[pos=0.25,right,font=\footnotesize]{next ch} (q1.east);
+  \draw[arr,gray,dashed](d3.east) -- ++(1.4,0) |- node[pos=0.25,right,font=\footnotesize]{next ch} (q1.east);
 \end{tikzpicture}
 \end{center}
 
@@ -326,7 +281,7 @@ kiểm soát render độc lập:
 \noindent\textbf{Event $\rightarrow$ action mapping:}
 
 \begin{center}\small
-\begin{tabular}{@{}l l l@{}}
+\begin{tabular}{@{}p{4.2cm} p{2.5cm} p{6.0cm}@{}}
 \hline
 \textbf{SDL Event} & \textbf{Hit zone} & \textbf{Action} \\
 \hline
@@ -342,7 +297,7 @@ kiểm soát render độc lập:
   \texttt{ratio = (my - dragOffsetY - track.y) / (track.h - thumbH)};
   \texttt{scrollPos = ratio * (total - visible)} \\
 \texttt{MOUSE\_BUTTON\_UP} & any &
-  reset: \texttt{upHeld=downHeld=dragging=false} \\
+  reset: \texttt{upHeld=}\allowbreak\texttt{downHeld=}\allowbreak\texttt{dragging=false} \\
 \texttt{MOUSE\_WHEEL} & popup open &
   \texttt{scrollPos -= wheel.y} \\
 \hline
@@ -381,176 +336,153 @@ passed directly to \texttt{runGameCore()} via the shared \texttt{SettingsConfig\
 % ─────────────────────────────────────────────────────────
 \subsection{Cấu trúc dữ liệu}
 
-\subsubsection{C++ Structs}
-
-\begin{verbatim}
-// gameConsole_layout.h — cross-module contract
-struct SettingsConfig {
-    float       volume          = 0.5f;
-    bool        colorEnabled[7] = {true,...,true};
-    int         storyId         = 0;
-    int         chapterId       = 0;
-    // runtime-only (not persisted in Settings):
-    int         nextBlockScore  = 0;
-    float       nextBlockSpeed  = 0.0f;
-    std::string tableMatrix     = "";
-};
-
-// app.cpp internal
-enum BoardSortMode { BOARD_SORT_SCORE_DESC=0, BOARD_SORT_SCORE_ASC,
-                     BOARD_SORT_TIME_DESC, BOARD_SORT_TIME_ASC };
-struct BoardEntry  { std::string user; int score;
-                     std::string time;      // display "MM-DD HH:MM"
-                     int64_t     timeEpoch; // Unix epoch UTC for sort };
-struct AppState {
-    bool           showGuide=false, showBoard=false,
-                   showSettings=false, showStories=false,
-                   wasmShutdown=false, isRunning=true;
-    int            nextScene=0, boardScroll=0, guideScroll=0;
-    int            focusIndex=0;
-    BoardSortMode  boardSortMode=BOARD_SORT_SCORE_DESC;
-    SBInteraction  sb;
-    SettingsConfig* cfg=nullptr;   // borrowed ptr — NOT owned
-    bool           draggingVolume=false;
-    // Stories:
-    std::vector<StoryRow> storiesCache;
-    int storiesCacheChapter=-1, storiesMaxChapter=1, currentStoryChapter=1;
-};
-struct SvgTexture { SDL_Texture* texture=nullptr; int w=0, h=0; };
-struct SBLayout   { SDL_FRect upBtn, track, downBtn, thumb; };
-struct SBInteraction { bool upHeld=false, downHeld=false, dragging=false;
-                       float dragOffsetY=0.0f;
-                       Uint32 lastAutoScroll=0, nextAutoStart=0; };
-\end{verbatim}
-
-\subsubsection{SQLite ERD --- \texttt{default.sqlite} (8 bảng, 3 nhóm)}
+\subsubsection{Class Diagrams}
 
 \begin{center}
-% Lesson: define \pk locally to avoid redefinition clash
-\newcommand{\pk}[1]{\underline{#1}}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
-  g1/.style={rectangle,draw=pillarBlue,fill=pillarBlue!7,rounded corners=2pt,
-             align=left,font=\scriptsize,inner sep=4pt,minimum width=3.5cm},
-  g2/.style={rectangle,draw=gray!55,fill=gray!6,rounded corners=2pt,
-             align=left,font=\scriptsize,inner sep=4pt,minimum width=3.5cm},
-  g3/.style={rectangle,draw=versionAmber,fill=versionAmber!8,rounded corners=2pt,
-             align=left,font=\scriptsize,inner sep=4pt,minimum width=3.5cm},
-  rel/.style={-{Stealth[length=4pt]},thick,pillarBlue!70},
-  g2rel/.style={-{Stealth[length=4pt]},thick,gray!60},
-  lbl/.style={font=\tiny,fill=white,inner sep=1pt}
+  class/.style={rectangle, draw=pillarBlue, fill=pillarBlue!6, rounded corners=2pt,
+                align=left, font=\scriptsize\ttfamily, inner sep=4pt},
+  enum/.style={rectangle, draw=versionGreen, fill=versionGreen!6, rounded corners=2pt,
+               align=left, font=\scriptsize\ttfamily, inner sep=4pt}
 ]
-  % ── Group 1 (left column) ──
-  \node[g1](rec) at (0,0) {
-    \textbf{default\_Records}\ \textit{\tiny(R/W)}\\[1pt]
-    % (omitted)
-    avgSpeed\ \texttt{REAL},\ retryNo
-  };
-  \node[g1,below=0.4cm of rec](sto) {
-    \textbf{default\_Stories}\ \textit{\tiny(R/W)}\\[1pt]
-    % (omitted)
-    lastMaxSpeed\ \texttt{REAL}
-  };
-  \node[g1,below=0.4cm of sto](set) {
-    \textbf{default\_Settings}\ \textit{\tiny(R/W)}\\[1pt]
-    % (omitted)
-    \textit{\tiny storyId, chapterId}
-  };
-  % ── Group 2 (centre column) ──
-  \node[g2](sd) at (5.6,0) {
-    \textbf{shared\_data}\ \textit{\tiny(R gameConsole)}\\[1pt]
-    % (omitted)
-    tableMatrix,\ thumbnailPath
-  };
-  \node[g2,below=0.4cm of sd](sdlg) {
-    \textbf{shared\_dialogues}\ \textit{\tiny(R gameStory)}\\[1pt]
-    % (omitted)
-    nextNodeId,\ hasChoices
-  };
-  \node[g2,below=0.4cm of sdlg](scho) {
-    \textbf{shared\_choices}\ \textit{\tiny(R gameStory)}\\[1pt]
-    % (omitted)
-    label,\ nextNodeId
-  };
-  \node[g2,below=0.4cm of scho](smet) {
-    \textbf{shared\_meta}\ \textit{\tiny(R gameConsole)}\\[1pt]
-    % (omitted)
-    media\_base\_url
-  };
-  % ── Group 3 (right column) ──
-  \node[g3](sync) at (11.2,0) {
-    \textbf{sync\_Records}\ \textit{\tiny(Cloudflare D1)}\\[1pt]
-    % (omitted)
-    \textit{\tiny seed: 30 rows from FALLBACK}
-  };
-  % ── relationships ──
-  \draw[rel](sd.west)to[bend right=8]
-      node[lbl,pos=0.35]{1}node[lbl,pos=0.8]{N}(sto.east);
-  \draw[rel](sd.west)to[bend right=20]
-      node[lbl,pos=0.3]{1}node[lbl,pos=0.78]{N}(rec.east);
-  \draw[g2rel](sd.south)--node[lbl,right]{1}node[lbl,pos=0.85]{N}(sdlg.north);
-  \draw[g2rel](sdlg.south)--node[lbl,right]{1}node[lbl,pos=0.85]{N}(scho.north);
-  \draw[g2rel,dashed](sd.south)to[bend left=10]
-      node[lbl,left,pos=0.4]{logical}(smet.north);
-  % sync_Records feeds Board display (no FK — data sink)
-  \draw[-{Stealth[length=4pt]},thick,versionAmber!70,dashed]
-      (sync.south)--++(0,-0.7)
-      node[above,font=\tiny,align=center]
-      {Board popup: \texttt{SELECT} ORDER BY score/endTS};
-  % group labels
-  \node[font=\scriptsize\bfseries,pillarBlue] at (0,-5.6)
-      {Group 1 --- Per-user R/W};
-  \node[font=\scriptsize\bfseries,gray!60] at (5.6,-7.4)
-      {Group 2 --- Shared (schema owner: gameConsole)};
-  \node[font=\scriptsize\bfseries,versionAmber] at (11.2,-2.2)
-      {Group 3 --- D1 sink};
-\end{tikzpicture}
-\end{center}
 
-\subsubsection{Dataflow Diagram --- Console Main Loop}
+  % gameConsole_layout.h
+  \node[class, anchor=north] (sc) at (0,0) {
+    \textbf{SettingsConfig}\\[2pt]
+    \color{gray}\rule{3.8cm}{0.4pt}\\[2pt]
+    + volume: float\\
+    + colorEnabled[7]: bool\\
+    + storyId: int\\
+    + chapterId: int\\
+    + nextBlockScore: int\\
+    + nextBlockSpeed: float\\
+    + tableMatrix: string
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (sc.north west) {gameConsole\_layout.h};
 
-\begin{center}
-\begin{tikzpicture}[
-  proc/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=2pt,
-               minimum width=2.5cm,minimum height=0.6cm,align=center,font=\scriptsize},
-  store/.style={cylinder,draw=gray!60,fill=gray!10,shape border rotate=90,
-                minimum width=2.2cm,minimum height=0.55cm,align=center,font=\scriptsize},
-  extio/.style={ellipse,draw=gray!50,fill=gray!6,minimum width=1.8cm,
-                minimum height=0.5cm,align=center,font=\scriptsize},
-  fl/.style={-{Stealth[length=4pt]},thick},
-  dfl/.style={-{Stealth[length=4pt]},dashed,gray!60}
-]
-  % external actors
-  \node[extio](ev)    at (0,5.5)   {SDL\\Events};
-  \node[extio](main2) at (0,0)     {\texttt{main.cpp}};
-  % processes
-  \node[proc](router) at (3.5,5.5) {Event\\Router};
-  \node[proc](flags)  at (3.5,3.8) {AppState\\flag update};
-  \node[proc](dblay)  at (7.0,5.5) {DBLayer\\CRUD};
-  \node[proc](sort2)  at (7.0,3.8) {SortEngine\\applyBoardSort};
-  \node[proc](rend2)  at (3.5,1.8) {Screen\\Renderer};
-  \node[proc](audio)  at (7.0,1.8) {AudioStream\\gain update};
-  \node[extio](ret)   at (3.5,0)   {return\\0/1/2/3};
-  % stores
-  \node[store](sett2) at (10.5,5.5){default\\\_Settings};
-  \node[store](sdat2) at (10.5,3.8){shared\\\_data\\(stories list)};
-  \node[store](srec)  at (10.5,1.8){sync\\\_Records\\(board data)};
-  % flows
-  \draw[fl](ev)--node[above,font=\tiny]{key/mouse}(router);
-  \draw[fl](router)--node[left,font=\tiny,align=center]{popup\\flags}(flags);
-  \draw[fl](router)--node[above,font=\tiny]{CRUD call}(dblay);
-  \draw[fl](dblay)--node[above,font=\tiny]{R/W}(sett2);
-  \draw[dfl](dblay.south)--node[right,font=\tiny]{R stories}(sdat2);
-  \draw[dfl](dblay.south)to[bend right=5]
-      node[right,font=\tiny]{R board}(srec);
-  \draw[fl](dblay.south)to[bend left=8]
-      node[left,font=\tiny]{sort trigger}(sort2);
-  \draw[fl](sort2)--node[right,font=\tiny,align=center]{sorted\\g\_board[]}(flags.east);
-  \draw[fl](flags)--node[left,font=\tiny,align=center]{render\\state}(rend2);
-  \draw[fl](flags.east)to[bend right=12]
-      node[below right,font=\tiny]{vol}(audio.north);
-  \draw[fl](rend2)--node[above,font=\tiny]{SDL\_RenderPresent}(ret);
-  \draw[fl](ret)--node[right,font=\tiny]{nextScene}(main2);
+  % gameConsole_db.h
+  \node[class, anchor=north] (sr) at (4.8,0) {
+    \textbf{StoryRow}\\[2pt]
+    \color{gray}\rule{3.8cm}{0.4pt}\\[2pt]
+    + idStory: int\\
+    + storyName: string\\
+    + idChapter: int\\
+    + chapterName: string\\
+    + minScore: int\\
+    + minSpeed: float\\
+    + minRetries: int\\
+    + requiredStories: string\\
+    + thumbnailPath: string\\
+    + isActivated: int\\
+    + isSelected: int\\
+    + lastMaxScore: int\\
+    + lastMaxSpeed: float\\
+    + lastTotalRetries: int
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (sr.north west) {gameConsole\_db.h};
+
+  % app.cpp internal
+  \node[class, anchor=north] (as) at (10.0,0) {
+    \textbf{AppState}\\[2pt]
+    \color{gray}\rule{4.5cm}{0.4pt}\\[2pt]
+    + showGuide, showBoard: bool\\
+    + showSettings, showStories: bool\\
+    + wasmShutdown, isRunning: bool\\
+    + nextScene, focusIndex: int\\
+    + boardScroll, guideScroll: int\\
+    + boardSortMode: BoardSortMode\\
+    + sb: SBInteraction\\
+    + cfg: SettingsConfig*\\
+    + draggingVolume: bool\\
+    + storiesCache: vector<StoryRow>\\
+    + storiesCacheChapter: int\\
+    + storiesMaxChapter: int\\
+    + currentStoryChapter: int
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (as.north west) {app.cpp (internal)};
+
+  \node[class, anchor=north] (be) at (0,-5.5) {
+    \textbf{BoardEntry}\\[2pt]
+    \color{gray}\rule{3.8cm}{0.4pt}\\[2pt]
+    + user: string\\
+    + score: int\\
+    + time: string\\
+    + timeEpoch: int64\_t
+  };
+
+  \node[class, anchor=north] (st) at (0,-8.5) {
+    \textbf{SvgTexture}\\[2pt]
+    \color{gray}\rule{3.8cm}{0.4pt}\\[2pt]
+    + texture: SDL\_Texture*\\
+    + w, h: int
+  };
+
+  \node[class, anchor=north] (sbi) at (4.8,-8.0) {
+    \textbf{SBInteraction}\\[2pt]
+    \color{gray}\rule{3.8cm}{0.4pt}\\[2pt]
+    + upHeld, downHeld: bool\\
+    + dragging: bool\\
+    + dragOffsetY: float\\
+    + lastAutoScroll: Uint32\\
+    + nextAutoStart: Uint32
+  };
+
+  \node[class, anchor=north] (sbl) at (4.8,-11.5) {
+    \textbf{SBLayout}\\[2pt]
+    \color{gray}\rule{3.8cm}{0.4pt}\\[2pt]
+    + upBtn, track: SDL\_FRect\\
+    + downBtn, thumb: SDL\_FRect
+  };
+
+  \node[enum, anchor=north] (bsm) at (10.0,-8.0) {
+    \textbf{\guillemotleft enum\guillemotright~BoardSortMode}\\[2pt]
+    \color{gray}\rule{4.5cm}{0.4pt}\\[2pt]
+    BOARD\_SORT\_SCORE\_DESC\\
+    BOARD\_SORT\_SCORE\_ASC\\
+    BOARD\_SORT\_TIME\_DESC\\
+    BOARD\_SORT\_TIME\_ASC
+  };
+
+  % Relations
+  \draw[-{Stealth[length=4pt]}, thick, dashed, gray] (as.south) -- (bsm.north);
+  \draw[-{Stealth[length=4pt]}, thick, dashed, gray] (as.west) -- (sr.east);
+
+  % Center short breaking line
+  \draw[thick, dashed, gray!50] (2.8, -14.5) -- (6.8, -14.5);
+
+  % logger.h (shared)
+  \node[class, fill=versionAmber!6, draw=versionAmber, anchor=north] (logger) at (1.5, -15.5) {
+    \textbf{\guillemotleft Singleton\guillemotright~Logger}\\[2pt]
+    \color{gray}\rule{4.8cm}{0.4pt}\\[2pt]
+    - file\_: ofstream\\
+    - mutex\_: mutex\\[2pt]
+    \color{gray}\rule{4.8cm}{0.4pt}\\[2pt]
+    \underline{+ getInstance(): Logger\&}\\
+    + log(fmt: char*, ...)\\
+    + logAudio(fmt: char*, ...)\\
+    + logEvent(module: char*, fmt: char*, ...)\\
+    + logError(fmt: char*, ...)\\
+    + flush()\\
+    + close()
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (logger.north west) {logger.h (shared)};
+
+  % ctetris_debug.h (shared)
+  \node[class, fill=gray!8, draw=gray, anchor=north] (ctdbg) at (8.0, -15.5) {
+    \textbf{\guillemotleft Macros\guillemotright~CTETRIS\_DEBUG}\\[2pt]
+    \color{gray}\rule{4.8cm}{0.4pt}\\[2pt]
+    + CTDBG\_INIT()\\
+    + CTDBG\_REQ(method, url)\\
+    + CTDBG\_RES(method, url, status, len)\\
+    + CTDBG\_BODY(bodyStr)\\
+    + CTDBG\_ERR(msg)\\
+    + CTDBG\_INFO(key, val)
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (ctdbg.north west) {ctetris\_debug.h (shared)};
+
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \subsubsection{Sequence Diagram --- PLAY path \& STORIES path}
@@ -650,47 +582,70 @@ nanosvg / nanosvgrast & always & SVG background rasterize; impl in
                                   \texttt{nanosvg\_impl.cpp} \\
 \texttt{gameConsole\_sort.h} & header-only & Smart Sort Engine v2.0 (7 algos) \\
 Emscripten IDBFS  & \texttt{\#ifdef \_\_EMSCRIPTEN\_\_} &
-  \texttt{idbfs\_mount\_dir}, \texttt{load/save\_from\_idb};
+  \texttt{idbfs\_mount\_dir}, \texttt{background SYNC job\_from\_idb};
   Asyncify (\texttt{-sASYNCIFY=1}) \\
 libcurl           & V3 (native) & Cloudflare D1 REST push/pull \\
 emscripten\_fetch & V3 (WASM)   & Cloudflare D1 REST (WASM path) \\
 \hline
 \end{tabularx}
 
-\PartVersions
+\noindent\PartVersions
 
 \begin{VersionTable}
-\Vone & Flag-based UI shell; SVG background; scrollbar; BUILD\_STANDALONE
+\Vone & Flag-based UI shell;
+      SVG background; scrollbar; BUILD\_\-STANDALONE
       & SDL3, nanosvg
-      & Feeds \texttt{SettingsConfig} to \texttt{runGameCore()} \\
-\Vtwo & SQLite 8-table schema; SettingsConfig persist; Smart Sort;
+      & Feeds \texttt{SettingsConfig} to \texttt{runGameCore()} \\ \hline
+\Vtwo & SQLite 8-table schema;
+        SettingsConfig persist; Smart Sort;
         Stories popup; IDBFS WASM
       & sqlite3, nlohmann/json, emscripten IDBFS
-      & Shared DB with gameStory (shared\_*); gameCore writes
-        \texttt{default\_Records} \\
-\Vthree & Cloudflare D1 leaderboard sync; OTP auth; \texttt{d1\_users}
+      & Shared DB with gameStory (shared\_*);
+        gameCore writes
+        \texttt{default\_Records} \\ \hline
+\Vthree & Cloudflare D1 leaderboard sync; SSO auth;
+        \texttt{d1\_users}
         & libcurl / emscripten\_fetch, Cloudflare Worker
-        & D1 Worker syncs \texttt{sync\_Records}; LOAD/SAVE via OTP \\
+        & D1 Worker syncs \texttt{sync\_Records};
+        background SYNC job after SSO \\
 \end{VersionTable}
 
 % ─────────────────────────────────────────────────────────
 \subsection{\Vone\ --- Static UI Shell}
 
-\textbf{Mục tiêu:} 6 nút điều hướng, SVG background lazy-init, scrollbar
+\textbf{Mục tiêu:} nút điều hướng, SVG background lazy-init, scrollbar
 tương tác, \texttt{BUILD\_STANDALONE}.
 
 \noindent\textbf{Screen layout pixel-map (270×480):}
 
 \begin{center}
 \begin{tikzpicture}[x=0.72pt,y=0.72pt,every node/.style={font=\tiny}]
+  % Canvas outline
   \draw[thick](0,0) rectangle (270,480);
-  % title band
-  \fill[pillarBlue!15](0,440) rectangle (270,480);
-  \draw[pillarBlue!40](0,440)--(270,440);
-  \node at (135,460){\textbf{C T E T R I S -- GAME CONSOLE} (y=440..480)};
-  % 6 buttons  y-coords inverted: display y0=130 $\rightarrow$ canvas y = 480-130-30=320
-  % (omitted)
-  \node[gray] at (258,6){y=480};
+  
+  % Y-axis labels (SDL coordinates: y=0 is top)
+  \node[gray, left] at (270,470) {y=0};
+  \node[gray, left] at (270,10) {y=480};
+  
+  % Title Area
+  \node[font=\footnotesize\bfseries] at (135,420) {C T E T R I S};
+  \node at (135,390) {-- GAME CONSOLE --};
+  
+  % 6 Buttons mapped dynamically from top-down coords
+  \foreach \ySDL/\lbl in {130/GUIDE, 170/BOARD, 210/PLAY, 250/STORIES, 290/SETTINGS, 330/QUIT} {
+      \pgfmathsetmacro{\yBot}{480 - \ySDL - 30}
+      \pgfmathsetmacro{\yTop}{480 - \ySDL}
+      \fill[pillarBlue!10] (65, \yBot) rectangle (205, \yTop);
+      \draw[pillarBlue!50] (65, \yBot) rectangle (205, \yTop);
+      \node at (135, \yBot + 15) {\textbf{\lbl}};
+      \node[gray, left] at (60, \yBot + 15) {y=\ySDL};
+  }
+  
+  % Bottom Hint Text
+  \node[anchor=west, gray, align=left] at (10, 100) {TAB/DOWN/LEFT(S/A): next};
+  \node[anchor=west, gray, align=left] at (10, 85) {SHIFT+TAB/UP/RIGHT(W/D):prev};
+  \node[anchor=west, gray, align=left] at (10, 70) {ENTER/SPACE: select};
+  \node[anchor=west, gray, align=left] at (10, 55) {ESC: close / cancel};
 \end{tikzpicture}
 \end{center}
 
@@ -727,16 +682,17 @@ Range clamp on load: \texttt{volume} $\in [0,1]$.
 from Stories popup row data.
 
 \noindent\textbf{Stories popup 3-state row classification:}
+
 \begin{center}\small
-\begin{tabular}{@{}l l l@{}}
+\begin{tabular}{@{}l p{6.5cm} p{5.5cm}@{}}
 \hline
 \textbf{State} & \textbf{Condition} & \textbf{Visual} \\
 \hline
 LOCKED    & \texttt{isActivated == false}
           & dim bg, dim radio, no Play btn, muted text \\
-ACTIVE    & \texttt{isActivated \&\& totalRetries==0 \&\& lastMaxScore==0}
+ACTIVE    & \texttt{isActivated \&\& totalRetries==0} \allowbreak \texttt{\&\& lastMaxScore==0}
           & normal row, white radio, green Play btn \\
-COMPLETED & \texttt{isActivated \&\& (totalRetries>0 || lastMaxScore>0)}
+COMPLETED & \texttt{isActivated \&\& (totalRetries>0} \allowbreak \texttt{|| lastMaxScore>0)}
           & green-tint bg, filled radio, green text \\
 \hline
 \end{tabular}
@@ -756,10 +712,10 @@ Native: \texttt{dbSyncToPersistent()} is a compile-time no-op.
 \end{itemize}
 
 % ─────────────────────────────────────────────────────────
-\subsection{\Vthree\ --- Cloudflare D1 + OTP Auth}
+\subsection{\Vthree\ --- Cloudflare D1 + SSO Auth}
 
-\textbf{Mục tiêu:} \texttt{sync\_Records} pushed to D1 after game-over;
-global leaderboard pulled by Board popup; LOAD/SAVE via OTP
+\textbf{Mục tiêu:} \texttt{sync\_Records} pushed to D1 after syncing;
+global leaderboard pulled by Board popup; background SYNC job after SSO
 (\texttt{d1\_users}).
 
 \noindent\textbf{Cloudflare Worker API (D1 path):}
@@ -767,9 +723,8 @@ global leaderboard pulled by Board popup; LOAD/SAVE via OTP
   \item \textbf{Push}: \texttt{POST /api/records} JSON
 \end{itemize}
 
-\noindent\textbf{OTP auth flow (LOAD/SAVE Settings button):}
-User enters email $\rightarrow$ Worker sends OTP $\rightarrow$ user enters
-code $\rightarrow$ Worker validates $\rightarrow$ returns JWT $\rightarrow$
+\noindent\textbf{SSO auth flow (background SYNC job of Sync button):}
+User enters email $\rightarrow$ Worker request SSO $\rightarrow$ user agree SSO's policy $\rightarrow$ Worker validates $\rightarrow$ returns JWT $\rightarrow$
 \texttt{default.sqlite} upload/download to \texttt{d1\_users}.
 
 \noindent\textbf{I/O validation:}
@@ -779,3 +734,6 @@ code $\rightarrow$ Worker validates $\rightarrow$ returns JWT $\rightarrow$
 
 \label{LastPageGameConsoleEngineering}
 \end{document}
+
+
+

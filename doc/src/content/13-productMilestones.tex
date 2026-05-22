@@ -2,26 +2,16 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 \usepackage{docmute}
-\usepackage{tabularx}
-\usepackage{enumitem}
-\usepackage{booktabs}
-\usepackage{multirow}
-\usepackage{colortbl}
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric,arrows.meta,positioning,calc,fit,backgrounds}
-
-\definecolor{v1green}{RGB}{20,130,80}
-\definecolor{v2amber}{RGB}{190,120,10}
-\definecolor{v3red}{RGB}{170,40,40}
-\definecolor{storyBlue}{RGB}{30,90,200}
-\definecolor{consoleOrange}{RGB}{200,100,20}
-\definecolor{coreViolet}{RGB}{100,30,160}
-\definecolor{headerGray}{RGB}{60,60,60}
-\definecolor{rowLight}{RGB}{245,247,250}
 
 \hypersetup{pdftitle={WBS \& Effort Estimation -- cTetris Project}}
 
@@ -574,3 +564,6 @@ Version-driven roadmap minh bạch tiến trình; Phase-driven process kiểm so
 
 \label{LastPageProjectEffortEstimation}
 \end{document}
+
+
+

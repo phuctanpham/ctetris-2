@@ -2,48 +2,18 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 \usepackage{docmute}
-\usepackage{tabularx}
-\usepackage{multirow}
-\usepackage{tikz}
-\usetikzlibrary{positioning,calc}
-\usepackage{xcolor}
-\usepackage{enumitem}
-\usepackage{booktabs}
-\usepackage{graphicx}
-\usepackage{array}
-
-% Define a left-aligned, wrappable X column to prevent overfull \hbox in tables
-\newcolumntype{L}{>{\raggedright\arraybackslash}X}
 
 \hypersetup{pdftitle={Sơ đồ Gantt dự án cTetris}}
-
-% ── Phase colors ─────────────────────────────────────────────────
-\definecolor{pConceptualize}{RGB}{120,120,120}
-\definecolor{pDesign}{RGB}{70,140,210}
-\definecolor{pImpl}{RGB}{30,90,190}
-\definecolor{pTest}{RGB}{210,155,0}
-\definecolor{pInteg}{RGB}{50,160,70}
-\definecolor{pFix}{RGB}{200,80,40}
-\definecolor{pDeploy}{RGB}{100,190,120}
-\definecolor{v1green}{RGB}{20,130,80}
-\definecolor{v2amber}{RGB}{190,120,10}
-\definecolor{v3red}{RGB}{170,40,40}
-\definecolor{headerGray}{RGB}{60,60,60}
-\definecolor{rowLight}{RGB}{245,247,250}
-
-% ── Lightweight Gantt bar macro ───────────────────────────────────
-% \gbar{color}{start}{end}{totalweeks}{barwidth_cm}{y}
-\newcommand{\gbar}[6]{%
-  \fill[#1!75, draw=#1, rounded corners=1.5pt]
-    ({(#2-1)/#4*#5}, #6) rectangle ({#3/#4*#5}, {#6+0.35});
-}
-
-\newcommand{\totalW}{13.5}
-\newcommand{\totalWks}{14}
 
 \begin{document}
 \providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
@@ -453,3 +423,6 @@ Design + Implement V3 & W11--W13 & $\sim$27.5 & Cloudflare API, OTP, media cache
 
 \label{LastPageProjectGanttChart}
 \end{document}
+
+
+

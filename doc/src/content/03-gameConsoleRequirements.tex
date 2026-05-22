@@ -2,14 +2,16 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 \usepackage{docmute}
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, trees}
-\usepackage{tabularx}
-\usepackage{enumitem}
 
 \hypersetup{pdftitle={Software Requirements Specification (SRS) - gameConsole Module}}
 
@@ -27,7 +29,7 @@ Phân hệ \textbf{gameConsole} đóng vai trò là Trung tâm điều phối (H
 
 \subsubsection{Kiến trúc Cơ sở dữ liệu (SQLite --- 3 nhóm bảng)}
 \textit{ERD đầy đủ với DDL-level precision (8 bảng, tên thực
-\texttt{default\_Records}/\texttt{default\_Stories}/\texttt{default\_Settings},
+\texttt{default\_Records}/\allowbreak\texttt{default\_Stories}/\allowbreak\texttt{default\_Settings},
 foreign-key relationships, 3 ownership groups) được đặc tả trong
 \textbf{SDS §06-gameConsoleEngineering, mục 2.4}.}
 
@@ -220,7 +222,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 \begin{tikzpicture}[
     every node/.style={font=\scriptsize},
     tbl/.style={rectangle, draw=black, fill=white, thick,
-                text width=4.8cm, align=left, inner sep=4pt},
+                text width=4.0cm, align=left, inner sep=4pt},
     grp/.style={rectangle, draw=gray, dashed, rounded corners,
                 fill=gray!5, inner sep=6pt},
     arrow/.style={-{Stealth[scale=1.0]}, thick}
@@ -239,7 +241,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 \node[tbl, below=0.3cm of rec] (stor) {
     \textbf{default\_Stories} (Group 1)\\
     \rule{\linewidth}{0.4pt}\\
-    PK(\texttt{idUser, idStory, idChapter})\\
+    PK(\texttt{idUser, idStory,}\allowbreak\texttt{idChapter})\\
     \texttt{isActivated / isSelected} INT\\
     \texttt{totalRetries / lastMaxScore}\\
     \texttt{lastMaxSpeed} REAL
@@ -251,21 +253,21 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \texttt{value} TEXT
 };
 % Group 2
-\node[tbl, right=1.6cm of rec] (sd) {
+\node[tbl, right=0.6cm of rec] (sd) {
     \textbf{shared\_data} (Group 2)\\
     \rule{\linewidth}{0.4pt}\\
     PK(\texttt{idStory, idChapter})\\
     \texttt{storyName / chapterName}\\
-    \texttt{minScore / minSpeed / minRetries}\\
+    \texttt{minScore/Speed/Retries}\\
     \texttt{requiredStories} TEXT (CSV)\\
-    \texttt{nextBlockScore / nextBlockSpeed}\\
+    \texttt{nextBlockScore/Speed}\\
     \texttt{tableMatrix / xmlDialogue}\\
     \texttt{thumbnailPath}
 };
 \node[tbl, below=0.3cm of sd] (sdlg) {
     \textbf{shared\_dialogues} (Group 2)\\
     \rule{\linewidth}{0.4pt}\\
-    UNIQUE(\texttt{idStory, idChapter, nodeId})\\
+    UNIQUE(\texttt{idStory,}\allowbreak\texttt{idChapter, nodeId})\\
     \texttt{speaker / text / imageUrl}\\
     \texttt{nextNodeId / hasChoices}
 };
@@ -277,22 +279,21 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \texttt{media\_base\_url}
 };
 % Group 3
-\node[tbl, right=1.6cm of sd] (sync) {
+\node[tbl, right=0.6cm of sd] (sync) {
     \textbf{sync\_Records} (Group 3)\\
     \rule{\linewidth}{0.4pt}\\
     \textit{Cloudflare D1 1-way sync}\\
     \texttt{nameUser / totalScore}\\
     \texttt{totalSeconds / avgSpeed}\\
-    \texttt{endTS / idStory / idChapter}\\
-    \textit{seed: 30 rows từ FALLBACK\_BOARD\_ROWS}
+    \texttt{endTS/idStory/idChapter}\\
+    \textit{seed: 30 rows fallback}
 };
 % Group boxes
 \begin{scope}[on background layer]
-    \node[grp, fit=(rec)(stor)(sett), label=above:{\small\bfseries Group 1 — Per-user R/W}] {};
-    \node[grp, fit=(sd)(sdlg)(smet), label=above:{\small\bfseries Group 2 — Shared Catalogue (read-only)}] {};
-    \node[grp, fit=(sync), label=above:{\small\bfseries Group 3 — Cloudflare D1 Sync}] {};
+    \node[grp, fit=(rec)(stor)(sett), label=above:{\scriptsize\bfseries Group 1 — Per-user R/W}] {};
+    \node[grp, fit=(sd)(sdlg)(smet), label=above:{\scriptsize\bfseries Group 2 — Shared Catalogue (read-only)}] {};
+    \node[grp, fit=(sync), label=above:{\scriptsize\bfseries Group 3 — Cloudflare D1 Sync}] {};
 \end{scope}
-
 % FK arrows
 \draw[arrow, blue!60] (stor.east) -- ++(0.3,0) |-
     node[pos=0.25, right, font=\tiny]{LEFT JOIN} (sd.west);
@@ -473,16 +474,6 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \hline
 \end{tabularx}
 
-\IfFileExists{03-gameConsoleRequirements-v2-screenshot.png}{
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.55\textwidth]{03-gameConsoleRequirements-v2-screenshot}
-    \\[6pt]
-    \textit{\small Hình V2.1: Màn hình gameConsole V2 — 6 nút, SVG background, popup Settings với volume slider và color swatches.}
-\end{figure}
-}{
-\begin{center}\framebox[0.55\textwidth]{\rule{0pt}{8cm}[Screenshot: 03-gameConsoleRequirements]}\end{center}
-}
 
 % ============================================================
 % END PATCH V2
@@ -507,3 +498,6 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 
 \label{LastPageGameConsoleRequirements}
 \end{document}
+
+
+

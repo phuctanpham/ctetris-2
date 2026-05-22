@@ -2,107 +2,20 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 
 % =======================================================================
 % Embedded sds-framework.tex
 % =======================================================================
-\usepackage{tikz}
-% Removed \usepackage{tikz-uml} to prevent missing package error
-\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
-
-% ── Color palette ──────────────────────────────────────────────────────────────
-\definecolor{pillarBlue}{RGB}{30,90,160}
-\definecolor{versionGreen}{RGB}{20,130,80}
-\definecolor{versionAmber}{RGB}{190,120,10}
-\definecolor{versionRed}{RGB}{170,40,40}
-\definecolor{boxGray}{RGB}{240,242,245}
-
-% ── TikZ styles ────────────────────────────────────────────────────────────────
-\tikzset{
-  sdsBox/.style   = {rectangle, rounded corners=3pt, draw=#1, fill=boxGray,
-                     text width=3.2cm, align=center, minimum height=0.9cm,
-                     font=\small\bfseries},
-  sdsArrow/.style = {-{Stealth[length=5pt]}, thick, #1},
-  vTag/.style     = {rectangle, rounded corners=2pt, fill=#1, text=white,
-                     font=\footnotesize\bfseries, inner sep=3pt},
-  seqLife/.style  = {draw=gray!60, dashed, thick},
-  seqMsg/.style   = {-{Stealth[length=4pt]}, draw=#1, thick},
-  layerBox/.style = {rectangle, draw=pillarBlue!50, fill=pillarBlue!8,
-                     rounded corners=4pt, minimum width=9cm,
-                     minimum height=0.7cm, align=center, font=\small},
-}
-
-% ── Part heading helpers ────────────────────────────────────────────────────────
-\newcommand{\PartPillars}{%
-  \vspace{4pt}
-  {\color{pillarBlue}\rule{\linewidth}{1.5pt}}\\[2pt]
-  {\large\bfseries\color{pillarBlue} PHẦN I \quad Trụ cột kỹ thuật (Technical Pillars)}\\[-2pt]
-  {\color{pillarBlue}\rule{\linewidth}{0.4pt}}
-  \vspace{2pt}
-}
-\newcommand{\PartVersions}{%
-  \vspace{10pt}
-  {\color{versionGreen}\rule{\linewidth}{1.5pt}}\\[2pt]
-  {\large\bfseries\color{versionGreen} PHẦN II \quad Lộ trình phiên bản (Versioned Development)}\\[-2pt]
-  {\color{versionGreen}\rule{\linewidth}{0.4pt}}
-  \vspace{2pt}
-}
-
-% ── Version badge ───────────────────────────────────────────────────────────────
-\DeclareRobustCommand{\vbadge}[2]{%   \vbadge{color}{label}
-  \tikz[baseline=-2pt]\node[vTag={#1}]{#2};~%
-}
-\newcommand{\Vone}{\texorpdfstring{\vbadge{versionGreen}{V1}}{[V1]}}
-\newcommand{\Vtwo}{\texorpdfstring{\vbadge{versionAmber}{V2}}{[V2]}}
-\newcommand{\Vthree}{\texorpdfstring{\vbadge{versionRed}{V3}}{[V3]}}
-
-% ── Reusable: 3-layer architecture diagram ─────────────────────────────────────
-\newcommand{\ThreeLayerArch}[4]{%
-  \begin{center}\begin{tikzpicture}[node distance=0.35cm]
-    \node[layerBox, fill=pillarBlue!18, draw=pillarBlue] (L1) {#2};
-    \node[layerBox, below=of L1]                         (L2) {#3};
-    \node[layerBox, fill=versionGreen!12, draw=versionGreen!60, below=of L2] (L3) {#4};
-    \draw[sdsArrow=pillarBlue!70] (L1)--(L2);
-    \draw[sdsArrow=versionGreen!70] (L2)--(L3);
-    \node[left=0.2cm of L1, font=\tiny\itshape, text=gray] {UI / Entry};
-    \node[left=0.2cm of L2, font=\tiny\itshape, text=gray] {Logic};
-    \node[left=0.2cm of L3, font=\tiny\itshape, text=gray] {Data};
-  \end{tikzpicture}\end{center}
-}
-
-% ── Reusable: linear sequence (up to 5 steps) ─────────────────────────────────
-\newcommand{\LinearSeq}[1]{%
-  \begin{center}\begin{tikzpicture}[node distance=0.6cm]
-  \def\steps{#1}
-  \foreach \s [count=\i] in \steps {
-    \node[sdsBox=pillarBlue!60] (n\i) at ({(\i-1)*3.8cm},0) {\s};
-  }
-  \foreach \i [count=\j from 2] in {1,...,4} {
-    \draw[sdsArrow=pillarBlue] (n\i)--(n\j);
-  }
-  \end{tikzpicture}\end{center}
-}
-
-% ── Reusable: Version comparison table ─────────────────────────────────────────
-\newenvironment{VersionTable}{%
-  \vspace{4pt}
-  \small
-  \begin{tabular}{@{}c p{3cm} p{3.5cm} p{3.5cm}@{}}
-  \hline
-  \rowcolor{pillarBlue!15}
-  \textbf{Ver} & \textbf{Mục tiêu} & \textbf{Công nghệ} & \textbf{Tích hợp} \\
-  \hline
-}{\hline\end{tabular}\vspace{4pt}}
-% =======================================================================
-% End of Embedded sds-framework.tex
-% =======================================================================
-
 \usepackage{docmute}
-\usepackage{enumitem}
-\usepackage{tabularx}
 \hypersetup{pdftitle={SDS - gameStory Module}}
 
 \begin{document}
@@ -113,7 +26,7 @@
 \section{SDS --- Module \texttt{gameStory}}
 
 % ═══════════════════════════════════════════════════════
-\PartPillars
+\noindent\PartPillars
 % ═══════════════════════════════════════════════════════
 
 % ----------------------------------------------------------
@@ -186,8 +99,9 @@ dialogues / choices} là read-only.
 \subsubsection{SVG Lazy-Init Rasterizer (V1)}
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[node distance=0.5cm,
-  b/.style={sdsBox=pillarBlue!60,text width=2.3cm}]
+  b/.style={sdsBox=pillarBlue!60,text width=2.8cm}]
   \node[b](a){Check\\cache flag};
   \node[b,right=0.6cm of a](b){\texttt{nsvgParse()}\\compute scale};
   \node[b,right=0.6cm of b](c){\texttt{NSVGrasterize}\\$\rightarrow$ pixels[]};
@@ -197,6 +111,7 @@ dialogues / choices} là read-only.
   \draw[sdsArrow=versionGreen,bend right=30](a.south)to
       node[below,font=\tiny]{cached $\rightarrow$ skip}(e.south);
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \noindent Công thức fade-in:
@@ -221,16 +136,16 @@ $\texttt{outH} = \lfloor \texttt{image->height} \times \texttt{scale} + 0.5 \rfl
   arr/.style={-{Stealth[length=4pt]},thick}
 ]
   \node[proc](p0) at (0,0)    {\texttt{httpGetSync(MANIFEST\_GIST\_URL)}};
-  \node[dec] (d0) at (0,-1.0) {body\\empty?};
-  \node[term](off)at (4.2,-1.0){\texttt{SYNC\_OFFLINE} $\rightarrow$ return};
-  \node[proc](p1) at (0,-2.0) {parse JSON $\rightarrow$ \texttt{versions[latest]}};
-  \node[proc](p2) at (0,-3.0) {foreach chapter: \texttt{metaGetSha()} vs newSha};
-  \node[dec] (d1) at (0,-4.0) {SHA\\match?};
-  \node[term](sk) at (4.2,-4.0){skip $\rightarrow$ next chapter};
-  \node[proc](p3) at (0,-5.0) {\texttt{httpGetSync(gistUrl)} $\rightarrow$ JSON body};
-  \node[proc](p4) at (0,-6.0) {\texttt{applyChapterJson(db, body, chapterId)}};
-  \node[proc](p5) at (0,-7.0) {\texttt{metaSetSha()}; WASM: \texttt{FS.syncfs()}};
-  \node[wterm](dn)at (0,-8.0) {\texttt{SYNC\_DONE}};
+  \node[dec] (d0) at (0,-1.3) {body\\empty?};
+  \node[term](off)at (4.5,-1.3){\texttt{SYNC\_OFFLINE} $\rightarrow$ return};
+  \node[proc](p1) at (0,-2.6) {parse JSON $\rightarrow$ \texttt{versions[latest]}};
+  \node[proc](p2) at (0,-3.7) {foreach chapter: \texttt{metaGetSha()} vs newSha};
+  \node[dec] (d1) at (0,-5.0) {SHA\\match?};
+  \node[term](sk) at (4.5,-5.0){skip $\rightarrow$ next chapter};
+  \node[proc](p3) at (0,-6.3) {\texttt{httpGetSync(gistUrl)} $\rightarrow$ JSON body};
+  \node[proc](p4) at (0,-7.4) {\texttt{applyChapterJson(db, body, chapterId)}};
+  \node[proc](p5) at (0,-8.5) {\texttt{metaSetSha()}; WASM: \texttt{FS.syncfs()}};
+  \node[wterm](dn)at (0,-9.6) {\texttt{SYNC\_DONE}};
   \draw[arr](p0)--(d0);
   \draw[arr](d0)--node[above,font=\tiny]{yes}(off);
   \draw[arr](d0)--node[left,font=\tiny]{no}(p1);
@@ -238,9 +153,8 @@ $\texttt{outH} = \lfloor \texttt{image->height} \times \texttt{scale} + 0.5 \rfl
   \draw[arr](d1)--node[above,font=\tiny]{yes}(sk);
   \draw[arr](d1)--node[left,font=\tiny]{no}(p3);
   \draw[arr](p3)--(p4); \draw[arr](p4)--(p5); \draw[arr](p5)--(dn);
-  % loop-back arrow for chapters
-  \draw[arr,gray,dashed](sk.east)--++(0.6,0)--++(0,3.05)--
-      node[right,font=\tiny]{next ch}++(-0.6,0)--(p2.east);
+% loop-back arrow for chapters
+  \draw[arr,gray,dashed](sk.east) -- ++(0.6,0) |- node[pos=0.25,right,font=\tiny]{next ch} (p2.east);
 \end{tikzpicture}
 \end{center}
 
@@ -266,11 +180,16 @@ $\texttt{outH} = \lfloor \texttt{image->height} \times \texttt{scale} + 0.5 \rfl
   \node[st,right=of wait](adv) {ADVANCE\\resolve\\nextId};
   \node[st,right=of adv] (chk) {CHK\\load new\\choices};
   \node[st,below=1.1cm of adv,draw=versionGreen,fill=versionGreen!8](end){END\\return};
+  
   \draw[sdsArrow=pillarBlue](init)--(wait);
   \draw[sdsArrow=pillarBlue](wait)--node[above, align=center, font=\tiny]{ENTER/SPACE\\or click}(adv);
   \draw[sdsArrow=pillarBlue](adv)--(chk);
-  \draw[sdsArrow=pillarBlue,bend left=40](chk)to
-      node[below,font=\tiny]{curIdx=nextIdx}(wait);
+  
+  % Fixed arrow: Explicitly leaves chk.north going up-left (145 deg) 
+  % and enters wait.north coming from the up-right (35 deg)
+  \draw[sdsArrow=pillarBlue] (chk.north) to[out=145, in=35]
+      node[above,font=\tiny]{curIdx=nextIdx} (wait.north);
+      
   \draw[sdsArrow=versionGreen](adv)--node[right,font=\tiny]{\texttt{nextId=0}}(end);
   \draw[sdsArrow=versionGreen,dashed](wait.south)to[bend right=15]
       node[below,font=\tiny]{ESC / SKIP click}(end.west);
@@ -315,30 +234,106 @@ SDS bổ sung implementation contract:}
 % ----------------------------------------------------------
 \subsection{Cấu trúc dữ liệu}
 
-\subsubsection{C++ Runtime Structs}
+\subsubsection{Class Diagrams}
 
-\begin{verbatim}
-// gameStory_db.h (public)
-struct DialogueNode {
-    int         nodeId;
-    std::string speaker, text, imageUrl, bgmUrl, sfxUrl;
-    int         nextNodeId;
-    // 0 = terminal node
-    bool        hasChoices;
-};
-struct DialogueChoice {
-    int         choiceIdx;
-    // 0-based display order
-    std::string label;
-    int         nextNodeId;
-};
-// app.cpp (module-internal)
-struct SvgTexture   { SDL_Texture* texture = nullptr; int w = 0, h = 0; };
-enum   SyncState    { SYNC_IDLE, SYNC_FETCHING, SYNC_UPDATING_DB,
-                      SYNC_DONE, SYNC_OFFLINE };
-struct SyncProgress { int total = 0, done = 0;
-                      std::string currentId; SyncState state = SYNC_IDLE; };
-\end{verbatim}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+  class/.style={rectangle, draw=pillarBlue, fill=pillarBlue!6, rounded corners=2pt,
+                align=left, font=\scriptsize\ttfamily, inner sep=4pt},
+  enum/.style={rectangle, draw=versionGreen, fill=versionGreen!6, rounded corners=2pt,
+               align=left, font=\scriptsize\ttfamily, inner sep=4pt}
+]
+  % gameStory_db.h (public)
+  \node[class] (dn) at (0,0) {
+    \textbf{DialogueNode}\\[2pt]
+    \color{gray}\rule{3.2cm}{0.4pt}\\[2pt]
+    + nodeId: int\\
+    + speaker: string\\
+    + text: string\\
+    + imageUrl: string\\
+    + bgmUrl: string\\
+    + sfxUrl: string\\
+    + nextNodeId: int\\
+    + hasChoices: bool
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (dn.north west) {gameStory\_db.h (public)};
+
+  \node[class] (dc) at (5.0, 0.4) {
+    \textbf{DialogueChoice}\\[2pt]
+    \color{gray}\rule{3.2cm}{0.4pt}\\[2pt]
+    + choiceIdx: int\\
+    + label: string\\
+    + nextNodeId: int
+  };
+
+  % app.cpp (module-internal)
+  \node[class] (svg) at (0, -4.0) {
+    \textbf{SvgTexture}\\[2pt]
+    \color{gray}\rule{3.2cm}{0.4pt}\\[2pt]
+    + texture: SDL\_Texture*\\
+    + w: int\\
+    + h: int
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (svg.north west) {app.cpp (module-internal)};
+
+  \node[class] (sp) at (5.0, -4.0) {
+    \textbf{SyncProgress}\\[2pt]
+    \color{gray}\rule{3.2cm}{0.4pt}\\[2pt]
+    + total: int\\
+    + done: int\\
+    + currentId: string\\
+    + state: SyncState
+  };
+
+  \node[enum] (ss) at (9.6, -4.0) {
+    \textbf{\guillemotleft enum\guillemotright~SyncState}\\[2pt]
+    \color{gray}\rule{3.2cm}{0.4pt}\\[2pt]
+    SYNC\_IDLE\\
+    SYNC\_FETCHING\\
+    SYNC\_UPDATING\_DB\\
+    SYNC\_DONE\\
+    SYNC\_OFFLINE
+  };
+
+ \draw[-{Stealth[length=4pt]}, thick, dashed, gray] (sp.east) -- (ss.west);
+
+  % Center short breaking line (Horizontally centered around x=4.8, pushed down to y=-7.5)
+  \draw[thick, dashed, gray!50] (2.8, -7.5) -- (6.8, -7.5);
+
+  % logger.h (shared) - Shifted left and down
+  \node[class, fill=versionAmber!6, draw=versionAmber] (logger) at (1.0, -10.8) {
+    \textbf{\guillemotleft Singleton\guillemotright~Logger}\\[2pt]
+    \color{gray}\rule{4.8cm}{0.4pt}\\[2pt]
+    - file\_: ofstream\\
+    - mutex\_: mutex\\[2pt]
+    \color{gray}\rule{4.8cm}{0.4pt}\\[2pt]
+    \underline{+ getInstance(): Logger\&}\\
+    + log(fmt: char*, ...)\\
+    + logAudio(fmt: char*, ...)\\
+    + logEvent(module: char*, fmt: char*, ...)\\
+    + logError(fmt: char*, ...)\\
+    + flush()\\
+    + close()
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (logger.north west) {logger.h (shared)};
+
+  % ctetris_debug.h (shared) - Shifted right and down
+  \node[class, fill=gray!8, draw=gray] (ctdbg) at (8.0, -10.8) {
+    \textbf{\guillemotleft Macros\guillemotright~CTETRIS\_DEBUG}\\[2pt]
+    \color{gray}\rule{4.8cm}{0.4pt}\\[2pt]
+    + CTDBG\_INIT()\\
+    + CTDBG\_REQ(method, url)\\
+    + CTDBG\_RES(method, url, status, len)\\
+    + CTDBG\_BODY(bodyStr)\\
+    + CTDBG\_ERR(msg)\\
+    + CTDBG\_INFO(key, val)
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (ctdbg.north west) {ctetris\_debug.h (shared)};
+
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
 
 \subsubsection{SQLite ERD}
 
@@ -408,24 +403,24 @@ struct SyncProgress { int total = 0, done = 0;
 \begin{tikzpicture}[
   proc/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=2pt,
                minimum width=2.6cm,minimum height=0.6cm,align=center,font=\scriptsize},
-  store/.style={cylinder,draw=gray!60,fill=gray!10,shape border rotate=90,
-                minimum width=2.2cm,minimum height=0.55cm,align=center,font=\scriptsize},
+  store/.style={cylinder,draw=gray!60,fill=gray!10,shape border rotate=90,aspect=0.25,
+                minimum width=1.8cm,minimum height=0.45cm,align=center,font=\tiny,inner sep=2pt},
   extio/.style={ellipse,draw=gray!50,fill=gray!6,minimum width=1.8cm,
                 minimum height=0.5cm,align=center,font=\scriptsize},
   fl/.style={-{Stealth[length=4pt]},thick},
   dfl/.style={-{Stealth[length=4pt]},dashed,gray!60}
 ]
-  \node[extio](gist) at (0,5)    {Gist\\manifest+JSON};
-  \node[proc] (sync) at (3.8,5)  {syncFromGist()};
-  \node[store](meta) at (7.6,5)  {shared\_meta};
-  \node[proc] (psc)  at (3.8,3)  {postSyncCheck()};
-  \node[store](us)   at (7.6,3)  {idUser\_Stories};
-  \node[store](sdat) at (7.6,1.5){shared\_data};
-  \node[proc] (load) at (3.8,1.5){storyDbLoad\\Dialogue()};
+  \node[extio](gist) at (0,7.5)  {Gist\\manifest+JSON};
+  \node[proc] (sync) at (3.8,7.5){syncFromGist()};
+  \node[store](meta) at (7.6,7.5){shared\_meta};
+  \node[proc] (psc)  at (3.8,5.0){postSyncCheck()};
+  \node[store](us)   at (7.6,5.0){idUser\_Stories};
+  \node[store](sdat) at (7.6,2.5){shared\_data};
+  \node[proc] (load) at (3.8,2.5){storyDbLoad\\Dialogue()};
   \node[store](sdlg) at (7.6,0)  {shared\_dialogues\\+ choices};
   \node[proc] (loop) at (3.8,0)  {dialRunLoop()};
   \node[proc] (draw) at (0,0)    {drawDialogue\\Page()};
-  \node[extio](user) at (0,1.5)  {SDL Events};
+  \node[extio](user) at (0,2.5)  {SDL Events};
   \draw[fl](gist)--node[above,font=\tiny]{httpGetSync()}(sync);
   \draw[fl](sync)--node[above,font=\tiny]{UPSERT sha}(meta);
   \draw[dfl](meta.south)to[bend right=12]
@@ -535,17 +530,16 @@ requires \texttt{-sASYNCIFY=1} \\
 \end{tabularx}
 
 % ═══════════════════════════════════════════════════════
-\PartVersions
+\noindent\PartVersions
 % ═══════════════════════════════════════════════════════
 
 \begin{VersionTable}
-\Vone & Logo animation, brand identity, BUILD\_STANDALONE
+\Vone & Logo animation, brand identity, BUILD\_\-STANDALONE
       & SDL3, nanosvg/rast
-      & Standalone $\rightarrow$ \texttt{runGameStory(win,ren)} entry \\
+      & Standalone $\rightarrow$ \texttt{runGameStory(win,}\allowbreak\texttt{ren)} entry \\ \hline
 \Vtwo & Dialogue engine, Gist SHA-diff sync, post-sync condition check
       & sqlite3, nlohmann/json, libcurl / emscripten\_fetch
-      & Reads gameConsole DB;
-writes \texttt{shared\_meta}, \texttt{idUser\_Stories} \\
+      & Reads gameConsole DB; writes \texttt{shared\_meta}, \texttt{idUser\_Stories} \\ \hline
 \Vthree & Per-file media disk cache, download-speed loading bar, Cloudflare D1 + Duration Objects migration
         & emscripten\_fetch, IDBFS, Cloudflare D1
         & V3 replaces Gist $\rightarrow$ Cloudflare D1 / Durable Objects \\
@@ -605,7 +599,7 @@ post-sync condition check.
 \[
   P_{\text{bar}} = \max\!\Bigl(\underbrace{\tfrac{\texttt{done}}{\texttt{total}}}_{\text{sync}},\;
                                \underbrace{\tfrac{t}{8000}}_{\text{time}}\Bigr)
-  \quad \text{(clamped to } [0,1]\text{)}
+  \quad \text{(clamped to [0,1])}
 \]
 \texttt{total=0} (all SHA match) $\Rightarrow$ $P_\text{sync}=1.0$ instantly.
 
@@ -635,7 +629,6 @@ post-sync condition check.
 \subsection{\Vthree\ --- Media Cache + Download-speed Bar}
 
 \textbf{Mục tiêu:} Per-file disk cache; loading bar reflects actual download speed;
-
 logo fade-in loops until all files ready.
 
 \noindent\textbf{Cache key:}
@@ -668,3 +661,6 @@ rewrite \texttt{DialogueNode.imageUrl} from raw GitHub URL $\rightarrow$ local c
 
 \label{LastPageGameStoryEngineering}
 \end{document}
+
+
+

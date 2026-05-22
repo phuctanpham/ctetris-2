@@ -2,18 +2,16 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\usepackage{enumitem}
-\setlist[itemize]{leftmargin=*, itemsep=2pt, parsep=0pt}
-
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 \usepackage{docmute}
-
-% --- ADDED FIX FOR MARGINS (Option-Clash Safe) ---
-\usepackage{geometry}
-\geometry{margin=1in}
-% -------------------------------------------------
 
 \hypersetup{pdftitle={Mo ta qua trinh lam viec nhom - ctetris}}
 
@@ -185,3 +183,6 @@
 
 \label{LastPageTeamConflictSolving}
 \end{document}
+
+
+

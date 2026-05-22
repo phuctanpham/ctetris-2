@@ -2,66 +2,16 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
-\usepackage{docmute}
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
-\usepackage{enumitem}
-\usepackage{tabularx}
-\usepackage{amsmath}
-
-% ═══════════════════════════════════════════════════════
-% SDS Framework macros (embedded — no external file)
-% ═══════════════════════════════════════════════════════
-\definecolor{pillarBlue}{RGB}{30,90,160}
-\definecolor{versionGreen}{RGB}{20,130,80}
-\definecolor{versionAmber}{RGB}{190,120,10}
-\definecolor{versionRed}{RGB}{170,40,40}
-\definecolor{boxGray}{RGB}{240,242,245}
-\tikzset{
-  sdsBox/.style={rectangle,rounded corners=3pt,draw=#1,fill=boxGray,
-                 text width=3.0cm,align=center,minimum height=0.85cm,font=\small\bfseries},
-  sdsArrow/.style={-{Stealth[length=5pt]},thick,#1},
-  vTag/.style={rectangle,rounded corners=2pt,fill=#1,text=white,
-               font=\footnotesize\bfseries,inner sep=3pt},
-  layerBox/.style={rectangle,draw=pillarBlue!50,fill=pillarBlue!8,
-                   rounded corners=4pt,minimum width=9cm,
-                   minimum height=0.7cm,align=center,font=\small},
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
 }
-\newcommand{\PartPillars}{%
-  \vspace{4pt}{\color{pillarBlue}\rule{\linewidth}{1.5pt}}\\[2pt]%
-  {\large\bfseries\color{pillarBlue}PHẦN I \quad Trụ cột kỹ thuật (Technical Pillars)}\\[-2pt]%
-  {\color{pillarBlue}\rule{\linewidth}{0.4pt}}\vspace{2pt}}
-\newcommand{\PartVersions}{%
-  \vspace{10pt}{\color{versionGreen}\rule{\linewidth}{1.5pt}}\\[2pt]%
-  {\large\bfseries\color{versionGreen}PHẦN II \quad Lộ trình phiên bản (Versioned Development)}\\[-2pt]%
-  {\color{versionGreen}\rule{\linewidth}{0.4pt}}\vspace{2pt}}
-\DeclareRobustCommand{\vbadge}[2]{%
-  \tikz[baseline=-2pt]\node[vTag={#1}]{#2};~}
-\newcommand{\Vone}{\texorpdfstring{\vbadge{versionGreen}{V1}}{[V1]}}
-\newcommand{\Vtwo}{\texorpdfstring{\vbadge{versionAmber}{V2}}{[V2]}}
-\newcommand{\Vthree}{\texorpdfstring{\vbadge{versionRed}{V3}}{[V3]}}
-\newcommand{\ThreeLayerArch}[4]{%
-  \begin{center}\begin{tikzpicture}[node distance=0.35cm]
-    \node[layerBox,fill=pillarBlue!18,draw=pillarBlue](L1){#2};
-    \node[layerBox,below=of L1](L2){#3};
-    \node[layerBox,fill=versionGreen!12,draw=versionGreen!60,below=of L2](L3){#4};
-    \draw[sdsArrow=pillarBlue!70](L1)--(L2);
-    \draw[sdsArrow=versionGreen!70](L2)--(L3);
-    \node[left=0.18cm of L1,font=\tiny\itshape,text=gray]{UI / Entry};
-    \node[left=0.18cm of L2,font=\tiny\itshape,text=gray]{Logic};
-    \node[left=0.18cm of L3,font=\tiny\itshape,text=gray]{Data};
-  \end{tikzpicture}\end{center}}
-\newenvironment{VersionTable}{%
-  \vspace{4pt}\small
-  \begin{tabular}{@{}c p{3cm} p{3.5cm} p{3.5cm}@{}}
-  \hline\rowcolor{pillarBlue!15}
-  \textbf{Ver}&\textbf{Mục tiêu}&\textbf{Công nghệ}&\textbf{Tích hợp}\\
-  \hline}{\hline\end{tabular}\vspace{4pt}}
-% ═══════════════════════════════════════════════════════
-
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
+\usepackage{docmute}
 \hypersetup{pdftitle={SDS - gameCore Module}}
 
 \begin{document}
@@ -524,32 +474,95 @@ colorID values (0=empty, 1--7=colors)}}.
 % ─────────────────────────────────────────────────────────
 \subsection{Cấu trúc dữ liệu}
 
-\subsubsection{C++ Structs}
+\subsubsection{Class Diagrams}
 
-\begin{verbatim}
-// gameCore_layout.h
-struct Point     { int x, y; };
-struct Tetromino { Point blocks[4]; int colorID; int x, y; };
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+  class/.style={rectangle, draw=pillarBlue, fill=pillarBlue!6, rounded corners=2pt,
+                align=left, font=\scriptsize\ttfamily, inner sep=4pt}
+]
 
-struct GameState {
-    int       board[BOARD_ROWS][BOARD_COLS] = {0};  // 0=empty, 1-7=colorID
-    Tetromino currentBlock, nextBlock, nextBlock2, nextBlock3;
-    int  score=0, exitCode=0, retryCount=0;
-    bool isGameOver=false, isPaused=false, showQuitPopup=false;
-    bool softDrop=false, speedHeld=false;
-    // flash-clear
-    bool pendingClear=false; int clearRowCount=0;
-    int  clearRows[4]; int flashTick=0; bool flashOn=false;
-    Uint32 flashTimer=0;
-    // pause-aware timer
-    Uint32 gameStartTime=0, pauseStartTime=0, totalPausedMs=0;
-    bool   wasRunning=false;
-    // sidebar mouse hold flags (highlight yellow effect)
-    bool mouseHeldQuit, mouseHeldPause, mouseHeld{ArrUp,Down,Left,Right};
-    // WASM
-    bool wasmShutdown=false, reloadHover=false;
-};
-\end{verbatim}
+  % Point
+  \node[class, anchor=north] (pt) at (0,0) {
+    \textbf{Point}\\[2pt]
+    \color{gray}\rule{3.0cm}{0.4pt}\\[2pt]
+    + x, y: int
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (pt.north west) {gameCore\_layout.h};
+
+  % Tetromino
+  \node[class, anchor=north] (tet) at (0,-2.5) {
+    \textbf{Tetromino}\\[2pt]
+    \color{gray}\rule{3.0cm}{0.4pt}\\[2pt]
+    + blocks[4]: Point\\
+    + colorID: int\\
+    + x, y: int
+  };
+
+  % GameState
+  \node[class, anchor=north] (gs) at (6.0,0) {
+    \textbf{GameState}\\[2pt]
+    \color{gray}\rule{6.2cm}{0.4pt}\\[2pt]
+    + board[20][10]: int\\
+    + currentBlock, nextBlock: Tetromino\\
+    + nextBlock2, nextBlock3: Tetromino\\
+    + score, exitCode, retryCount: int\\
+    + isGameOver, isPaused, showQuitPopup: bool\\
+    + softDrop, speedHeld: bool\\
+    + pendingClear, flashOn: bool\\
+    + clearRowCount, flashTick: int\\
+    + clearRows[4]: int\\
+    + flashTimer, gameStartTime: Uint32\\
+    + pauseStartTime, totalPausedMs: Uint32\\
+    + wasRunning: bool\\
+    + mouseHeldQuit, mouseHeldPause: bool\\
+    + mouseHeldArrUp, mouseHeldArrDown: bool\\
+    + mouseHeldArrLeft, mouseHeldArrRight: bool\\
+    + mouseHeldSpeed: bool\\
+    + wasmShutdown, reloadHover: bool
+  };
+
+  % Relations
+  \draw[-{Stealth[length=4pt]}, thick, dashed, gray] (tet.north) -- (pt.south);
+  \draw[-{Stealth[length=4pt]}, thick, dashed, gray] (tet.east) -- (tet.east -| gs.west);
+
+  % Center short breaking line
+  \draw[thick, dashed, gray!50] (1.0, -8.0) -- (7.0, -8.0);
+
+  % logger.h (shared)
+  \node[class, fill=versionAmber!6, draw=versionAmber, anchor=north] (logger) at (1.5, -9.0) {
+    \textbf{\guillemotleft Singleton\guillemotright~Logger}\\[2pt]
+    \color{gray}\rule{4.8cm}{0.4pt}\\[2pt]
+    - file\_: ofstream\\
+    - mutex\_: mutex\\[2pt]
+    \color{gray}\rule{4.8cm}{0.4pt}\\[2pt]
+    \underline{+ getInstance(): Logger\&}\\
+    + log(fmt: char*, ...)\\
+    + logAudio(fmt: char*, ...)\\
+    + logEvent(module: char*, fmt: char*, ...)\\
+    + logError(fmt: char*, ...)\\
+    + flush()\\
+    + close()
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (logger.north west) {logger.h (shared)};
+
+  % ctetris_debug.h (shared)
+  \node[class, fill=gray!8, draw=gray, anchor=north] (ctdbg) at (8.0, -9.0) {
+    \textbf{\guillemotleft Macros\guillemotright~CTETRIS\_DEBUG}\\[2pt]
+    \color{gray}\rule{4.8cm}{0.4pt}\\[2pt]
+    + CTDBG\_INIT()\\
+    + CTDBG\_REQ(method, url)\\
+    + CTDBG\_RES(method, url, status, len)\\
+    + CTDBG\_BODY(bodyStr)\\
+    + CTDBG\_ERR(msg)\\
+    + CTDBG\_INFO(key, val)
+  };
+  \node[font=\scriptsize\itshape, text=gray, anchor=south west] at (ctdbg.north west) {ctetris\_debug.h (shared)};
+
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
 
 \subsubsection{Layout Constants \& Sidebar Map}
 
@@ -827,7 +840,7 @@ sqlite3           & always & Write-only via \texttt{gameConsole\_db.h} (no direc
                               \texttt{dbCheckAndUnlockStories} \\
 \texttt{gameConsole\_layout.h} & always & \texttt{SettingsConfig} definition \\
 Emscripten        & \texttt{\#ifdef \_\_EMSCRIPTEN\_\_} &
-  \foreignlanguage{english}{\texttt{emscripten\_run\_script("window.location.reload()")}} for WASM reload \\
+  \foreignlanguage{english}{\texttt{emscripten\_run\_script(}\allowbreak\texttt{"window.location.reload()")}} for WASM reload \\ \\
 \hline
 \end{tabularx}
 
@@ -835,17 +848,22 @@ Emscripten        & \texttt{\#ifdef \_\_EMSCRIPTEN\_\_} &
 rotation, line-clear, scoring, timer — all pure C++ with \texttt{<cstdlib>},
 \texttt{<ctime>}, \texttt{<cmath>}. SDL3 and DB only in render/IO/persist layers.
 
-\PartVersions
+\noindent\PartVersions
 
 \begin{VersionTable}
-\Vone & 5 shapes + mirror flip; keyboard/mouse/swipe; pause; WASM reload
+\Vone & 5 shapes + mirror flip; keyboard/\allowbreak mouse/\allowbreak swipe; pause;
+      WASM reload
       & SDL3
-      & Reads \texttt{SettingsConfig\&} (defaults); no DB \\
+      & Reads \texttt{SettingsConfig\&} (defaults);
+no DB \\ \hline
 \Vtwo & Dynamic speed; n² combo; flash-clear; 3-block queue;
-        color palette; tableMatrix; DB write on game-over; BGM stub
+        color palette; tableMatrix; DB write on game-over;
+BGM stub
       & sqlite3 (via gameConsole\_db.h)
-      & Writes \texttt{default\_Records}; triggers cascade unlock \\
-\Vthree & D1 leaderboard push; BGM real audio; name input; nextBlockScore3
+      & Writes \texttt{default\_Records};
+triggers cascade unlock \\ \hline
+\Vthree & D1 leaderboard push; BGM real audio; name input;
+nextBlockScore3
         & libcurl / emscripten\_fetch
         & POST to Cloudflare Worker after each game-over \\
 \end{VersionTable}
@@ -970,7 +988,7 @@ file; player name input; \texttt{nextBlockScore3} field.
         call \texttt{httpPostRecord()} (async in WASM; blocking in native).
   \item \texttt{coreOpenBgm()}: queue actual audio samples from
         \texttt{cfg.bgmUrl} (new V3 field) into existing stream.
-  \item Popup GAME OVER: add text-input widget for \texttt{nameUser}
+  \item Popup GAME OVER: background job to trace the latest achievement based on\texttt{idUser} or \texttt{idDevice}
         before \texttt{dbInsertRecord()} fires.
   \item \texttt{showNext3} formula replaced by:
         $\texttt{score} \geq \texttt{cfg.nextBlockScore3}$.
@@ -984,3 +1002,6 @@ file; player name input; \texttt{nextBlockScore3} field.
 
 \label{LastPageGameCoreEngineering}
 \end{document}
+
+
+

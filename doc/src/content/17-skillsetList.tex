@@ -2,20 +2,17 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 \usepackage{docmute}
-\usepackage{tabularx}
-\usepackage{enumitem}
-\usepackage{multirow}
-\usepackage{hyperref}
 \hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - Danh sách kỹ năng}}
-
-% Mức thành thạo
-\newcommand{\levelBeg}{\textcolor{gray}{\textbf{Cơ bản}}}
-\newcommand{\levelMid}{\textcolor{blue!70!black}{\textbf{Trung cấp}}}
-\newcommand{\levelAdv}{\textcolor{green!50!black}{\textbf{Thành thạo}}}
 
 \begin{document}
 \providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
@@ -574,3 +571,6 @@ Trách nhiệm với lỗi & Khi gây bug regression, chủ động nhận trác
 
 \label{LastPageSkillsetList}
 \end{document}
+
+
+

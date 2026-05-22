@@ -1,15 +1,17 @@
 % !TEX TS-program = lualatex
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
-\PassOptionsToPackage{edges}{forest}
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 \usepackage{docmute}
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, trees}
-\usepackage{tabularx}
-\usepackage{enumitem}
+
 
 \hypersetup{pdftitle={Software Requirements Specification (SRS) - gameCore Module}}
 
@@ -278,8 +280,9 @@ Mô tả trực quan quá trình trải nghiệm của người chơi từ lúc 
         
     \draw[arrow] (over) -- node[above,font=\scriptsize]{Quit (WASM)} (wasm); 
     
-    % FIX 2: Tăng độ sâu xuống hẳn -5.5 để lọt qua bên dưới tất cả các node text
-    \draw[arrow] (over.south west) -- ++(0, -5.5) -| node[near start, above, font=\scriptsize]{Restart} (init.south);
+   % FIX 2: Bắt đầu từ middle left (over.west), vòng sang trái rồi đi xuống
+    \draw[arrow] (over.west) -- ++(-0.8, 0) -- ++(0, -5.5) -|
+    node[near start, above, font=\scriptsize]{Restart} (init.south);
     
     \draw[arrow] (over.north east) -- ++(0.4,0.4)
         node[above right,font=\scriptsize,draw=blue!30,fill=white,rounded corners,inner sep=2pt]
@@ -502,3 +505,6 @@ SRS phát biểu ràng buộc hành vi:
 
 \label{LastPageGameCoreRequirements}
 \end{document}
+
+
+

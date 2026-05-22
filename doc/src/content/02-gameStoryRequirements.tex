@@ -2,14 +2,16 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 \usepackage{docmute}
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, trees}
-\usepackage{tabularx}
-\usepackage{enumitem}
 
 \hypersetup{pdftitle={Software Requirements Specification (SRS) - gameStory Module}}
 
@@ -225,8 +227,8 @@ Phân hệ \textbf{gameStory} đóng vai trò là màn hình khởi động và 
     \draw[darrow, gray] (db.south) -- ++(0,-0.5)
         node[below, draw=gray!40, fill=gray!5, rounded corners, inner sep=2pt]
         {\scriptsize V3: migrate to Cloudflare D1 / Durable Objects};
-    % SHA check
-    \draw[darrow, blue!50] (db.north) to[bend left=30]
+% SHA check
+    \draw[darrow, blue!50] (db.north) to[bend right=35]
         node[above, font=\tiny]{local SHA lookup} (sync.north east);
 \end{tikzpicture}
 \end{center}
@@ -358,7 +360,7 @@ SRS chỉ phát biểu ràng buộc giao diện:}
 \begin{itemize}[leftmargin=*]
     \item \textbf{Dual-mode entry:} \texttt{storyId=0} $\rightarrow$ intro + sync; \texttt{storyId>0} $\rightarrow$ dialogue trực tiếp (từ Console Play/Stories popup). Backward-compatible với \texttt{main.cpp} V1 call.
     \item \textbf{Gist SHA-diff sync:} so sánh \texttt{shared\_meta.sha} vs manifest; chỉ fetch và apply chapters có SHA mới. Offline $\rightarrow$ \texttt{SYNC\_OFFLINE}, tiếp tục dùng local data.
-    \item \textbf{applyChapterJson():} DELETE stories no longer in JSON $\rightarrow$ UPSERT \texttt{shared\_data} + \texttt{shared\_dialogues} + \texttt{shared\_choices} trong một transaction. Không full-replace để bảo toàn user progress.
+    \item \textbf{applyChapterJson():} DELETE stories no longer in JSON $\rightarrow$ UPSERT \texttt{shared\_data} + \allowbreak\texttt{shared\_dialogues} + \allowbreak\texttt{shared\_choices} trong một transaction. Không full-replace để bảo toàn user progress.
     \item \textbf{Dialogue engine:} load nodes bulk $\rightarrow$ \texttt{dialRunLoop()} state machine; choices loaded on-demand per node. Terminal: \texttt{nextNodeId=0} $\rightarrow$ exit.
     \item \textbf{Skip button:} visible ONLY trong PHASE\_LOGO (sync đã hoàn thành); ẩn trong phase sync để tránh user bỏ qua DB write.
     \item \textbf{Progress bar V2:} \texttt{fill = max(syncProgress, timeProgress)}; status line hiển thị chapter đang sync / ``Offline'' / ``Up to date''.
@@ -393,17 +395,6 @@ SRS chỉ phát biểu ràng buộc giao diện:}
     WASM: sync chapter $\rightarrow$ đóng tab $\rightarrow$ mở lại & \texttt{shared\_meta.sha} vẫn còn; sync bỏ qua chapter đã cập nhật \\
     \hline
 \end{tabularx}
-
-\IfFileExists{02-gameStoryRequirements-v2-screenshot.png}{
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.55\textwidth]{02-gameStoryRequirements-v2-screenshot}
-    \\[6pt]
-    \textit{\small Hình V2.1: gameStory V2 — dialogue engine, text box bán trong suốt, choice buttons, skip button góc trên phải.}
-\end{figure}
-}{
-\begin{center}\framebox[0.55\textwidth]{\rule{0pt}{8cm}[Screenshot: 02-gameStoryRequirements]}\end{center}
-}
 
 % ============================================================
 % END PATCH V2 — 02-gameStoryRequirements.tex
@@ -444,3 +435,6 @@ SRS chỉ phát biểu ràng buộc giao diện:}
 
 \label{LastPageGameStoryRequirements}
 \end{document}
+
+
+

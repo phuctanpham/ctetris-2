@@ -2,21 +2,27 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
 \usepackage{docmute}
 \hypersetup{pdftitle={Hướng dẫn gameStory -- v1 và v2}}
 
 % Tip/note box style cho v2
-\newcommand{\tipbox}[1]{%
+\renewcommand{\tipbox}[1]{%
   \vspace{4pt}%
   \noindent\colorbox{yellow!18}{\begin{minipage}{0.96\linewidth}%
     \vspace{2pt}\textbf{Mẹo nhanh:} #1\vspace{2pt}%
   \end{minipage}}%
   \vspace{4pt}%
 }
-\newcommand{\notebox}[1]{%
+\renewcommand{\notebox}[1]{%
   \vspace{4pt}%
   \noindent\colorbox{cyan!12}{\begin{minipage}{0.96\linewidth}%
     \vspace{2pt}\textbf{Lưu ý:} #1\vspace{2pt}%
@@ -42,7 +48,7 @@
     \centering
     \includegraphics[width=0.3\textwidth]{08-gameStoryGuide-screenshot}
     \\[10pt] % Tạo khoảng cách nhỏ giữa hình và chú thích
-    \textit{\small Hình 8.1: Màn hình module gameStory}
+    \textit{\small Hình 8.1: Màn hình module gameStory - V1}
 \end{figure}
 
 \subsection{Bố cục màn hình}
@@ -167,14 +173,9 @@ nhìn. Trong \textit{v2}: muốn bỏ qua thì bấm \texttt{ESC} hoặc click
 
 \begin{figure}[htbp]
     \centering
-    % [SCREENSHOT 8.1: Chụp màn hình gameStory đúng vào giây thứ 4-5
-    %  (khi logo đã đủ sáng để nhìn rõ). Cần thấy: logo 3×3 ô màu,
-    %  chữ "C T E T R I S", loading bar xanh lá khoảng 50% đầy,
-    %  dòng "Powered up by" + logo UIT ở cuối. Nền đen/tối.]
-    \fbox{\parbox{0.28\textwidth}{\centering\vspace{3.5cm}
-        \textit{[Hình 8.1: gameStory -- giây thứ 4]}\vspace{3.5cm}}}
-    \\[6pt]
-    \textit{\small Hình 8.1: Màn hình gameStory lúc đang chạy intro}
+    \includegraphics[width=0.3\textwidth]{08-gameStoryGuide-screenshot-v2}
+    \\[10pt] % Tạo khoảng cách nhỏ giữa hình và chú thích
+    \textit{\small Hình 8.2: Màn hình module gameStory V2}
 \end{figure}
 
 Toàn bộ màn hình giữ tỉ lệ \textbf{9:16 (dọc)}, nền tối. Ba thành phần
@@ -366,15 +367,9 @@ có lựa chọn ảnh hưởng đến nhánh tiếp theo.
 
 \begin{figure}[htbp]
     \centering
-    % [SCREENSHOT 8.2: Chụp màn hình gameStory đang ở chế độ dialogue.
-    %  Cần thấy: khung hội thoại phía dưới với tên nhân vật in đậm, dòng text
-    %  câu thoại, vùng ảnh scene ở trên (dù chỉ là placeholder "[IMAGE]").
-    %  Nếu đang ở node có choices: thấy được 2-3 nút lựa chọn.
-    %  Nếu chụp được nút Skip ở góc thì càng tốt.]
-    \fbox{\parbox{0.28\textwidth}{\centering\vspace{4cm}
-        \textit{[Hình 8.2: Dialogue mode -- node có lựa chọn]}\vspace{4cm}}}
-    \\[6pt]
-    \textit{\small Hình 8.2: Chế độ hội thoại (dialogue-only mode)}
+    \includegraphics[width=0.3\textwidth]{assets/08-gameStoryGuide-screenshot-v2-dialogue}
+    \\[10pt] % Tạo khoảng cách nhỏ giữa hình và chú thích
+    \textit{\small Hình 8.3: Màn hình module gameStory V2 - Dialogue}
 \end{figure}
 
 \noindent\textbf{Bố cục màn hình hội thoại:}
@@ -585,3 +580,6 @@ phiên mà không lo xung đột.}
 
 \label{LastPageGameStoryGuide}
 \end{document}
+
+
+

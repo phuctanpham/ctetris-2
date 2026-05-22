@@ -2,108 +2,33 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
-\usepackage{docmute}
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc,matrix}
-\usepackage{tabularx}
-\usepackage{enumitem}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{pifont} % Dùng để lấy icon checkmark và cross
-\usepackage{colortbl}
-\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - Công nghệ nền tảng}}
-
-% ── Color palette (aligned with SDS docs) ──────────────────────────────────
-\definecolor{pillarBlue}{RGB}{30,90,160}
-\definecolor{versionGreen}{RGB}{20,130,80}
-\definecolor{versionAmber}{RGB}{190,120,10}
-\definecolor{versionRed}{RGB}{170,40,40}
-\definecolor{boxGray}{RGB}{240,242,245}
-\definecolor{frontendColor}{RGB}{25,118,210}
-\definecolor{backendColor}{RGB}{46,125,50}
-\definecolor{dbColor}{RGB}{123,31,162}
-\definecolor{devopsColor}{RGB}{183,28,28}
-\definecolor{sharedColor}{RGB}{230,81,0}
-
-\tikzset{
-  techBox/.style={rectangle, rounded corners=4pt, draw=#1, fill=#1!10,
-                  thick, align=center, font=\small\bfseries,
-                  inner sep=6pt, minimum height=0.9cm},
-  techBoxSm/.style={rectangle, rounded corners=3pt, draw=#1!70, fill=#1!8,
-                    align=center, font=\scriptsize, inner sep=4pt,
-                    minimum height=0.65cm, text width=2.2cm},
-  layerBar/.style={rectangle, draw=#1!70, fill=#1!12, rounded corners=3pt,
-                   minimum width=11cm, minimum height=0.85cm,
-                   align=center, font=\small\bfseries},
-  sdsArrow/.style={-{Stealth[length=5pt]}, thick, #1},
-  vTag/.style={rectangle, rounded corners=2pt, fill=#1, text=white,
-               font=\footnotesize\bfseries, inner sep=3pt},
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
 }
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
+\usepackage{docmute}
 
-% ── Platform matrix cell macros ─────────────────────────────────────────────
-\newcommand{\Yes}{\cellcolor{versionGreen!12}\textcolor{versionGreen}{\ding{51}}}
-\newcommand{\No}{\cellcolor{red!8}\textcolor{versionRed}{\ding{55}}}
-\newcommand{\Par}{\cellcolor{versionAmber!12}\textcolor{versionAmber}{\textbf{\sim}}}
+\hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - Công nghệ nền tảng}}
 
 \begin{document}
 \providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
 \StandaloneSectionSetup{15-technologyAdoption.tex}{LastPageTechnologyAdoption}
+
 \onehalfspacing
 
 \section{Công nghệ nền tảng}
 
 % ── TỔNG QUAN KIẾN TRÚC ────────────────────────────────────────────────────
-\subsection{Tổng quan kiến trúc kỹ thuật}
-
+\subsection{Công nghệ Frontend}
+\subsubsection{Tổng quan}
 \textbf{cTetris} được xây dựng theo triết lý \textit{``một nguồn mã, đa nền tảng''}: cùng một codebase C++17 biên dịch thành native executable (macOS / Windows / Ubuntu) và WebAssembly bundle (trình duyệt), không có nhánh logic riêng cho từng nền tảng.
-
 \begin{center}
 \begin{tikzpicture}[node distance=0.4cm]
-  % Layer 5 — DevOps / Toolchain
-  \node[layerBar=devopsColor]
-    (L5) at (0,0)
-    {DevOps \& Toolchain --- CMake · build.sh/ps1 · Emscripten/emsdk · GitHub Actions · Docker};
-  % Layer 4 — Database
-  \node[layerBar=dbColor, below=of L5]
-    (L4)
-    {Database --- SQLite3 (embedded) · Cloudflare D1 (edge) · IDBFS (WASM persist)};
-  % Layer 3 — Backend / Services
-  \node[layerBar=backendColor, below=of L4]
-    (L3)
-    {Backend / Services --- C++17 Game Logic · libcurl · emscripten\_fetch · GitHub Gist · Cloudflare Worker};
-  % Layer 2 — Shared Libs
-  \node[layerBar=sharedColor, below=of L3]
-    (L2)
-    {Shared Libraries --- nlohmann/json · nanosvg/rast · sqlite3 amalgamation};
-  % Layer 1 — Frontend
-  \node[layerBar=frontendColor, below=of L2]
-    (L1)
-    {Frontend / Rendering --- SDL3 · SDL3\_ttf · nanosvg · WebAssembly (Emscripten)};
-  % Arrows
-  \foreach \a/\b in {L5/L4, L4/L3, L3/L2, L2/L1}{
-    \draw[sdsArrow=gray!50](\a)--(\b);
-  }
-  % Version badges on right
-  \node[vTag=versionGreen, right=0.3cm of L1] {V1};
-  \node[vTag=versionAmber, right=0.3cm of L3] {V2};
-  \node[vTag=versionRed,   right=0.3cm of L4] {V3};
-\end{tikzpicture}
-\end{center}
-
-% ── FRONTEND ────────────────────────────────────────────────────────────────
-\subsection{Công nghệ Frontend}
-
-\subsubsection{Tổng quan}
-Frontend của cTetris không dùng framework UI truyền thống mà dựa hoàn toàn vào \textbf{SDL3} làm lớp trừu tượng đa nền tảng cho window, renderer, sự kiện và âm thanh. Toàn bộ đồ hoạ được vẽ thủ công bằng các lệnh procedural (\texttt{SDL\_RenderFillRect}, \texttt{SDL\_RenderDebugText}, hình học SDL), loại bỏ phụ thuộc vào bất kỳ engine nào.
-
-\begin{center}
-\begin{tikzpicture}[
-  comp/.style={techBoxSm=frontendColor, text width=2.4cm},
-  arrow/.style={sdsArrow=frontendColor!70}
-]
   % Row 1 — Entry
   \node[techBox=frontendColor, text width=9cm]
     (entry) at (0,0)
@@ -193,22 +118,27 @@ Frontend của cTetris không dùng framework UI truyền thống mà dựa hoà
   \node[box](gr)  at (1.5,-1.8)  {gameCore\\Physics Loop\\+ DB write};
   \node[box](http) at (4.5,-1.8) {HTTP Layer\\libcurl (native)\\emsc\_fetch (web)};
 
-  % External services
-  \node[cloud](gist)   at (-4.5,-3.6) {GitHub Gist\\manifest.json\\chapter JSON};
-  \node[cloud](cfwork) at (1.5,-3.6)  {Cloudflare\\Worker\\REST proxy};
-  \node[cloud](d1)     at (4.5,-3.6)  {Cloudflare D1\\Edge SQLite\\leaderboard};
+ % External services
+  \node[cloud](gist)   at (-4.5,-4.8) {GitHub Gist\\manifest.json\\chapter JSON};
+  \node[cloud](d1)     at (0.0,-4.8)  {Cloudflare D1\\Edge SQLite\\leaderboard};
+  \node[cloud](cfwork) at (4.5,-4.8)  {Cloudflare\\Worker\\REST proxy};
 
   \foreach \c in {gs,gc,gr,http}{\draw[arrow](core)--(\c.north);}
+  
   \draw[darrow](gs.south)--(gist.north)
     node[midway,right,font=\tiny]{SHA-diff sync};
+    
+  % Chuyển thành mũi tên thẳng đứng để loại bỏ đường chéo
   \draw[darrow](http.south)--(cfwork.north)
     node[midway,right,font=\tiny]{POST record};
-  \draw[darrow](cfwork.east)--(d1.west)
+    
+  % Kéo dài mũi tên và đổi hướng kết nối
+  \draw[darrow](cfwork.west)--(d1.east)
     node[midway,above,font=\tiny]{D1 write};
 
-  \node[font=\tiny,vTag=versionAmber] at (-4.5,-4.3){V2};
-  \node[font=\tiny,vTag=versionRed]   at (1.5,-4.3){V3};
-  \node[font=\tiny,vTag=versionRed]   at (4.5,-4.3){V3};
+  \node[font=\tiny,vTag=versionAmber] at (-4.5,-5.6){V2};
+  \node[font=\tiny,vTag=versionRed]   at (0.0,-5.6){V3};
+  \node[font=\tiny,vTag=versionRed]   at (4.5,-5.6){V3};
 \end{tikzpicture}
 \end{center}
 
@@ -259,7 +189,7 @@ Frontend của cTetris không dùng framework UI truyền thống mà dựa hoà
   \draw[arr](d0)--node[above,font=\tiny]{yes}(p2);
   \draw[arr](d0)--node[right,font=\tiny]{no}(p3);
   \draw[arr](p3)--(p4); \draw[arr](p4)--(p5);
-  \draw[arr,gray,dashed](p2.south)--++(0,-0.5)-|(p5.south);
+  \draw[arr,gray,dashed](p2.south) |- ([yshift=-0.5cm]p5.south) -- (p5.south);
 \end{tikzpicture}
 \end{center}
 
@@ -277,89 +207,55 @@ cTetris dùng ba lớp lưu trữ: \textbf{SQLite3 nhúng} (local, mọi phiên 
               align=left, font=\scriptsize, inner sep=4pt, text width=3.0cm},
   arrow/.style={sdsArrow=gray!60, dashed}
 ]
-  % Group 1
-  \node[grp=pillarBlue, minimum width=3.6cm, minimum height=4.8cm,
-        label=above:{\small\bfseries\color{pillarBlue}Group 1 — Per-user R/W}]
+  % Group 1 (Align top edge with other groups)
+  \node[grp=pillarBlue, minimum width=3.6cm, minimum height=8.0cm]
     (g1box) at (-4.5,0) {};
-  \node[tbl=pillarBlue] (rec) at (-4.5,1.2)
+  % Title moved to bottom, under the arrow, with smaller font
+  \node[font=\scriptsize\bfseries\color{pillarBlue}, align=center] 
+    at ([yshift=-0.85cm]g1box.south) {Group 1 — Per-user R/W};
+  \node[tbl=pillarBlue] (rec) at (-4.5, 2.5)
     {\textbf{default\_Records}\\id, idUser, startTS\\endTS, totalScore\\totalSeconds, avgSpeed\\retryNo, idStory};
-  \node[tbl=pillarBlue] (sto) at (-4.5,-0.5)
+  \node[tbl=pillarBlue] (sto) at (-4.5, 0.1)
     {\textbf{default\_Stories}\\idUser, idStory\\isActivated, isSelected\\lastMaxScore\\lastMaxSpeed};
-  \node[tbl=pillarBlue] (set) at (-4.5,-2.1)
+  \node[tbl=pillarBlue] (set) at (-4.5, -2.4)
     {\textbf{default\_Settings}\\key TEXT PK\\value TEXT\\(10 rows: volume\\color0-6, storyId\\chapterId)};
 
   % Group 2
-  \node[grp=dbColor, minimum width=3.6cm, minimum height=4.8cm,
-        label=above:{\small\bfseries\color{dbColor}Group 2 — Shared Catalogue}]
+  \node[grp=dbColor, minimum width=3.6cm, minimum height=8.0cm]
     (g2box) at (0,0) {};
-  \node[tbl=dbColor] (sd) at (0,1.4)
+  \node[font=\scriptsize\bfseries\color{dbColor}, align=center] 
+    at (0, -4.85) {Group 2 — Shared Catalogue};
+  \node[tbl=dbColor] (sd) at (0, 2.8)
     {\textbf{shared\_data}\\idStory, idChapter\\storyName, minScore\\minSpeed, tableMatrix\\requiredStories};
-  \node[tbl=dbColor] (sdlg) at (0,-0.3)
+  \node[tbl=dbColor] (sdlg) at (0, 1.0)
     {\textbf{shared\_dialogues}\\idStory, idChapter\\nodeId, speaker\\text, imageUrl\\nextNodeId};
-  \node[tbl=dbColor] (scho) at (0,-1.8)
+  \node[tbl=dbColor] (scho) at (0, -0.8)
     {\textbf{shared\_choices}\\nodeId, choiceIdx\\label, nextNodeId};
-  \node[tbl=dbColor] (smet) at (0,-3.0)
+  \node[tbl=dbColor] (smet) at (0, -2.6)
     {\textbf{shared\_meta}\\chapter\_id PK\\sha, updated\_at\\media\_base\_url};
 
-  % Group 3
-  \node[grp=devopsColor, minimum width=3.4cm, minimum height=2.0cm,
-        label=above:{\small\bfseries\color{devopsColor}Group 3 — D1 Sink}]
-    (g3box) at (4.5,0.8) {};
-  \node[tbl=devopsColor] (sync) at (4.5,0.8)
+  % Group 3 (Align top edge to match y=4.0)
+  \node[grp=devopsColor, minimum width=3.4cm, minimum height=4.0cm]
+    (g3box) at (4.5, 2.0) {};
+  \node[font=\scriptsize\bfseries\color{devopsColor}, align=center] 
+    at (4.5, -4.85) {Group 3 — D1 Sink};
+  \node[tbl=devopsColor] (sync) at (4.5, 2.5)
     {\textbf{sync\_Records}\\nameUser, totalScore\\totalSeconds, avgSpeed\\endTS, idStory\\seed: 30 fallback rows};
 
   % IDBFS node
   \node[grp=versionAmber, minimum width=3.4cm, minimum height=1.2cm]
-    (idbfs) at (4.5,-1.5)
+    (idbfs) at (4.5, -2.6)
     {\textbf{IDBFS (WASM only)}\\IndexedDB \texttt{FS.syncfs}\\flush sau mỗi write};
 
   % Arrows
-  \draw[arrow](rec.east)--(sync.west)
-    node[midway,above,font=\tiny]{leaderboard seed};
-  \draw[arrow](g2box.east)--(g3box.west)
+  % Path arrow over the top to avoid overlapping Group 2
+  \draw[arrow] (rec.north) -- ++(0,1.8) coordinate (top) -| (sync.north);
+  \path (top) -- (top -| sync.north) node[midway, above, font=\tiny] {leaderboard seed};
+    
+  \draw[arrow](g2box.east |- g3box.west)--(g3box.west)
     node[midway,above,font=\tiny,align=center]{D1 sync\\(V3)};
-  \draw[sdsArrow=versionAmber,dashed](g1box.south east)--++(0,-0.5)-|(idbfs.south);
-
-\end{tikzpicture}
-\end{center}
-
-\subsubsection{Bảng chi tiết Database}
-
-\begin{tabularx}{\linewidth}{|l|l|X|}
-  \hline
-  \textbf{Công nghệ} & \textbf{Mode} & \textbf{Vai trò \& đặc điểm kỹ thuật} \\
-  \hline
-  \textbf{SQLite3}        & Embedded     & File duy nhất \texttt{default.sqlite}; path = \texttt{SDL\_GetPrefPath("uit","cTetris")} + \texttt{<idUser>.sqlite}; compile flag \texttt{-DSQLITE\_THREADSAFE=0} (WASM single-thread); \texttt{CREATE TABLE IF NOT EXISTS} idempotent schema init; 8 bảng, 3 nhóm ownership. \\
-  \hline
-  \textbf{IDBFS}          & WASM only    & Emscripten \texttt{idbfs\_mount\_dir} ánh xạ \texttt{SDL\_GetPrefPath} sang IndexedDB; \texttt{idbfs\_load\_from\_idb()} trước \texttt{sqlite3\_open}; \texttt{idbfs\_save\_to\_idb()} sau mỗi write transaction. Native: \texttt{dbSyncToPersistent()} là compile-time no-op. \\
-  \hline
-  \textbf{Cloudflare D1}  & V3 / Edge    & Serverless SQLite trên Cloudflare edge; schema \texttt{sync\_Records}; 1-way sink từ local → D1 sau game-over; Board popup \texttt{GET /api/records} ORDER BY score DESC. \\
-  \hline
-  \textbf{Cloudflare D1 + Durable Objects}  & V3 / Optional& Dự phòng cho user profile store và session data nếu D1 Durable Objects không đủ; driver: C++ Driver via REST (không dùng native C++ SDK để tránh WASM incompatibility). \\
-  \hline
-\end{tabularx}
-
-\subsubsection{Vòng đời kết nối SQLite (DB Lifecycle Contract)}
-
-\begin{center}
-\begin{tikzpicture}[
-  proc/.style={techBoxSm=dbColor, text width=2.4cm, minimum height=0.65cm},
-  arr/.style={sdsArrow=dbColor}
-]
-  \node[proc](p1){gameConsole\\dbOpen +\\dbInitSchema};
-  \node[proc,right=0.5cm of p1](p2){Event loop\\R/W Settings\\Stories, Board};
-  \node[proc,right=0.5cm of p2](p3){runGameCore\\(separate sqlite3*)};
-  \node[proc,right=0.5cm of p3](p4){onGameOver:\\dbOpen→INSERT\\→UPSERT→Close};
-  \node[proc,right=0.5cm of p4](p5){Console\\re-entry:\\dbOpen lại};
-
-  \foreach \x/\y in {p1/p2,p2/p3,p3/p4,p4/p5}{\draw[arr](\x)--(\y);}
-
-  \node[font=\tiny,draw=red!40,fill=red!5,rounded corners,inner sep=2pt,
-        below=0.4cm of p4, align=center]
-    {gameOverRecorded guard\\chỉ ghi đúng 1 lần/session};
-  \node[font=\tiny,draw=blue!40,fill=blue!5,rounded corners,inner sep=2pt,
-        below=0.4cm of p3, align=center]
-    {Hai sqlite3* độc lập\\không double-open conflict};
+    
+  \draw[sdsArrow=versionAmber,dashed](g1box.south)--++(0,-0.5)-|(idbfs.south);
 \end{tikzpicture}
 \end{center}
 
@@ -377,22 +273,23 @@ Pipeline build của cTetris hỗ trợ \textbf{4 target} từ một codebase: \
 ]
   % Source
   \node[techBox=pillarBlue, text width=5.5cm]
-    (src) at (0,3) {C++ Source + CMakeLists.txt};
-
-  % Build scripts
-  \node[b](bs)  at (-2.5,1.5) {build.sh\\build.ps1\\(interactive menu)};
-  \node[b](cmake) at (0,1.5) {CMake\\find\_package\\+ CPM};
-  \node[b](emsdk) at (2.5,1.5) {Emscripten\\emsdk\\3.1.x};
-
-  % Outputs (đã đổi tên style thành outBox để tránh đụng từ khóa 'out')
-  \node[outBox](nat) at (-3.5,-0.2) {cTetris\\(.exe/.app)\\native};
-  \node[outBox](wasm) at (-1.2,-0.2){cTetris.html\\+ .js + .wasm};
-  \node[outBox](sa)  at (1.2,-0.2)  {gameStory\\gameConsole\\gameCore (standalone)};
-  \node[outBox](ci)  at (3.5,-0.2)  {GitHub Actions\\CI artifact};
+    (src) at (0,4.0) {C++ Source + CMakeLists.txt};
+  
+  % Build scripts (Red layer - expanded horizontally)
+  \node[b](bs)  at (-3.5, 1.5) {build.sh\\build.ps1\\(interactive menu)};
+  \node[b](cmake) at (0, 1.5) {CMake\\find\_package\\+ CPM};
+  \node[b](emsdk) at (3.5, 1.5) {Emscripten\\emsdk\\3.1.x};
+  
+  % Outputs (Green layer - expanded horizontally and pushed down)
+  \node[outBox](nat) at (-4.5, -1.5) {cTetris\\(.exe/.app)\\native};
+  \node[outBox](wasm) at (-1.5, -1.5) {cTetris.html\\+ .js + .wasm};
+  \node[outBox](sa)  at (1.5, -1.5)  {gameStory\\gameConsole\\gameCore (standalone)};
+  \node[outBox](ci)  at (4.5, -1.5)  {GitHub Actions\\CI artifact};
 
   \draw[arr](src)--(bs); \draw[arr](src)--(cmake); \draw[arr](src)--(emsdk);
   \draw[arr](bs)--(nat); \draw[arr](cmake)--(nat); \draw[arr](cmake)--(sa);
-  \draw[arr](emsdk)--(wasm); \draw[arr](cmake)--(wasm);
+  \draw[arr, rounded corners=12pt] (emsdk.east) -- ++(2.8,0) |- ([yshift=-0.8cm]wasm.south) -- (wasm.south);
+  \draw[arr](cmake)--(wasm);
   \draw[arr](cmake)--(ci);
 \end{tikzpicture}
 \end{center}
@@ -458,8 +355,8 @@ Pipeline build của cTetris hỗ trợ \textbf{4 target} từ một codebase: \
 
 \begin{center}
 \begin{tikzpicture}[
-  pkg/.style={techBoxSm=devopsColor, text width=2.2cm},
-  from/.style={techBoxSm=pillarBlue, text width=2.2cm},
+  pkg/.style={techBoxSm=devopsColor, text width=2.4cm},
+  from/.style={techBoxSm=pillarBlue, text width=2.4cm},
   arr/.style={sdsArrow=gray!60},
 ]
   \node[from](sdl3){SDL3\\(git main\\self-build)};
@@ -467,8 +364,8 @@ Pipeline build của cTetris hỗ trợ \textbf{4 target} từ một codebase: \
   \node[pkg,right=0.5cm of nano](sq){sqlite3\\amalgamation\\(-DSQLITE\_\\THREADSAFE=0)};
   \node[pkg,right=0.5cm of sq](json){nlohmann\\json\\(header-only)};
   \node[pkg,right=0.5cm of json](curl){libcurl\\(system) /\\emsc\_fetch};
-
-  \node[techBox=pillarBlue, text width=11cm, below=0.8cm of json]
+  % Center below 'sq' (the middle node) and expand width to span all 5 nodes
+  \node[techBox=pillarBlue, text width=13.5cm, below=0.8cm of sq]
     (app) {cTetris executable / cTetris.html bundle};
 
   \foreach \x in {sdl3,nano,sq,json,curl}
@@ -477,24 +374,25 @@ Pipeline build của cTetris hỗ trợ \textbf{4 target} từ một codebase: \
 \end{center}
 
 % ── CI/CD ───────────────────────────────────────────────────────────────────
-\subsubsection{Quy trình CI/CD (GitHub Actions --- 3 workflows)}
+\subsubsection{Quy trình CI/CD (GitHub Actions --- 4 workflows)}
 
-Hệ thống CI/CD gồm 3 workflow độc lập, mỗi cái bảo vệ một khía cạnh khác nhau của dự án:
+Hệ thống CI/CD gồm 4 workflow độc lập, mỗi cái bảo vệ một khía cạnh khác nhau của dự án:
 
 \vspace{4pt}
-\begin{tabularx}{\linewidth}{|l|l|X|X|}
+\begin{tabularx}{\linewidth}{|p{3.8cm}|X|X|X|}
   \hline
   \rowcolor{devopsColor!15}
   \textbf{Workflow} & \textbf{Trigger} & \textbf{Mục tiêu} & \textbf{Runner} \\
   \hline
-  \texttt{deploy-pages.yml}   & push \texttt{main}/\texttt{test} + path \texttt{app/**} & Build WASM $\rightarrow$ deploy GitHub Pages & Configurable: ubuntu / windows / macos \\
+  \texttt{deploy-pages.yml}   & push \texttt{main}/\texttt{test}\newline path: \texttt{app/**} & Build WASM $\rightarrow$ deploy GitHub Pages & Configurable:\newline ubuntu / windows / macos \\
   \hline
-  \texttt{sync-chapters.yml}  & push \texttt{main}/\texttt{test} + path \texttt{chapters/src/**} & Validate JSON $\rightarrow$ upsert Gist $\rightarrow$ rebuild manifest & ubuntu-latest \\
+  \texttt{sync-chapters.yml}  & push \texttt{main}/\texttt{test}, manual\newline path: \texttt{chapters/src/**} & Validate Token $\rightarrow$ Upsert Gist $\rightarrow$ Echo Manifest URL & ubuntu-latest \\
   \hline
-  \texttt{test-build.yml}     & push nhánh khác main/test + path \texttt{app/**} & Build native + WASM trên 3 OS song song & matrix: windows / ubuntu / macos \\
+  \texttt{test-build.yml}     & push nhánh khác\newline path: \texttt{app/**} & Build native + WASM trên 3 OS song song & matrix:\newline windows / ubuntu / macos \\
+  \hline
+  \texttt{deploy-}\newline\texttt{cloudflare.yml} & push \texttt{main}, manual\newline path: \texttt{api/**} & Validate Secrets $\rightarrow$ Deploy Worker $\rightarrow$ Healthcheck API & ubuntu-latest \\
   \hline
 \end{tabularx}
-
 % ── Workflow 1: deploy-pages ─────────────────────────────────────────────────
 \vspace{6pt}
 \noindent\textbf{Workflow 1: \texttt{deploy-pages.yml} --- Build WASM \& Deploy to GitHub Pages}
@@ -563,24 +461,25 @@ Hệ thống CI/CD gồm 3 workflow độc lập, mỗi cái bảo vệ một kh
   darr/.style={sdsArrow=gray!50, dashed}
 ]
   \node[trig](trig) at (-5.2,0)
-    {push main/test\\chapters/src/\\**/*.json};
+    {push main/test\\+ dispatch\\chapters/src/**};
   \node[cStep](s0) at (-2.0,0)
-    {\textbf{Step 0}\\Read \texttt{app/.env}\\Extract Gist ID};
+    {\textbf{Step 0}\\Validate\\GIST\_TOKEN};
   \node[cStep](s1) at (1.2,0)
-    {\textbf{Step 1}\\Validate JSON\\(\texttt{jq has("shared\_data")})};
+    {\textbf{Step 1}\\Sync Chapters\\(Upsert to Gist)};
   \node[cStep](s2) at (4.4,0)
-    {\textbf{Step 2}\\Upsert chapter Gists\\find-or-create + PATCH};
+    {\textbf{Step 2}\\Rebuild Manifest\\(Update latest)};
   \node[cStep](s3) at (7.6,0)
-    {\textbf{Step 3}\\Rebuild manifest\\Gist + version \texttt{vXX.YY}};
+    {\textbf{Step 3}\\Echo URL\\to copy to .env};
+
   \node[cSide](ver) at (7.6,-1.8)
-    {Version scheme:\\chapter\_count $\rightarrow$ XX\\commit++ $\rightarrow$ YY};
-  \node[cSide](sha) at (4.4,-1.8)
-    {Per-chapter SHA:\\latestCommitId\\gistUrl, mediaBaseUrl};
+    {Notice: MANIFEST\_GIST\_URL\\for app/.env};
+  \node[cSide](sha) at (-2.0,-1.8)
+    {Token check:\\Require 'gist' scope\\via x-oauth-scopes};
 
   \draw[arr](trig)--(s0); \draw[arr](s0)--(s1);
   \draw[arr](s1)--(s2);   \draw[arr](s2)--(s3);
   \draw[darr](s3)--(ver);
-  \draw[darr](s2)--(sha);
+  \draw[darr](s0)--(sha);
 \end{tikzpicture}
 \end{center}
 
@@ -589,13 +488,13 @@ Hệ thống CI/CD gồm 3 workflow độc lập, mỗi cái bảo vệ một kh
   \rowcolor{backendColor!10}
   \textbf{Điểm thiết kế} & \textbf{Chi tiết} \\
   \hline
-  Manifest URL từ \texttt{app/.env} & \texttt{MANIFEST\_GIST\_URL} được parse từ repo --- không hardcode trong workflow; Gist ID extract bằng \texttt{awk -F'/'}. \\
+  Bảo mật Token & Kiểm tra ngay từ đầu quyền \texttt{gist} của \texttt{GIST\_TOKEN} thông qua HTTP header \texttt{x-oauth-scopes}, tránh workflow fail ngầm giữa chừng do thiếu phân quyền. \\
   \hline
-  SHA-diff versioning & Manifest lưu \texttt{latest: "vXX.YY"}; XX = số chapter, YY tăng dần mỗi push; client so SHA trước khi tải chapter JSON. \\
+  Feedback URL rõ ràng & Tự động tạo chuỗi \texttt{MANIFEST\_GIST\_URL} định dạng sẵn để dev copy thẳng vào \texttt{app/.env}. Có fallback đọc từ \texttt{.env} cũ nếu workflow lỗi, đảm bảo luôn in ra URL cuối cùng kèm GitHub actions notice. \\
   \hline
-  find-or-create Gist & Tìm Gist theo filename trong 100 Gist đầu; tạo mới nếu chưa tồn tại; PATCH content nếu đã có --- idempotent. \\
+  Thủ công (dispatch) & Hỗ trợ \texttt{workflow\_dispatch} để ép đồng bộ lại bất cứ lúc nào mà không cần tạo code commit giả mạo. \\
   \hline
-  Không ghi vào repo & \texttt{permissions: contents: read} --- workflow chỉ đọc repo, toàn bộ output đẩy lên Gist; không có commit ngược. \\
+  Không ghi vào repo & Sử dụng \texttt{permissions: contents: read} --- workflow chỉ đọc nội dung repo, toàn bộ kết quả đồng bộ đẩy lên Gist, bảo vệ tính nguyên vẹn của source code. \\
   \hline
 \end{tabularx}
 
@@ -656,9 +555,57 @@ Hệ thống CI/CD gồm 3 workflow độc lập, mỗi cái bảo vệ một kh
   \hline
   Trigger path filter & Chỉ chạy khi \texttt{app/**} thay đổi; push doc/chore không trigger --- tiết kiệm CI minutes. \\
   \hline
-  Timeout 60 phút & Mỗi job có \texttt{timeout-minutes: 60}; emsdk download + SDL3 compile lần đầu chiếm $\sim$20 phút, cache hit còn $\sim$5 phút. \\
+  Timeout 60 phút & Mỗi job có \texttt{timeout-minutes: 60};
+emsdk download + SDL3 compile lần đầu chiếm $\sim$20 phút, cache hit còn $\sim$5 phút. \\
+  \hline
+\end{tabularx}
+
+% ── Workflow 4: deploy-cloudflare ────────────────────────────────────────────
+\vspace{6pt}
+\noindent\textbf{Workflow 4: \texttt{deploy-cloudflare.yml} --- Deploy API lên Cloudflare Workers}
+
+\begin{center}
+\begin{tikzpicture}[
+  cStep/.style={techBoxSm=devopsColor, text width=2.4cm, minimum height=0.95cm},
+  trig/.style={techBoxSm=pillarBlue, text width=2.4cm},
+  cSide/.style={rectangle, draw=gray!50, fill=gray!6, rounded corners=2pt,
+               font=\tiny, align=center, inner sep=3pt, text width=2.4cm},
+  arr/.style={sdsArrow=devopsColor!70},
+  darr/.style={sdsArrow=gray!50, dashed}
+]
+  \node[trig](trig) at (0,0)
+    {push main\\+ dispatch\\path: api/**};
+  \node[cStep](s0) at (3.2,0)
+    {\textbf{Step 0}\\Validate\\CF Secrets};
+  \node[cStep](s1) at (6.4,0)
+    {\textbf{Step 1}\\Deploy Worker\\(npx wrangler)};
+  \node[cStep](s2) at (9.6,0)
+    {\textbf{Step 2}\\Healthcheck\\(/health API)};
+  
+  \node[cSide](info) at (9.6,-1.8)
+    {Read URL từ .env\\Check HTTP 200\\Output ::notice};
+    
+  \draw[arr](trig)--(s0);
+  \draw[arr](s0)--(s1);
+  \draw[arr](s1)--(s2);
+  \draw[darr](s2)--(info);
+\end{tikzpicture}
+\end{center}
+
+\begin{tabularx}{\linewidth}{|l|X|}
+  \hline
+  \rowcolor{devopsColor!10}
+  \textbf{Điểm thiết kế} & \textbf{Chi tiết} \\
+  \hline
+  Pre-flight check & Xác thực \texttt{CLOUDFLARE\_API\_TOKEN} và \texttt{ACCOUNT\_ID} trước khi chạy Wrangler. Báo lỗi chi tiết kèm hướng dẫn lấy token để fail-fast, tiết kiệm thời gian CI. \\
+  \hline
+  Wrangler Deploy & Chạy \texttt{npx wrangler deploy} trong thư mục \texttt{api/} với Node 24 runtime để đẩy mã nguồn backend lên edge network của Cloudflare. \\
+  \hline
+  Tự động Healthcheck & Tách \texttt{CTETRIS\_API\_URL} từ file \texttt{app/.env}, sau đó dùng \texttt{curl} gọi endpoint \texttt{/health} để đảm bảo Worker mới deploy đang hoạt động bình thường (HTTP 200). Đính kèm notice logs trên GitHub UI. \\
   \hline
 \end{tabularx}
 
 \label{LastPageTechnologyAdoption}
 \end{document}
+
+

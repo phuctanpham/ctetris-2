@@ -28,6 +28,7 @@
 \usepackage{enumitem}
 \usepackage{array}
 \usepackage{tabularx}
+\usepackage{booktabs}
 \usepackage{multirow}
 \usepackage[table]{xcolor}
 \usepackage{ulem}
@@ -35,6 +36,7 @@
 
 % ====== THÊM 2 GÓI NÀY ĐỂ FIX LỖI ADJUSTBOX VÀ FOREST ======
 \usepackage{adjustbox}
+\PassOptionsToPackage{edges}{forest}
 \usepackage[edges]{forest}
 % ============================================================
 
@@ -42,12 +44,164 @@
 \usepackage{tikz}
 
 % ====== BỔ SUNG FIT, BACKGROUNDS, TREES VÀO DANH SÁCH ======
-\usetikzlibrary{calc, arrows.meta, shapes.geometric, positioning, fit, backgrounds, trees}
+\usetikzlibrary{calc, arrows.meta, shapes.geometric, positioning, fit, backgrounds, trees, matrix}
+
+% Shared colors, TikZ styles, and macros used across all documents
+\definecolor{pillarBlue}{RGB}{30,90,160}
+\definecolor{versionGreen}{RGB}{20,130,80}
+\definecolor{versionAmber}{RGB}{190,120,10}
+\definecolor{versionRed}{RGB}{170,40,40}
+\definecolor{boxGray}{RGB}{240,242,245}
+
+\definecolor{frontendColor}{RGB}{25,118,210}
+\definecolor{backendColor}{RGB}{46,125,50}
+\definecolor{dbColor}{RGB}{123,31,162}
+\definecolor{devopsColor}{RGB}{183,28,28}
+\definecolor{sharedColor}{RGB}{230,81,0}
+
+\definecolor{pConceptualize}{RGB}{120,120,120}
+\definecolor{pDesign}{RGB}{70,140,210}
+\definecolor{pImpl}{RGB}{30,90,190}
+\definecolor{pTest}{RGB}{210,155,0}
+\definecolor{pInteg}{RGB}{50,160,70}
+\definecolor{pFix}{RGB}{200,80,40}
+\definecolor{pDeploy}{RGB}{100,190,120}
+
+\definecolor{v1green}{RGB}{20,130,80}
+\definecolor{v2amber}{RGB}{190,120,10}
+\definecolor{v3red}{RGB}{170,40,40}
+
+\definecolor{storyBlue}{RGB}{30,90,200}
+\definecolor{consoleOrange}{RGB}{200,100,20}
+\definecolor{coreViolet}{RGB}{100,30,160}
+
+\definecolor{headerGray}{RGB}{60,60,60}
+\definecolor{rowLight}{RGB}{245,247,250}
+
+\tikzset{
+  techBox/.style   = {rectangle, rounded corners=3pt, draw=#1, fill=#1!8,
+                     text width=3.2cm, align=center, minimum height=1.2cm,
+                     font=\small\bfseries},
+  techBoxSm/.style = {rectangle, rounded corners=2pt, draw=#1, fill=#1!8,
+                     text width=2.4cm, align=center, minimum height=0.85cm,
+                     font=\scriptsize\bfseries},
+  comp/.style      = {rectangle, rounded corners=3pt, draw=gray!55, fill=gray!10,
+                     align=center, font=\scriptsize, inner sep=4pt,
+                     minimum height=0.65cm, text width=2.2cm},
+  layerBar/.style  = {rectangle, draw=#1!70, fill=#1!12, rounded corners=3pt,
+                     minimum width=11cm, minimum height=0.85cm,
+                     align=center, font=\small\bfseries},
+  sdsBox/.style   = {rectangle, rounded corners=3pt, draw=#1, fill=boxGray,
+                     text width=3.2cm, align=center, minimum height=0.9cm,
+                     font=\small\bfseries},
+  sdsArrow/.style = {-{Stealth[length=5pt]}, thick, #1},
+  arrow/.style    = {-{Stealth[length=4.5pt]}, thick},
+  vTag/.style     = {rectangle, rounded corners=2pt, fill=#1, text=white,
+                     font=\footnotesize\bfseries, inner sep=3pt},
+  seqLife/.style  = {draw=gray!60, dashed, thick},
+  seqMsg/.style   = {-{Stealth[length=4pt]}, draw=#1, thick},
+  layerBox/.style = {rectangle, draw=pillarBlue!50, fill=pillarBlue!8,
+                     rounded corners=4pt, minimum width=9cm,
+                     minimum height=0.7cm, align=center, font=\small}
+}
+
+\DeclareRobustCommand{\vbadge}[2]{%
+  \tikz[baseline=-2pt]\node[vTag={#1}]{#2};~%
+}
+\newcommand{\Vone}{\texorpdfstring{\vbadge{versionGreen}{V1}}{[V1]}}
+\newcommand{\Vtwo}{\texorpdfstring{\vbadge{versionAmber}{V2}}{[V2]}}
+\newcommand{\Vthree}{\texorpdfstring{\vbadge{versionRed}{V3}}{[V3]}}
+
+\newcommand{\PartPillars}{%
+  \vspace{4pt}
+  {\color{pillarBlue}\rule{\linewidth}{1.5pt}}\\[2pt]
+  {\large\bfseries\color{pillarBlue} Phần I \quad Kỹ thuật tổng thể của phân hệ}\\[-2pt]
+  {\color{pillarBlue}\rule{\linewidth}{0.4pt}}
+  \vspace{2pt}
+}
+\newcommand{\PartVersions}{%
+  \vspace{4pt}
+  {\color{versionGreen}\rule{\linewidth}{1.5pt}}\\[2pt]
+  {\large\bfseries\color{versionGreen} Phần II \quad Kỹ thuật theo giai đoạn}\\[-2pt]
+  {\color{versionGreen}\rule{\linewidth}{0.4pt}}
+  \vspace{2pt}
+}
+
+\newcommand{\ThreeLayerArch}[4]{%
+  \begin{center}\begin{tikzpicture}[node distance=0.35cm]
+    \node[layerBox, fill=pillarBlue!18, draw=pillarBlue] (L1) {#2};
+    \node[layerBox, below=of L1]                         (L2) {#3};
+    \node[layerBox, fill=versionGreen!12, draw=versionGreen!60, below=of L2] (L3) {#4};
+    \draw[sdsArrow=pillarBlue!70] (L1)--(L2);
+    \draw[sdsArrow=versionGreen!70] (L2)--(L3);
+    \node[left=0.2cm of L1, font=\tiny\itshape, text=gray] {UI / Entry};
+    \node[left=0.2cm of L2, font=\tiny\itshape, text=gray] {Logic};
+    \node[left=0.2cm of L3, font=\tiny\itshape, text=gray] {Data};
+  \end{tikzpicture}\end{center}
+}
+
+\newcommand{\LinearSeq}[1]{%
+  \begin{center}\begin{tikzpicture}[node distance=0.6cm]
+  \def\steps{#1}
+  \foreach \s [count=\i] in \steps {
+    \node[sdsBox=pillarBlue!60] (n\i) at ({(\i-1)*3.8cm},0) {\s};
+  }
+  \foreach \i [count=\j from 2] in {1,...,4} {
+    \draw[sdsArrow=pillarBlue] (n\i)--(n\j);
+  }
+  \end{tikzpicture}\end{center}
+}
+
+\newenvironment{VersionTable}{%
+  \vspace{4pt}
+  \small
+  \begin{tabular}{@{}c p{3cm} p{3.5cm} p{3.5cm}@{}}
+  \hline
+  \rowcolor{pillarBlue!15}
+  \textbf{Ver} & \textbf{Muc tieu} & \textbf{Cong nghe} & \textbf{Tich hop} \\
+  \hline
+}{\hline\end{tabular}\vspace{4pt}}
+
+\newcommand{\gbar}[6]{%
+  \fill[#1!75, draw=#1, rounded corners=1.5pt]
+    ({(#2-1)/#4*#5}, #6) rectangle ({#3/#4*#5}, {#6+0.35});
+}
+\newcommand{\totalW}{13.5}
+\newcommand{\totalWks}{14}
+
+\usepackage{pifont}
+\newcommand{\Yes}{\textcolor{versionGreen}{\ding{51}}}
+\newcommand{\No}{\textcolor{versionRed}{\ding{55}}}
+\newcommand{\Par}{\textcolor{versionAmber}{\textbf{\sim}}}
+
+\newcommand{\levelBeg}{\textcolor{gray}{\textbf{Cơ bản}}}
+\newcommand{\levelMid}{\textcolor{blue!70!black}{\textbf{Trung cấp}}}
+\newcommand{\levelAdv}{\textcolor{green!50!black}{\textbf{Thành thạo}}}
+
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+
+\providecommand{\tipbox}[1]{%
+  \vspace{4pt}%
+  \noindent\colorbox{yellow!18}{\begin{minipage}{0.96\linewidth}%
+    \vspace{2pt}\textbf{Mẹo nhanh:} #1\vspace{2pt}%
+  \end{minipage}}%
+  \vspace{4pt}%
+}
+\providecommand{\notebox}[1]{%
+  \vspace{4pt}%
+  \noindent\colorbox{cyan!12}{\begin{minipage}{0.96\linewidth}%
+    \vspace{2pt}\textbf{Lưu ý:} #1\vspace{2pt}%
+  \end{minipage}}%
+  \vspace{4pt}%
+}
 
 % Table tuning
 \renewcommand{\tabularxcolumn}[1]{m{#1}}
 \hbadness=10000
 \hfuzz=10000pt
+
+\setlist[itemize]{leftmargin=*, itemsep=2pt, parsep=0pt}
+
 
 % Shared commands
 \newcommand{\subsecheading}[1]{%

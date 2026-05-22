@@ -2,48 +2,79 @@
 % !TEX encoding = UTF-8 Unicode
 \documentclass[12pt,a4paper]{article}
 
-% Kiểm tra file thư viện
-\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
-\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
-\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+% Load libraries directly
+\IfFileExists{src/libs/body.tex}{
+  \input{src/libs/body.tex}
+  \input{src/libs/header.tex}
+  \input{src/libs/footer.tex}
+}{
+  \input{libs/body.tex}
+  \input{libs/header.tex}
+  \input{libs/footer.tex}
+}
 
 \usepackage{docmute}
+\usepackage{lastpage}
 \hypersetup{pdftitle={Báo cáo Kỹ năng nghề nghiệp - Nội dung}}
 
-% FIX: Xử lý cảnh báo fancyhdr Warning
 \setlength{\headheight}{15.1pt}
 \addtolength{\topmargin}{-0.6pt}
 
 \begin{document}
-\StandaloneDocumentSetup{content.tex}{LastPageContent}
+% FIX 1: Enforce the global LastPageContent label for ALL footers in this document
+\ApplyStandardFooter{content.tex}{LastPageContent}
+\renewcommand{\StandaloneDocumentSetup}[2]{} % Disable sub-document footer overrides
+\renewcommand{\StandaloneSectionSetup}[2]{}  % Disable sub-document footer overrides
 \onehalfspacing
 
-% Fix 1 — Footer ID
-\renewcommand{\StandaloneSectionSetup}[2]{%
-  \ApplyStandardFooter{#1}{LastPageContent}%
-}
-
-% Fix 2 — Section numbering (Roman/Arabic)
+% Numbering definitions
 \renewcommand{\thesection}{\Roman{section}}
 \renewcommand{\thesubsection}{\arabic{subsection}}
+\newcounter{contentgroup}
+\renewcommand{\theHsection}{cg\arabic{contentgroup}.sec\arabic{section}}
+\renewcommand{\theHsubsection}{cg\arabic{contentgroup}.sec\arabic{section}.sub\arabic{subsection}}
+\renewcommand{\theHsubsubsection}{cg\arabic{contentgroup}.sec\arabic{section}.sub\arabic{subsection}.ssub\arabic{subsubsection}}
 
-% Fix 3 — Group heading (Ngắt trang + In hoa tiêu đề)
+% Group Heading
 \newcommand{\ContentGroup}[2]{%
   \clearpage
-  \setcounter{section}{0}%
+  \stepcounter{contentgroup}%
   \phantomsection
-  % Tự động viết hoa tiêu đề trong Mục lục (TOC)
-  \addcontentsline{toc}{section}{\textbf{#1.\ \MakeUppercase{#2}}}% 
+  \addcontentsline{toc}{part}{\textbf{#1.\ \MakeUppercase{#2}}}%
   \vspace*{0.4cm}%
-  % Tự động viết hoa tiêu đề hiển thị trong văn bản
   {\centering\large\bfseries #1.\ \MakeUppercase{#2}\par}% 
   \vspace{0.4cm}%
 }
 
-% Lệnh chèn file
 \newcommand{\InputContentFile}[1]{%
-  \IfFileExists{src/content/#1}{\input{src/content/#1}}{%
-    \IfFileExists{content/#1}{\input{content/#1}}{\input{../content/#1}}%
+  \IfFileExists{src/content/#1}{\input{src/content/#1}}{\input{content/#1}}%
+}
+
+% FIX 2: Smooth out the bookmark hierarchy to prevent jump warnings.
+\newcommand{\InputGroupedContentFile}[1]{%
+  {%
+    \let\section\subsection
+    \let\subsection\subsubsection
+    \let\subsubsection\paragraph
+    %
+    \let\origaddcontentsline\addcontentsline
+    \renewcommand{\addcontentsline}[3]{%
+      \def\tempa{##2}%
+      \def\tempb{section}%
+      \def\tempc{subsection}%
+      \def\tempd{subsubsection}%
+      % Map the original commands to sequential outline levels
+      \ifx\tempa\tempb
+        \origaddcontentsline{##1}{section}{##3}%
+      \else\ifx\tempa\tempc
+        \origaddcontentsline{##1}{subsection}{##3}%
+      \else\ifx\tempa\tempd
+        \origaddcontentsline{##1}{subsubsection}{##3}%
+      \else
+        \origaddcontentsline{##1}{##2}{##3}%
+      \fi\fi\fi
+    }%
+    \InputContentFile{#1}%
   }%
 }
 
@@ -52,44 +83,61 @@
 % Preface
 \InputContentFile{01-Preface.tex}
 
-%  A/ TÀI LIỆU ĐẶC TẢ YÊU CẦU (SRS)
+% A/ TÀI LIỆU ĐẶC TẢ YÊU CẦU (SRS)
 \ContentGroup{A}{đặc tả yêu cầu (SRS)}
-\InputContentFile{02-gameStoryRequirements.tex} \clearpage
-\InputContentFile{03-gameConsoleRequirements.tex} \clearpage
-\InputContentFile{04-gameCoreRequirements.tex}
 
-%  B/ TÀI LIỆU ĐẶC TẢ KỸ THUẬT (SDS)
+\InputGroupedContentFile{02-gameStoryRequirements.tex} \clearpage
+
+\InputGroupedContentFile{03-gameConsoleRequirements.tex} \clearpage
+
+\InputGroupedContentFile{04-gameCoreRequirements.tex}
+
+% B/ TÀI LIỆU ĐẶC TẢ KỸ THUẬT (SDS)
 \ContentGroup{B}{đặc tả kỹ thuật (SDS)}
-\InputContentFile{05-gameStoryEngineering.tex} \clearpage
-\InputContentFile{06-gameConsoleEngineering.tex} \clearpage
-\InputContentFile{07-gameCoreEngineering.tex}
 
-%  C/ HƯỚNG DẪN CÀI ĐẶT VÀ SỬ DỤNG
+\InputGroupedContentFile{05-gameStoryEngineering.tex} \clearpage
+
+\InputGroupedContentFile{06-gameConsoleEngineering.tex} \clearpage
+
+\InputGroupedContentFile{07-gameCoreEngineering.tex}
+
+% C/ HƯỚNG DẪN CÀI ĐẶT VÀ SỬ DỤNG
 \ContentGroup{C}{Hướng dẫn sử dụng}
-\InputContentFile{08-gameStoryGuide.tex} \clearpage
-\InputContentFile{09-gameConsoleGuide.tex} \clearpage
-\InputContentFile{10-gameCoreGuide.tex}
 
-%  D/ KIỂM THỬ VÀ KIỂM SOÁT CHẤT LƯỢNG
-\ContentGroup{D}{Kiểm thử}
-\InputContentFile{11-testStrategy.tex} \clearpage
-\InputContentFile{12-testList.tex}
+\InputGroupedContentFile{08-gameStoryGuide.tex} \clearpage
 
-%  E/ QUẢN LÝ DỰ ÁN
+\InputGroupedContentFile{09-gameConsoleGuide.tex} \clearpage
+
+\InputGroupedContentFile{10-gameCoreGuide.tex}
+
+% D/ KIỂM THỬ VÀ KIỂM SOÁT CHẤT LƯỢNG
+\ContentGroup{D}
+
+\InputGroupedContentFile{11-testStrategy.tex} \clearpage
+
+\InputGroupedContentFile{12-testList.tex}
+
+% E/ QUẢN LÝ DỰ ÁN
 \ContentGroup{E}{Quản lý}
-\InputContentFile{13-productMilestones.tex} \clearpage
-\InputContentFile{14-projectGanttChart.tex}
 
-%  F/ QUY HOẠCH TÀI NGUYÊN VÀ ĐỊNH HƯỚNG NHÂN LỰC
+\InputGroupedContentFile{13-productMilestones.tex} \clearpage
+
+\InputGroupedContentFile{14-projectGanttChart.tex}
+
+% F/ QUY HOẠCH TÀI NGUYÊN VÀ ĐỊNH HƯỚNG NHÂN LỰC
 \ContentGroup{F}{Quy hoạch}
-\InputContentFile{15-technologyAdoption.tex} \clearpage
-\InputContentFile{16-toolsetList.tex} \clearpage
-\InputContentFile{17-skillsetList.tex}
 
-%  G/ CÁC NỘI DUNG KHÁC
+\InputGroupedContentFile{15-technologyAdoption.tex} \clearpage
+
+\InputGroupedContentFile{16-toolsetList.tex} \clearpage
+
+\InputGroupedContentFile{17-skillsetList.tex}
+
+% G/ CÁC NỘI DUNG KHÁC
 \ContentGroup{G}{Các nội dung khác}
-\InputContentFile{00-References.tex} \clearpage
-\InputContentFile{00-Appendix.tex}
 
+\InputGroupedContentFile{00-References.tex} \clearpage
+
+\InputGroupedContentFile{00-Appendix.tex}
 \label{LastPageContent}
 \end{document}
