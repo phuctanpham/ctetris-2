@@ -11,6 +11,12 @@
 #include <cstdint>
 #include <cstdio>
 #include <ctime>
+#include <map>
+
+// stb_image: declarations only. The implementation (STB_IMAGE_IMPLEMENTATION)
+// is compiled once in gameStory/app.cpp; here we just reference the extern
+// stbi_load_from_memory / stbi_image_free symbols to decode story thumbnails.
+#include "stb_image.h"
 
 // [C.5] nlohmann/json for JSON-driven leaderboard
 #include <nlohmann/json.hpp>
@@ -1264,30 +1270,53 @@ std::vector<BoardRecord> dbLoadRecords(int limit) {
 // Minimal synchronous HTTP GET.
 // WASM: emscripten_fetch with Asyncify (requires -sASYNCIFY=1, already set).
 // Native: libcurl (linked when HAVE_LIBCURL; graceful offline otherwise).
+#ifdef __EMSCRIPTEN__
+// Async emscripten_fetch made synchronous via Asyncify. Synchronous
+// emscripten_fetch is illegal on the browser main thread (sync XHR cannot use
+// arraybuffer responseType -> instant status 0), which broke web sync + chapter
+// loading. Issue an async fetch and pump the event loop until done.
+struct EmFetchResult { std::string body; int status = 0; bool done = false; };
+static void emFetchOk(emscripten_fetch_t* f) {
+    EmFetchResult* r = (EmFetchResult*)f->userData;
+    if (f->numBytes > 0) r->body.assign(f->data, (size_t)f->numBytes);
+    r->status = (int)f->status;
+    r->done   = true;
+    emscripten_fetch_close(f);
+}
+static void emFetchErr(emscripten_fetch_t* f) {
+    EmFetchResult* r = (EmFetchResult*)f->userData;
+    r->status = (int)f->status;
+    r->done   = true;
+    emscripten_fetch_close(f);
+}
+#endif
+
 static std::string consoleHttpGet(const char* url) {
     if (!url || !*url) return "";
 
     CTDBG_REQ("GET", url);
 
 #ifdef __EMSCRIPTEN__
+    EmFetchResult res;
     emscripten_fetch_attr_t attr;
     emscripten_fetch_attr_init(&attr);
     SDL_strlcpy(attr.requestMethod, "GET", sizeof(attr.requestMethod));
-    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY |
-                      EMSCRIPTEN_FETCH_SYNCHRONOUS;
-    emscripten_fetch_t* fetch = emscripten_fetch(&attr, url);
-    std::string body;
-    if (fetch && fetch->status == 200 && fetch->numBytes > 0) {
-        body.assign(fetch->data, (size_t)fetch->numBytes);
-        CTDBG_RES("GET", url, 200, body.size());
-        CTDBG_BODY(body);
-    } else if (fetch) {
-        CTDBG_RES("GET", url, fetch->status, 0);
-        CTDBG_ERR("emscripten_fetch: non-200 or empty body");
-        SDL_Log("[gameConsole] GET %s HTTP %d", url, (int)fetch->status);
+    attr.attributes   = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;   // async (no SYNCHRONOUS)
+    attr.timeoutMSecs = 20000;
+    attr.onsuccess    = emFetchOk;
+    attr.onerror      = emFetchErr;
+    attr.userData     = &res;
+    emscripten_fetch(&attr, url);
+    while (!res.done) emscripten_sleep(8);   // Asyncify pumps the JS event loop
+    if (res.status == 200 && !res.body.empty()) {
+        CTDBG_RES("GET", url, 200, res.body.size());
+        CTDBG_BODY(res.body);
+        return res.body;
     }
-    if (fetch) emscripten_fetch_close(fetch);
-    return body;
+    CTDBG_RES("GET", url, res.status, 0);
+    CTDBG_ERR("emscripten_fetch(async): non-200 or empty body");
+    SDL_Log("[gameConsole] GET %s HTTP %d", url, res.status);
+    return std::string();
 
 #else
 #ifdef HAVE_LIBCURL
@@ -1339,19 +1368,22 @@ static int consoleHttpPost(const char* url,
         "Authorization", authVal.c_str(),
         nullptr
     };
+    EmFetchResult res;
     emscripten_fetch_attr_t attr;
     emscripten_fetch_attr_init(&attr);
     SDL_strlcpy(attr.requestMethod, "POST", sizeof(attr.requestMethod));
-    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY |
-                      EMSCRIPTEN_FETCH_SYNCHRONOUS;
-    attr.requestHeaders = hdr;
-    attr.requestData = jsonBody;
+    attr.attributes      = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;   // async
+    attr.timeoutMSecs    = 20000;
+    attr.requestHeaders  = hdr;
+    attr.requestData     = jsonBody;
     attr.requestDataSize = SDL_strlen(jsonBody);
-    emscripten_fetch_t* fetch = emscripten_fetch(&attr, url);
-    int status = fetch ? (int)fetch->status : -1;
-    CTDBG_RES("POST", url, status, fetch ? (size_t)fetch->numBytes : 0);
-    if (fetch) emscripten_fetch_close(fetch);
-    return status;
+    attr.onsuccess       = emFetchOk;
+    attr.onerror         = emFetchErr;
+    attr.userData        = &res;
+    emscripten_fetch(&attr, url);
+    while (!res.done) emscripten_sleep(8);   // Asyncify pumps the JS event loop
+    CTDBG_RES("POST", url, res.status, res.body.size());
+    return res.status;
 
 #else
 #ifdef HAVE_LIBCURL
@@ -2191,6 +2223,77 @@ static void drawSettingsLightbox(SDL_Renderer* renderer, const AppState& state) 
     drawCloseButton(renderer, SETTINGS_CLOSE);
 }
 
+// ---------------------------------------------------------------------------
+// Story thumbnails. The catalogue stores a per-chapter media_base_url (filled
+// by gameStory sync) + a per-story thumbnailPath filename. We download + decode
+// (stb_image) on first use and cache the texture by "chapter/filename" so the
+// render loop never re-fetches. Failures cache as nullptr -> placeholder shown.
+// ---------------------------------------------------------------------------
+static std::map<std::string, SDL_Texture*> g_thumbCache;
+
+static std::string consoleMediaBaseUrl(int chapterId) {
+    if (!g_db) return "";
+    char cid[8];
+    SDL_snprintf(cid, sizeof(cid), "c%03d", chapterId);
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db,
+        "SELECT media_base_url FROM shared_meta WHERE chapter_id=?;",
+        -1, &st, nullptr) != SQLITE_OK) return "";
+    sqlite3_bind_text(st, 1, cid, -1, SQLITE_TRANSIENT);
+    std::string u;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        const unsigned char* p = sqlite3_column_text(st, 0);
+        if (p) u = (const char*)p;
+    }
+    sqlite3_finalize(st);
+    return u;
+}
+
+static SDL_Texture* consoleLoadThumb(SDL_Renderer* r,
+                                     const std::string& filename, int chapterId) {
+    if (filename.empty()) return nullptr;
+    std::string key = std::to_string(chapterId) + "/" + filename;
+    auto it = g_thumbCache.find(key);
+    if (it != g_thumbCache.end()) return it->second;
+
+    std::string url = filename;
+    if (url.rfind("http", 0) != 0) {
+        std::string base = consoleMediaBaseUrl(chapterId);
+        if (base.empty()) return nullptr;   // no base yet (unsynced) -> retry later
+        if (base.back() != '/') base += '/';
+        url = base + filename;
+    }
+
+    SDL_Texture* tex = nullptr;
+    std::string bytes = consoleHttpGet(url.c_str());
+    if (!bytes.empty()) {
+        int w = 0, h = 0, n = 0;
+        unsigned char* px = stbi_load_from_memory(
+            (const unsigned char*)bytes.data(), (int)bytes.size(), &w, &h, &n, 4);
+        if (px) {
+            SDL_Surface* surf = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_RGBA32,
+                                                      px, w * 4);
+            if (surf) { tex = SDL_CreateTextureFromSurface(r, surf);
+                        SDL_DestroySurface(surf); }
+            stbi_image_free(px);
+        }
+    }
+    g_thumbCache[key] = tex;   // cache result (incl. nullptr) -> no re-fetch
+    return tex;
+}
+
+// Filled right-pointing "play" triangle inside box.
+static void drawPlayTriangle(SDL_Renderer* r, const SDL_FRect& box, SDL_Color c) {
+    const float pad = 3.0f;
+    SDL_FColor fc = { c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, 1.0f };
+    SDL_Vertex v[3];
+    v[0].position = { box.x + pad,            box.y + pad };
+    v[1].position = { box.x + pad,            box.y + box.h - pad };
+    v[2].position = { box.x + box.w - pad,    box.y + box.h / 2.0f };
+    for (int i = 0; i < 3; i++) { v[i].color = fc; v[i].tex_coord = { 0, 0 }; }
+    SDL_RenderGeometry(r, nullptr, v, 3, nullptr, 0);
+}
+
 static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
     // [F.4] Stories popup -- DB-driven body. Three visual states per row:
     //   LOCKED    : isActivated == false  -> dim bg, dim outline radio,
@@ -2229,17 +2332,35 @@ static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
                         STORIES_POPUP.x + (STORIES_POPUP.w - tl * 8.0f) / 2.0f,
                         STORIES_POPUP.y + 14, title);
 
-    // ===== Thumbnail (placeholder until thumbnail texture loading lands) =====
+    // ===== Thumbnail of the selected story (falls back to first row) =====
+    int thumbRows = (int)state.storiesCache.size();
+    if (thumbRows > STORIES_LIST_VISIBLE) thumbRows = STORIES_LIST_VISIBLE;
+    int selIdx = -1;
+    for (int i = 0; i < thumbRows; i++)
+        if (state.storiesCache[i].isSelected) { selIdx = i; break; }
+    if (selIdx < 0 && thumbRows > 0) selIdx = 0;
+
+    SDL_Texture* thumbTex = nullptr;
+    if (selIdx >= 0) {
+        const StoryRow& tsr = state.storiesCache[selIdx];
+        thumbTex = consoleLoadThumb(renderer, tsr.thumbnailPath, tsr.idChapter);
+    }
+
     SDL_SetRenderDrawColor(renderer, 50, 40, 35, 255);
     SDL_RenderFillRect(renderer, &STORIES_THUMB);
+    if (thumbTex) {
+        SDL_RenderTexture(renderer, thumbTex, nullptr, &STORIES_THUMB);
+    } else {
+        const char* thumbLbl = "THUMBNAIL";
+        int thl = (int)SDL_strlen(thumbLbl);
+        SDL_SetRenderDrawColor(renderer, 160, 130, 100, 255);
+        SDL_RenderDebugText(renderer,
+                            STORIES_THUMB.x + (STORIES_THUMB.w - thl * 8.0f) / 2.0f,
+                            STORIES_THUMB.y + STORIES_THUMB.h / 2.0f - 4.0f,
+                            thumbLbl);
+    }
     SDL_SetRenderDrawColor(renderer, 160, 130, 100, 255);
     SDL_RenderRect(renderer, &STORIES_THUMB);
-    const char* thumbLbl = "THUMBNAIL";
-    int thl = (int)SDL_strlen(thumbLbl);
-    SDL_RenderDebugText(renderer,
-                        STORIES_THUMB.x + (STORIES_THUMB.w - thl * 8.0f) / 2.0f,
-                        STORIES_THUMB.y + STORIES_THUMB.h / 2.0f - 4.0f,
-                        thumbLbl);
 
     // ===== Story rows =====
     int rowsToFill = (int)state.storiesCache.size();
@@ -2329,13 +2450,14 @@ static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
             SDL_RenderDebugText(renderer, bestX, row.y + 5.0f, bestBuf);
         }
 
-        // Play button -- HIDDEN for locked rows (per task.md spec)
-        if (us != STORY_UI_LOCKED) {
+        // Play (replay dialogue) button -- shown on ALL rows incl. locked, so
+        // any story's dialogue can be previewed. Dim it on locked rows.
+        {
             SDL_FRect play = storiesPlayRect(i);
-            SDL_SetRenderDrawColor(renderer, 100, 160, 100, 255);
-            SDL_RenderFillRect(renderer, &play);
-            SDL_SetRenderDrawColor(renderer, 220, 240, 220, 255);
-            SDL_RenderRect(renderer, &play);
+            SDL_Color tri = (us == STORY_UI_LOCKED)
+                ? SDL_Color{150, 170, 150, 255}
+                : SDL_Color{120, 220, 130, 255};
+            drawPlayTriangle(renderer, play, tri);
         }
     }
 
@@ -2795,17 +2917,15 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                             state.storiesCacheChapter = state.currentStoryChapter;
                         }
                     }
-                    // [F.6] Row clicks: radio OR play -> select this story.
-                    // Locked rows ignore clicks. Play's "replay gameStory"
-                    // semantics remains TODO -- both buttons share selection
-                    // behaviour for now.
+                    // [F.6] Row clicks: radio selects (updates thumbnail),
+                    // play previews the story dialogue. Both work on ALL rows
+                    // incl. locked, so any story can be viewed/replayed.
                     else {
                         int rowsCheckable = (int)state.storiesCache.size();
                         if (rowsCheckable > STORIES_LIST_VISIBLE)
                             rowsCheckable = STORIES_LIST_VISIBLE;
                         for (int i = 0; i < rowsCheckable; i++) {
                             const StoryRow& sr = state.storiesCache[i];
-                            if (!sr.isActivated) continue;   // locked
                             SDL_FRect radio = storiesRadioRect(i);
                             SDL_FRect play  = storiesPlayRect(i);
                             if (hitTest(radio, mx, my) || hitTest(play, mx, my)) {

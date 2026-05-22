@@ -132,6 +132,14 @@
                 - dialPlayBgm() now retains the opened audio device until dialStopBgm(),
                   preventing music from stopping immediately after start.
                 - Keeps dialogue visuals/audio stable when node-specific assets are missing.
+[x] Issue 3.14: Dialogue BGM decoding now supports MP3 assets and WASM async fetch.
+                - Added `dr_mp3.h` as the single-header MP3 decoder, with `DR_MP3_NO_STDIO`
+                  so the browser/native fetch path stays memory-only.
+                - `dialPlayBgm()` now decodes non-WAV audio to PCM via dr_mp3 before pushing
+                  into SDL_AudioStream, while WAV still uses SDL_LoadWAV_IO.
+                - WASM `httpGetSync()` switched from synchronous fetch to Asyncify-backed
+                  async fetch + `emscripten_sleep()` polling, fixing the browser-side
+                  fetch path used by dialogue media downloads.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.

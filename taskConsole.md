@@ -120,6 +120,13 @@
                  Console so they can sync from the board popup first.
                - SYNC + submit flow moved into the Board popup, using the new Google SSO
                  stub token path and updating `apiSyncStatus` there.
+[x] Issue 3.14: Browser shell now injects CTETRIS_DEV_TOKEN for the Google SSO stub.
+               - `app/web/shell.html` writes the token into `ENV.CTETRIS_DEV_TOKEN`, so
+                 `SDL_getenv("CTETRIS_DEV_TOKEN")` works in WASM the same way as native.
+               - `app/CMakeLists.txt` now generates the shell file from `web/shell.html` and
+                 flips `_debugEnabled` from `DEBUG=true`, keeping the browser debug toolbar
+                 aligned with the native DEBUG flag.
+               - Supports browser-side sync/auth testing without hardcoding a token in code.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameConsole/app.cpp) duy nhất để viết.

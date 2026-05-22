@@ -178,6 +178,22 @@
 
         // ── Emscripten Module config ───────────────────────────────────────────
         var Module = {
+            // Inject the sync auth token into the WASM environment so
+            // SDL_getenv("CTETRIS_DEV_TOKEN") resolves in the browser, matching
+            // the native env var. The Worker only requires a non-empty Bearer
+            // token in stub mode. Override without rebuilding via either
+            //   localStorage.setItem('CTETRIS_DEV_TOKEN', '<token>')
+            // or a global  window.CTETRIS_DEV_TOKEN = '<token>'  before load.
+            // Swap the default for a real Google ID token when SSO lands.
+            preRun: [function() {
+                try {
+                    var t = (typeof localStorage !== 'undefined' &&
+                             localStorage.getItem('CTETRIS_DEV_TOKEN')) ||
+                            window.CTETRIS_DEV_TOKEN || 'dev-token';
+                    if (typeof ENV !== 'undefined') ENV.CTETRIS_DEV_TOKEN = t;
+                } catch (e) { /* ENV unavailable -> sync stays offline */ }
+            }],
+
             canvas: (function() {
                 var canvas = document.getElementById('canvas');
                 canvas.addEventListener('webglcontextlost', function(e) {

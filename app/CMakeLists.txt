@@ -296,10 +296,29 @@ if(BUILD_WASM)
     # CTETRIS_API_URL, chapter content + media is fetched per chapter from
     # MANIFEST_GIST_URL + mediaBaseUrl at runtime. Both endpoints are
     # validated by build.sh/build.ps1 before linking.
+
+    # [DEBUG] Reuse the .env DEBUG flag for the WASM GUI. shell.html ships with
+    # `var _debugEnabled = false;`; when DEBUG=true we flip it to true in a
+    # generated copy and feed THAT to --shell-file (source file stays clean).
+    # This turns on the in-browser debug toolbar + SDL_Log accumulation so the
+    # WASM build is debuggable the same way DEBUG=1 helps the native build.
+    set(_shell_src "${CMAKE_SOURCE_DIR}/web/shell.html")
+    set(_shell_out "${CMAKE_BINARY_DIR}/shell.html")
+    file(READ "${_shell_src}" _shell_content)
+    if(CTETRIS_DEBUG_ENABLED)
+        string(REPLACE "var _debugEnabled = false;"
+                       "var _debugEnabled = true;"
+                       _shell_content "${_shell_content}")
+        message(STATUS "[cTetris] WASM shell debug toolbar: ENABLED (DEBUG=true)")
+    else()
+        message(STATUS "[cTetris] WASM shell debug toolbar: disabled")
+    endif()
+    file(WRITE "${_shell_out}" "${_shell_content}")
+
     target_link_options(cTetris PRIVATE
         "SHELL:-sALLOW_MEMORY_GROWTH=1"
         "SHELL:-sASYNCIFY=1"
-        "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/web/shell.html"
+        "SHELL:--shell-file ${_shell_out}"
     )
 
     # Sinh ra cTetris.html (kem .js + .wasm) thay vi binary mac dinh

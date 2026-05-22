@@ -44,6 +44,12 @@
 #include "stb_truetype.h"
 #include "gameStory_font.h"   // embedded Liberation Sans Bold (Vietnamese-capable)
 
+// dr_mp3: single-header MP3 decoder. Dialogue BGM assets are .mp3 (ID3), which
+// SDL_LoadWAV cannot decode -- decode to PCM here, then feed an SDL_AudioStream.
+#define DR_MP3_IMPLEMENTATION
+#define DR_MP3_NO_STDIO
+#include "dr_mp3.h"
+
 #include "ctetris_debug.h"
 
 #include <map>
@@ -734,28 +740,53 @@ static void dialPlayBgm(const std::string& url) {
     std::string bytes = httpGetSync(url.c_str());
     if (bytes.empty()) { g_bgmUrl = url; return; }
 
-    SDL_IOStream* io = SDL_IOFromMem((void*)bytes.data(), (int)bytes.size());
-    if (!io) { g_bgmUrl = url; return; }
-
+    // Decode to PCM. WAV (RIFF) via SDL; everything else assumed MP3 via dr_mp3
+    // (dialogue BGM assets are .mp3 -- SDL_LoadWAV cannot decode those).
     SDL_AudioSpec spec{};
-    Uint8* wav = nullptr; Uint32 wavLen = 0;
-    if (!SDL_LoadWAV_IO(io, true, &spec, &wav, &wavLen)) {
-        g_bgmUrl = url; return;
+    Uint8* pcm = nullptr; Uint32 pcmLen = 0;
+    bool   isMp3 = false;
+
+    bool looksWav = bytes.size() >= 12 &&
+                    SDL_memcmp(bytes.data(), "RIFF", 4) == 0;
+    if (looksWav) {
+        SDL_IOStream* io = SDL_IOFromMem((void*)bytes.data(), (int)bytes.size());
+        if (!io || !SDL_LoadWAV_IO(io, true, &spec, &pcm, &pcmLen)) {
+            g_bgmUrl = url; return;
+        }
+    } else {
+        drmp3_config cfg{};
+        drmp3_uint64 frames = 0;
+        drmp3_int16* s16 = drmp3_open_memory_and_read_pcm_frames_s16(
+            bytes.data(), bytes.size(), &cfg, &frames, nullptr);
+        if (!s16 || cfg.channels == 0 || frames == 0) {
+            if (s16) drmp3_free(s16, nullptr);
+            SDL_Log("[gameStory] BGM decode failed (mp3): %s", url.c_str());
+            g_bgmUrl = url; return;
+        }
+        spec.format   = SDL_AUDIO_S16;
+        spec.channels = (int)cfg.channels;
+        spec.freq     = (int)cfg.sampleRate;
+        pcm    = (Uint8*)s16;
+        pcmLen = (Uint32)(frames * cfg.channels * sizeof(drmp3_int16));
+        isMp3  = true;
     }
 
     SDL_AudioDeviceID dev = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec);
-    if (dev == 0) { SDL_free(wav); g_bgmUrl = url; return; }
+    if (dev == 0) {
+        if (isMp3) drmp3_free(pcm, nullptr); else SDL_free(pcm);
+        g_bgmUrl = url; return;
+    }
 
     g_bgmStream = SDL_CreateAudioStream(&spec, &spec);
     if (g_bgmStream) {
         SDL_BindAudioStream(dev, g_bgmStream);
-        SDL_PutAudioStreamData(g_bgmStream, wav, (int)wavLen);
+        SDL_PutAudioStreamData(g_bgmStream, pcm, (int)pcmLen);   // copies data
         SDL_ResumeAudioDevice(dev);
         g_bgmDev = dev;          // retain device so playback keeps going
     } else {
         SDL_CloseAudioDevice(dev);
     }
-    SDL_free(wav);
+    if (isMp3) drmp3_free(pcm, nullptr); else SDL_free(pcm);
     g_bgmUrl = url;
 }
 
@@ -766,30 +797,55 @@ static void dialPlayBgm(const std::string& url) {
 //          the browser event loop; requires -sASYNCIFY in link flags).
 // Offline: returns "" — all callers treat empty response as offline.
 // ---------------------------------------------------------------------------
+#ifdef __EMSCRIPTEN__
+// Async emscripten_fetch made synchronous via Asyncify. Synchronous
+// emscripten_fetch is ILLEGAL on the browser main thread (a synchronous XHR
+// cannot use arraybuffer responseType -> instant status 0 failure), which is
+// why the old SYNCHRONOUS path reported "offline" even when online. Instead we
+// issue an ASYNC fetch and pump the JS event loop with emscripten_sleep until
+// the success/error callback flips `done`. Requires -sASYNCIFY=1 (set).
+struct EmFetchResult { std::string body; int status = 0; bool done = false; };
+static void emFetchOk(emscripten_fetch_t* f) {
+    EmFetchResult* r = (EmFetchResult*)f->userData;
+    if (f->numBytes > 0) r->body.assign(f->data, (size_t)f->numBytes);
+    r->status = (int)f->status;
+    r->done   = true;
+    emscripten_fetch_close(f);
+}
+static void emFetchErr(emscripten_fetch_t* f) {
+    EmFetchResult* r = (EmFetchResult*)f->userData;
+    r->status = (int)f->status;
+    r->done   = true;
+    emscripten_fetch_close(f);
+}
+#endif
+
 static std::string httpGetSync(const char* url) {
     if (!url || url[0] == '\0') return "";
 
     CTDBG_REQ("GET", url);
 
 #ifdef __EMSCRIPTEN__
-    // Emscripten synchronous fetch via Asyncify
+    EmFetchResult res;
     emscripten_fetch_attr_t attr;
     emscripten_fetch_attr_init(&attr);
     SDL_strlcpy(attr.requestMethod, "GET", sizeof(attr.requestMethod));
-    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY | EMSCRIPTEN_FETCH_SYNCHRONOUS;
-    emscripten_fetch_t* fetch = emscripten_fetch(&attr, url);
-    std::string body;
-    if (fetch && fetch->status == 200 && fetch->numBytes > 0) {
-        body.assign(fetch->data, (size_t)fetch->numBytes);
-        CTDBG_RES("GET", url, 200, body.size());
-        CTDBG_BODY(body);
-    } else if (fetch) {
-        CTDBG_RES("GET", url, fetch->status, 0);
-        CTDBG_ERR("emscripten_fetch: non-200 or empty");
-        SDL_Log("[gameStory] httpGetSync WASM: HTTP %d for %s", (int)fetch->status, url);
+    attr.attributes   = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;   // async (no SYNCHRONOUS)
+    attr.timeoutMSecs = 20000;
+    attr.onsuccess    = emFetchOk;
+    attr.onerror      = emFetchErr;
+    attr.userData     = &res;
+    emscripten_fetch(&attr, url);
+    while (!res.done) emscripten_sleep(8);   // Asyncify pumps the JS event loop
+    if (res.status == 200 && !res.body.empty()) {
+        CTDBG_RES("GET", url, 200, res.body.size());
+        CTDBG_BODY(res.body);
+        return res.body;
     }
-    if (fetch) emscripten_fetch_close(fetch);
-    return body;
+    CTDBG_RES("GET", url, res.status, 0);
+    CTDBG_ERR("emscripten_fetch(async): non-200 or empty");
+    SDL_Log("[gameStory] httpGetSync WASM: HTTP %d for %s", res.status, url);
+    return std::string();
 
 #else
     // Native: libcurl (build.sh / build.ps1 must link -lcurl)
