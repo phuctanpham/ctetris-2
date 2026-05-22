@@ -146,18 +146,24 @@ export default {
 			return new Response(null, { status: 204, headers: CORS_HEADERS });
 		}
 
-		if (method === "GET" && url.pathname === "/health") {
-			return jsonResponse({ ok: true });
+		// Wrap routing so ANY thrown error (e.g. a D1 query failure) still
+		// returns a JSON response WITH CORS headers. Without this, an
+		// uncaught throw yields Cloudflare's bare 500 page that lacks CORS,
+		// which browsers surface to fetch() as an opaque status-0 "offline".
+		try {
+			if (method === "GET" && url.pathname === "/health") {
+				return jsonResponse({ ok: true });
+			}
+			if (method === "GET" && url.pathname === "/leaderboard") {
+				return await handleLeaderboard(request, env);
+			}
+			if (method === "POST" && url.pathname === "/record") {
+				return await handlePostRecord(request, env);
+			}
+			return errorResponse("Not found", 404);
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			return errorResponse("Internal error: " + msg, 500);
 		}
-
-		if (method === "GET" && url.pathname === "/leaderboard") {
-			return handleLeaderboard(request, env);
-		}
-
-		if (method === "POST" && url.pathname === "/record") {
-			return handlePostRecord(request, env);
-		}
-
-		return errorResponse("Not found", 404);
 	},
 } satisfies ExportedHandler<Env>;

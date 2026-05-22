@@ -140,6 +140,21 @@
                 - WASM `httpGetSync()` switched from synchronous fetch to Asyncify-backed
                   async fetch + `emscripten_sleep()` polling, fixing the browser-side
                   fetch path used by dialogue media downloads.
+[x] Issue 3.15: Dialogue audio now uses a shared playback device with separate BGM and
+                SFX streams.
+                - A single SDL audio device is opened lazily, then reused for both looping
+                  music and one-shot effects instead of reopening playback twice.
+                - decodeAudio() handles WAV and MP3 into a shared PCM path, while first
+                  gesture resume keeps browser audio audible after auto-start.
+                - dialCloseAudio() tears down both streams and the shared device cleanly on
+                  dialogue exit.
+[x] Issue 3.16: Startup flow now shows a centered progress bar with a single status
+                console line.
+                - The old multi-line task list is replaced with a percent bar that eases
+                  toward each milestone.
+                - The latest flow step is shown as one centered status line with animated
+                  dots while running.
+                - Corporate credit now renders below the compact progress area.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.

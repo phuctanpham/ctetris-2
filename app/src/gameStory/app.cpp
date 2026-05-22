@@ -676,20 +676,90 @@ static std::string httpGetSync(const char* url);
 // Dialogue media: image texture cache + BGM audio stream
 // ---------------------------------------------------------------------------
 static std::map<std::string, SDL_Texture*> g_imgCache;
-static SDL_AudioStream* g_bgmStream  = nullptr;
-static SDL_AudioDeviceID g_bgmDev    = 0;
-static std::string      g_bgmUrl;
+// BGM (looping-feel, replaced per node) and SFX (one-shot) share ONE audio
+// device, each with its own stream bound to it (SDL mixes them). Opening the
+// default device twice is unreliable; a single device is robust on native and
+// WASM. The device is opened lazily and resumed (WASM needs a gesture to
+// actually start, which the first dialogue click provides).
+static SDL_AudioDeviceID g_audioDev  = 0;
+static SDL_AudioSpec     g_devSpec   = { SDL_AUDIO_S16, 2, 44100 };
+static SDL_AudioStream*  g_bgmStream = nullptr;
+static SDL_AudioStream*  g_sfxStream = nullptr;
+static std::string       g_bgmUrl;
+
+static bool dialEnsureAudioDevice() {
+    if (g_audioDev) return true;
+    SDL_AudioSpec want = { SDL_AUDIO_S16, 2, 44100 };
+    g_audioDev = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &want);
+    if (!g_audioDev) return false;
+    SDL_GetAudioDeviceFormat(g_audioDev, &g_devSpec, NULL);
+    SDL_ResumeAudioDevice(g_audioDev);
+    return true;
+}
 
 static void dialStopBgm() {
-    if (g_bgmStream) {
-        SDL_DestroyAudioStream(g_bgmStream);
-        g_bgmStream = nullptr;
-    }
-    if (g_bgmDev) {
-        SDL_CloseAudioDevice(g_bgmDev);
-        g_bgmDev = 0;
-    }
+    if (g_bgmStream) { SDL_DestroyAudioStream(g_bgmStream); g_bgmStream = nullptr; }
     g_bgmUrl.clear();
+}
+
+static void dialStopSfx() {
+    if (g_sfxStream) { SDL_DestroyAudioStream(g_sfxStream); g_sfxStream = nullptr; }
+}
+
+// Full teardown on dialogue exit: drop both streams + close the shared device.
+static void dialCloseAudio() {
+    dialStopBgm();
+    dialStopSfx();
+    if (g_audioDev) { SDL_CloseAudioDevice(g_audioDev); g_audioDev = 0; }
+}
+
+// Decode WAV (RIFF) or MP3 (dr_mp3) bytes to PCM. Returns true on success;
+// caller frees pcm with drmp3_free (isMp3) or SDL_free (WAV).
+static bool decodeAudio(const std::string& bytes, SDL_AudioSpec* spec,
+                        Uint8** pcm, Uint32* pcmLen, bool* isMp3) {
+    *pcm = nullptr; *pcmLen = 0; *isMp3 = false;
+    if (bytes.size() < 12) return false;
+    if (SDL_memcmp(bytes.data(), "RIFF", 4) == 0) {
+        SDL_IOStream* io = SDL_IOFromMem((void*)bytes.data(), (int)bytes.size());
+        if (!io || !SDL_LoadWAV_IO(io, true, spec, pcm, pcmLen)) return false;
+        return true;
+    }
+    drmp3_config cfg{};
+    drmp3_uint64 frames = 0;
+    drmp3_int16* s16 = drmp3_open_memory_and_read_pcm_frames_s16(
+        bytes.data(), bytes.size(), &cfg, &frames, nullptr);
+    if (!s16 || cfg.channels == 0 || frames == 0) {
+        if (s16) drmp3_free(s16, nullptr);
+        return false;
+    }
+    spec->format   = SDL_AUDIO_S16;
+    spec->channels = (int)cfg.channels;
+    spec->freq     = (int)cfg.sampleRate;
+    *pcm    = (Uint8*)s16;
+    *pcmLen = (Uint32)(frames * cfg.channels * sizeof(drmp3_int16));
+    *isMp3  = true;
+    return true;
+}
+
+// Play a one-shot sound effect (fire-and-forget; replaces any prior SFX).
+static void dialPlaySfx(const std::string& url) {
+    if (url.empty()) return;
+    if (!dialEnsureAudioDevice()) return;
+    std::string bytes = httpGetSync(url.c_str());
+    if (bytes.empty()) return;
+    SDL_AudioSpec spec{}; Uint8* pcm = nullptr; Uint32 pcmLen = 0; bool isMp3 = false;
+    if (!decodeAudio(bytes, &spec, &pcm, &pcmLen, &isMp3)) {
+        SDL_Log("[gameStory] SFX decode failed: %s", url.c_str());
+        return;
+    }
+    dialStopSfx();
+    g_sfxStream = SDL_CreateAudioStream(&spec, &g_devSpec);
+    if (g_sfxStream) {
+        SDL_BindAudioStream(g_audioDev, g_sfxStream);
+        SDL_PutAudioStreamData(g_sfxStream, pcm, (int)pcmLen);
+        SDL_ResumeAudioDevice(g_audioDev);
+    }
+    if (isMp3) drmp3_free(pcm, nullptr); else SDL_free(pcm);
 }
 
 static SDL_Texture* dialLoadImage(SDL_Renderer* renderer, const std::string& url) {
@@ -719,54 +789,24 @@ static void dialPlayBgm(const std::string& url) {
     dialStopBgm();
     if (url.empty()) return;
 
+    if (!dialEnsureAudioDevice()) { g_bgmUrl = url; return; }
+
     std::string bytes = httpGetSync(url.c_str());
     if (bytes.empty()) { g_bgmUrl = url; return; }
 
-    // Decode to PCM. WAV (RIFF) via SDL; everything else assumed MP3 via dr_mp3
-    // (dialogue BGM assets are .mp3 -- SDL_LoadWAV cannot decode those).
+    // Decode to PCM (WAV or MP3 -- dialogue BGM assets are .mp3).
     SDL_AudioSpec spec{};
-    Uint8* pcm = nullptr; Uint32 pcmLen = 0;
-    bool   isMp3 = false;
-
-    bool looksWav = bytes.size() >= 12 &&
-                    SDL_memcmp(bytes.data(), "RIFF", 4) == 0;
-    if (looksWav) {
-        SDL_IOStream* io = SDL_IOFromMem((void*)bytes.data(), (int)bytes.size());
-        if (!io || !SDL_LoadWAV_IO(io, true, &spec, &pcm, &pcmLen)) {
-            g_bgmUrl = url; return;
-        }
-    } else {
-        drmp3_config cfg{};
-        drmp3_uint64 frames = 0;
-        drmp3_int16* s16 = drmp3_open_memory_and_read_pcm_frames_s16(
-            bytes.data(), bytes.size(), &cfg, &frames, nullptr);
-        if (!s16 || cfg.channels == 0 || frames == 0) {
-            if (s16) drmp3_free(s16, nullptr);
-            SDL_Log("[gameStory] BGM decode failed (mp3): %s", url.c_str());
-            g_bgmUrl = url; return;
-        }
-        spec.format   = SDL_AUDIO_S16;
-        spec.channels = (int)cfg.channels;
-        spec.freq     = (int)cfg.sampleRate;
-        pcm    = (Uint8*)s16;
-        pcmLen = (Uint32)(frames * cfg.channels * sizeof(drmp3_int16));
-        isMp3  = true;
-    }
-
-    SDL_AudioDeviceID dev = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec);
-    if (dev == 0) {
-        if (isMp3) drmp3_free(pcm, nullptr); else SDL_free(pcm);
+    Uint8* pcm = nullptr; Uint32 pcmLen = 0; bool isMp3 = false;
+    if (!decodeAudio(bytes, &spec, &pcm, &pcmLen, &isMp3)) {
+        SDL_Log("[gameStory] BGM decode failed: %s", url.c_str());
         g_bgmUrl = url; return;
     }
 
-    g_bgmStream = SDL_CreateAudioStream(&spec, &spec);
+    g_bgmStream = SDL_CreateAudioStream(&spec, &g_devSpec);
     if (g_bgmStream) {
-        SDL_BindAudioStream(dev, g_bgmStream);
+        SDL_BindAudioStream(g_audioDev, g_bgmStream);
         SDL_PutAudioStreamData(g_bgmStream, pcm, (int)pcmLen);   // copies data
-        SDL_ResumeAudioDevice(dev);
-        g_bgmDev = dev;          // retain device so playback keeps going
-    } else {
-        SDL_CloseAudioDevice(dev);
+        SDL_ResumeAudioDevice(g_audioDev);
     }
     if (isMp3) drmp3_free(pcm, nullptr); else SDL_free(pcm);
     g_bgmUrl = url;
@@ -1300,6 +1340,10 @@ static int postSyncConditionCheck(sqlite3* db, const char* idUser) {
 }
 
 static void diagUpdateBgm(const std::string& fullUrl) {
+    // Empty bgmUrl on a node means "no change" -> keep the current track
+    // playing through to dialogue end (do NOT stop). Only a new, different
+    // non-empty URL switches tracks.
+    if (fullUrl.empty()) return;
     dialPlayBgm(fullUrl);
 }
 
@@ -1374,13 +1418,32 @@ static void dialRunLoop(SDL_Renderer* renderer,
         return;
     }
 
+    // Media for the first node is fetched/decoded synchronously (image + BGM
+    // can be hundreds of KB), which would otherwise freeze on the previous
+    // screen. Paint a "Loading dialogue..." frame first so the transition is
+    // visible and it's clear the app is progressing, not stuck.
+    {
+        SDL_SetRenderDrawColor(renderer, 18, 18, 28, 255);
+        SDL_RenderClear(renderer);
+        const char* lm = "Loading dialogue...";
+        SDL_SetRenderDrawColor(renderer, 180, 190, 210, 255);
+        SDL_RenderDebugText(renderer,
+            (STORY_SCREEN_WIDTH - (int)SDL_strlen(lm) * 8.0f) / 2.0f,
+            232.0f, lm);
+        SDL_RenderPresent(renderer);
+    }
+    SDL_Log("[gameStory] dialogue load story=%d ch=%d nodes=%d",
+            storyId, chapterId, (int)nodes.size());
+
     // Load choices and media for first node
     if (nodes[0].hasChoices)
         curChoices = storyDbLoadChoices(storyId, chapterId, nodes[0].nodeId);
     curImg = dialLoadImage(renderer, dialNodeImageUrl(nodes[0], storyId, chapterId));
 
-    // D.6 initial BGM
+    // D.6 initial BGM + SFX
     diagUpdateBgm(dialMediaUrl(nodes[0].bgmUrl, chapterId));
+    dialPlaySfx(dialMediaUrl(nodes[0].sfxUrl, chapterId));
+    SDL_Log("[gameStory] dialogue first-node media loaded");
 
     while (!quit && curIdx < (int)nodes.size()) {
         const DialogueNode& node = nodes[curIdx];  // valid until curIdx changes
@@ -1391,6 +1454,13 @@ static void dialRunLoop(SDL_Renderer* renderer,
                 if (ev.type == SDL_EVENT_QUIT) {
                     quit = true;
                     break;
+                }
+                // On the browser, the audio context is suspended until a user
+                // gesture. The dialogue can auto-start after sync (no gesture
+                // yet), so resume on the first key/click to make BGM+SFX audible.
+                if (ev.type == SDL_EVENT_KEY_DOWN ||
+                    ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                    if (g_audioDev) SDL_ResumeAudioDevice(g_audioDev);
                 }
                 // D.5 keyboard
                 if (ev.type == SDL_EVENT_KEY_DOWN) {
@@ -1466,9 +1536,10 @@ static void dialRunLoop(SDL_Renderer* renderer,
                                             nodes[curIdx].nodeId);
         curImg = dialLoadImage(renderer, dialNodeImageUrl(nodes[curIdx], storyId, chapterId));
         diagUpdateBgm(dialMediaUrl(nodes[curIdx].bgmUrl, chapterId));
+        dialPlaySfx(dialMediaUrl(nodes[curIdx].sfxUrl, chapterId));
     }
 
-    dialStopBgm();   // stop audio on exit
+    dialCloseAudio();   // drop streams + close shared device on exit
 }
 
 // =============================================================================
@@ -1489,6 +1560,10 @@ static void dialRunLoop(SDL_Renderer* renderer,
 enum FlowStepStatus { FS_RUN, FS_OK, FS_FAIL, FS_INFO, FS_SKIP };
 struct FlowStep { std::string label; std::string detail; FlowStepStatus status; };
 static std::vector<FlowStep> g_flow;
+// Progress bar: g_flowPctTarget is set at each milestone; g_flowPct eases
+// toward it every frame so the bar visibly increments as child tasks finish.
+static float g_flowPct       = 0.0f;
+static float g_flowPctTarget = 0.0f;
 
 static int flowAdd(const std::string& label, FlowStepStatus st,
                    const std::string& detail = "") {
@@ -1500,37 +1575,64 @@ static void flowSet(int i, FlowStepStatus st, const std::string& detail = "") {
     g_flow[i].status = st;
     if (!detail.empty()) g_flow[i].detail = detail;
 }
+static void flowProgress(float target) {
+    if (target < 0.0f) target = 0.0f;
+    if (target > 1.0f) target = 1.0f;
+    g_flowPctTarget = target;
+}
 
+// Single-line status console + percentage progress bar (replaces the old
+// multi-line task list). The bar eases toward the latest milestone so the
+// percent climbs as each child task completes.
 static void flowRender(SDL_Renderer* r, Uint32 elapsed) {
     SDL_SetRenderDrawColor(r, 30, 30, 30, 255);
     SDL_RenderClear(r);
     drawLogo(r, elapsed);
 
-    const float x    = 16.0f;
-    const float top  = STORY_SCREEN_HEIGHT - 210.0f;
-    const float step = 13.0f;
-    const int   maxShow = 12;
-    const int   dots = (int)((elapsed / 250) % 4);   // 0..3 animated dots
+    // Ease displayed percent toward target.
+    g_flowPct += (g_flowPctTarget - g_flowPct) * 0.18f;
+    if (g_flowPct > g_flowPctTarget - 0.001f) g_flowPct = g_flowPctTarget;
 
-    int n = (int)g_flow.size();
-    int start = (n > maxShow) ? (n - maxShow) : 0;
-    for (int i = start; i < n; i++) {
-        const FlowStep& s = g_flow[i];
-        SDL_Color c; const char* tag;
-        switch (s.status) {
-            case FS_OK:   c = {120, 200, 120, 255}; tag = "[ok]"; break;
-            case FS_RUN:  c = {230, 210, 120, 255}; tag = "[..]"; break;
-            case FS_FAIL: c = {220, 110, 110, 255}; tag = "[x ]"; break;
-            case FS_SKIP: c = {135, 135, 145, 255}; tag = "[--]"; break;
-            default:      c = {170, 185, 210, 255}; tag = "[ i]"; break;
-        }
-        std::string line = std::string(tag) + " " + s.label;
-        if (s.status == FS_RUN)        line += std::string(dots, '.');
-        else if (!s.detail.empty())    line += ": " + s.detail;
-        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, 255);
-        SDL_RenderDebugText(r, x, top + (i - start) * step, line.c_str());
+    const float barW = 180.0f, barH = 14.0f;
+    const float barX = (STORY_SCREEN_WIDTH - barW) / 2.0f;
+    const float barY = STORY_SCREEN_HEIGHT - 96.0f;
+
+    SDL_FRect bg = { barX, barY, barW, barH };
+    SDL_SetRenderDrawColor(r, 60, 60, 60, 255);
+    SDL_RenderFillRect(r, &bg);
+    float fill = g_flowPct; if (fill < 0) fill = 0; if (fill > 1) fill = 1;
+    if (fill > 0.0f) {
+        SDL_FRect fg = { barX, barY, barW * fill, barH };
+        SDL_SetRenderDrawColor(r, 0, 200, 80, 255);
+        SDL_RenderFillRect(r, &fg);
     }
-    drawCorpCredit(r, elapsed, top + maxShow * step + 6.0f);
+    char pctBuf[8];
+    SDL_snprintf(pctBuf, sizeof(pctBuf), "%d%%", (int)(fill * 100.0f));
+    SDL_SetRenderDrawColor(r, 10, 10, 10, 220);
+    SDL_RenderDebugText(r, barX + (barW - (int)SDL_strlen(pctBuf) * 8.0f) / 2.0f,
+                        barY + (barH - 8.0f) / 2.0f, pctBuf);
+
+    // Single status line = the most recent task, with animated dots if running.
+    if (!g_flow.empty()) {
+        const FlowStep& s = g_flow.back();
+        const int dots = (int)((elapsed / 250) % 4);
+        SDL_Color c;
+        switch (s.status) {
+            case FS_OK:   c = {120, 200, 120, 255}; break;
+            case FS_RUN:  c = {230, 210, 120, 255}; break;
+            case FS_FAIL: c = {220, 110, 110, 255}; break;
+            case FS_SKIP: c = {135, 135, 145, 255}; break;
+            default:      c = {170, 185, 210, 255}; break;
+        }
+        std::string line = s.label;
+        if (s.status == FS_RUN)     line += std::string(dots, '.');
+        else if (!s.detail.empty()) line += ": " + s.detail;
+        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, 255);
+        SDL_RenderDebugText(r,
+            (STORY_SCREEN_WIDTH - (int)line.size() * 8.0f) / 2.0f,
+            barY + barH + 8.0f, line.c_str());
+    }
+    drawCorpCredit(r, elapsed, barY + barH + 26.0f);
 }
 
 // Render frames for `ms`, animating dots and pumping events. QUIT exits.
@@ -1592,9 +1694,11 @@ static const char* MANIFEST_META_KEY = "__manifest__";
 
 static void runStartupFlow(SDL_Renderer* r, sqlite3* db, bool dbFileExisted) {
     g_flow.clear();
+    g_flowPct = 0.0f; g_flowPctTarget = 0.0f;
     const Uint32 t0   = SDL_GetTicks();
     const Uint32 DW   = 280;   // min dwell so a step is actually seen
     const Uint32 ANIM = 420;   // animated "running" dwell
+    SDL_Log("[gameStory] startup flow begin");
 
     // 1. init db setup
     int s1 = flowAdd("init db setup", dbFileExisted ? FS_OK : FS_RUN,
@@ -1603,21 +1707,25 @@ static void runStartupFlow(SDL_Renderer* r, sqlite3* db, bool dbFileExisted) {
         flowDwell(r, t0, ANIM);            // animate while "setting up"
         flowSet(s1, FS_OK, "created");     // schema created by caller
     }
+    flowProgress(0.10f);
     flowDwell(r, t0, DW);
 
     // 2. shared db check
     bool sharedHasRows = sharedDataHasRows(db);
     flowAdd("shared db check", FS_INFO, sharedHasRows ? "existed" : "unexisted");
+    flowProgress(0.20f);
     flowDwell(r, t0, DW);
 
     // 3. current manifest version
     std::string curVer = db ? metaGetSha(db, MANIFEST_META_KEY) : "";
     if (curVer.empty()) curVer = "00.00";
     flowAdd("current manifest version", FS_INFO, curVer);
+    flowProgress(0.30f);
     flowDwell(r, t0, DW);
 
     // 4. internet connection (fetch manifest)
     int s4 = flowAdd("internet connection", FS_RUN);
+    flowProgress(0.42f);
     flowDwell(r, t0, ANIM);
     const char* manifestUrl = MANIFEST_GIST_URL;
     std::string manifestBody =
@@ -1630,10 +1738,12 @@ static void runStartupFlow(SDL_Renderer* r, sqlite3* db, bool dbFileExisted) {
     }
     if (!online) {
         flowSet(s4, FS_FAIL, "no connection");
+        flowProgress(1.0f);
         flowConfirmOffline(r, t0);
         return;                            // proceed to console with local data
     }
     flowSet(s4, FS_OK, "passed");
+    flowProgress(0.50f);
     flowDwell(r, t0, DW);
 
     // 5. latest manifest version
@@ -1641,33 +1751,46 @@ static void runStartupFlow(SDL_Renderer* r, sqlite3* db, bool dbFileExisted) {
     if (latest.empty() || !manifest.contains(latest) ||
         !manifest[latest].is_object()) {
         flowAdd("latest manifest version", FS_FAIL, "invalid manifest");
+        flowProgress(1.0f);
         flowConfirmOffline(r, t0);
         return;
     }
     flowAdd("latest manifest version", FS_INFO, latest);
+    flowProgress(0.58f);
     flowDwell(r, t0, DW);
 
     if (latest == curVer && sharedHasRows) {
         flowAdd("up to date - launching", FS_OK, "");
+        flowProgress(1.0f);
         flowDwell(r, t0, 600);
+        SDL_Log("[gameStory] startup flow: up to date, launching");
         return;                            // versions match -> auto proceed
     }
 
-    // 6 + 7. recursive fetch + import per chapter
+    // 6 + 7. recursive fetch + import per chapter. Distribute 0.58..0.95 of
+    // the bar across chapters so percent climbs with each fetch/import.
     const auto& lv = manifest[latest];
-    for (auto it = lv.begin(); it != lv.end(); ++it) {
+    int nChapters = 0;
+    for (auto it = lv.begin(); it != lv.end(); ++it) nChapters++;
+    if (nChapters < 1) nChapters = 1;
+    int idx = 0;
+    for (auto it = lv.begin(); it != lv.end(); ++it, ++idx) {
         std::string cid     = it.key();
         std::string sha     = it.value().value("latestCommitId", std::string());
         std::string gistUrl = it.value().value("gistUrl",        std::string());
         std::string mbu     = it.value().value("mediaBaseUrl",   std::string());
+        float base = 0.58f + (0.37f * idx) / nChapters;
+        float next = 0.58f + (0.37f * (idx + 1)) / nChapters;
         if (cid.empty() || sha.empty() || gistUrl.empty()) continue;
 
         if (metaGetSha(db, cid.c_str()) == sha && sharedHasRows) {
             flowAdd(cid + " fetch", FS_SKIP, "up to date");
+            flowProgress(next);
             flowDwell(r, t0, 160);
             continue;
         }
         int sf = flowAdd(cid + " fetch", FS_RUN);
+        flowProgress(base + (next - base) * 0.4f);
         flowDwell(r, t0, ANIM);
         std::string body = httpGetSync(gistUrl.c_str());
         if (body.empty()) { flowSet(sf, FS_FAIL, "fetch failed");
@@ -1676,22 +1799,27 @@ static void runStartupFlow(SDL_Renderer* r, sqlite3* db, bool dbFileExisted) {
 
         int si = flowAdd(cid + " import rows", FS_RUN);
         flowDwell(r, t0, ANIM);
+        SDL_Log("[gameStory] flow import %s begin", cid.c_str());
         if (applyChapterJson(db, body, cid.c_str(), mbu.c_str())) {
             metaSetSha(db, cid.c_str(), sha.c_str(), mbu.c_str());
             flowSet(si, FS_OK, "imported");
+            SDL_Log("[gameStory] flow import %s done", cid.c_str());
 #ifdef __EMSCRIPTEN__
-            EM_ASM({ Module['FS'].syncfs(false, function(){}); });
+            EM_ASM({ if (Module['FS'] && FS.syncfs) FS.syncfs(false, function(){}); });
 #endif
         } else {
             flowSet(si, FS_FAIL, "import error");
         }
+        flowProgress(next);
         flowDwell(r, t0, DW);
     }
 
     // Persist current version = latest, then recheck (now matches) -> launch.
     if (db) metaSetSha(db, MANIFEST_META_KEY, latest.c_str(), "");
     flowAdd("recheck version", FS_OK, latest + " == current");
+    flowProgress(1.0f);
     flowDwell(r, t0, 700);
+    SDL_Log("[gameStory] startup flow complete -> launching");
 }
 
 // =============================================================================
@@ -1787,12 +1915,25 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
             "  label TEXT DEFAULT '', nextNodeId INTEGER DEFAULT 0,"
             "  UNIQUE(idStory, idChapter, nodeId, choiceIdx));",
             nullptr, nullptr, nullptr);
+        // default_Stories (per-user overlay) -- gameConsole owns this table, but
+        // on first launch gameStory runs BEFORE gameConsole, so create it here
+        // too (idempotent). Without it, postSyncConditionCheck's JOIN query
+        // fails to prepare and returns 0 -> the intro dialogue never plays.
+        sqlite3_exec(g_storyDb,
+            "CREATE TABLE IF NOT EXISTS default_Stories ("
+            "  idUser TEXT NOT NULL, idStory INTEGER NOT NULL,"
+            "  idChapter INTEGER NOT NULL, isActivated INTEGER DEFAULT 0,"
+            "  isSelected INTEGER DEFAULT 0, totalRetries INTEGER DEFAULT 0,"
+            "  lastMaxScore INTEGER DEFAULT 0, lastMaxSpeed REAL DEFAULT 0,"
+            "  PRIMARY KEY (idUser, idStory, idChapter));",
+            nullptr, nullptr, nullptr);
     }
 
     // --- Startup flow: deterministic step-by-step intro (replaces the old
     // timed bar + background sync thread). Runs the whole init/check/sync
     // sequence on the main thread, rendering each step so the player sees it.
     runStartupFlow(renderer, g_storyDb, dbFileExisted);
+    SDL_Log("[gameStory] post-flow: running condition check");
 
     // --- Issue 2.9: Post-sync condition check ---
     // Determine next story to run based on DB state.
@@ -1804,6 +1945,7 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
     if (g_storyDb) {
         nextStory = postSyncConditionCheck(g_storyDb, "default");
     }
+    SDL_Log("[gameStory] postSyncConditionCheck -> %d", nextStory);
 
     // Show "Chapter Completion" banner if all stories in chapter are done
     // (postSyncConditionCheck returns 0 only when no more stories)

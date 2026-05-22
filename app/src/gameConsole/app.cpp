@@ -1810,9 +1810,23 @@ static const SDL_FRect BOARD_HDR_TIME_BTN   = {
 // SYNC button lives in the board popup footer (moved here from Settings in V4).
 // Single button: Google SSO (stub) -> pull D1 leaderboard -> background checksum
 // + upload best record. No separate SUBMIT button (that runs as a side effect).
+// Single SYNC button. Authentication (Google SSO) is handled transparently
+// inside the sync flow -- there is no separate SSO button.
 static const SDL_FRect BOARD_SYNC_BTN = {
-    BOARD_POPUP.x + 8.0f, BOARD_POPUP.y + BOARD_POPUP.h - 34.0f, 110.0f, 18.0f
+    BOARD_POPUP.x + 8.0f, BOARD_POPUP.y + BOARD_POPUP.h - 34.0f, 130.0f, 18.0f
 };
+
+#ifndef CTETRIS_SSO_URL
+#define CTETRIS_SSO_URL ""
+#endif
+
+// Resolve the Google SSO sign-in URL: explicit CTETRIS_SSO_URL, else
+// CTETRIS_API_URL + "/auth/google", else empty.
+static std::string ssoVerifyUrl() {
+    if (SDL_strlen(CTETRIS_SSO_URL) > 0) return CTETRIS_SSO_URL;
+    if (SDL_strlen(CTETRIS_API_URL) > 0) return std::string(CTETRIS_API_URL) + "/auth/google";
+    return "";
+}
 
 static int drawWrappedText(SDL_Renderer* renderer, const char* text,
                            float x, float y, int maxCharsPerLine, int maxLines) {
@@ -2058,17 +2072,18 @@ static void drawBoardLightbox(SDL_Renderer* renderer, const AppState& state) {
                         BOARD_SYNC_BTN.y + (BOARD_SYNC_BTN.h - 8.0f) / 2.0f,
                         hasCfgUrl ? "SYNC (Google)" : "SYNC (no URL)");
 
-    // Sync status text to the right of the button (replaces old settings line)
+    // Sync status text on the footer line (full width avoids button overlap).
     if (!state.apiSyncStatus.empty()) {
         SDL_SetRenderDrawColor(renderer, 160, 200, 160, 255);
-        SDL_RenderDebugText(renderer, BOARD_SYNC_BTN.x + BOARD_SYNC_BTN.w + 6.0f,
-                            BOARD_SYNC_BTN.y + (BOARD_SYNC_BTN.h - 8.0f) / 2.0f,
+        SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8,
+                            BOARD_POPUP.y + BOARD_POPUP.h - 14,
                             state.apiSyncStatus.c_str());
+    } else {
+        SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
+        SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8,
+                            BOARD_POPUP.y + BOARD_POPUP.h - 14,
+                            "W/S scroll, ESC close");
     }
-
-    SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8,
-                        BOARD_POPUP.y + BOARD_POPUP.h - 14,
-                        "W/S scroll, ESC close");
 
     drawCloseButton(renderer, BOARD_CLOSE);
 }
@@ -2450,14 +2465,12 @@ static void drawStoriesLightbox(SDL_Renderer* renderer, const AppState& state) {
             SDL_RenderDebugText(renderer, bestX, row.y + 5.0f, bestBuf);
         }
 
-        // Play (replay dialogue) button -- shown on ALL rows incl. locked, so
-        // any story's dialogue can be previewed. Dim it on locked rows.
-        {
+        // Play (replay dialogue) button -- only on activated rows. Locked rows
+        // are view-only (clicking the row still shows its thumbnail), so no
+        // replay affordance is drawn for them.
+        if (us != STORY_UI_LOCKED) {
             SDL_FRect play = storiesPlayRect(i);
-            SDL_Color tri = (us == STORY_UI_LOCKED)
-                ? SDL_Color{150, 170, 150, 255}
-                : SDL_Color{120, 220, 130, 255};
-            drawPlayTriangle(renderer, play, tri);
+            drawPlayTriangle(renderer, play, SDL_Color{120, 220, 130, 255});
         }
     }
 
@@ -2632,19 +2645,31 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
         state.storiesMaxChapter = dbMaxActivatedChapter("default");
 
         // [F.6] Restore last-selected story into SettingsConfig so the
-        // Console -> Core handoff has the right idStory/idChapter
-        // even after a full app restart (cfg is reset by main.cpp).
+        // Console -> Core handoff has the right idStory/idChapter -- AND the
+        // tableMatrix (barrier layout) + nextBlock thresholds, joined from
+        // shared_data. Without tableMatrix here, PLAY starts with an empty
+        // board (no barriers) even when the chapter defines them.
         sqlite3_stmt* st = nullptr;
         std::string selSQL =
-            "SELECT idStory, idChapter FROM " + userTable("Stories") +
-            " WHERE idUser = ? AND isSelected = 1 LIMIT 1;";
+            "SELECT us.idStory, us.idChapter, sd.tableMatrix, "
+            "       sd.nextBlockScore, sd.nextBlockSpeed "
+            "FROM " + userTable("Stories") + " us "
+            "JOIN shared_data sd ON us.idStory = sd.idStory "
+            "  AND us.idChapter = sd.idChapter "
+            "WHERE us.idUser = ? AND us.isSelected = 1 LIMIT 1;";
         if (sqlite3_prepare_v2(g_db, selSQL.c_str(), -1, &st, nullptr) == SQLITE_OK) {
             sqlite3_bind_text(st, 1, "default", -1, SQLITE_TRANSIENT);
             if (sqlite3_step(st) == SQLITE_ROW) {
                 cfgInOut.storyId   = sqlite3_column_int(st, 0);
                 cfgInOut.chapterId = sqlite3_column_int(st, 1);
-                SDL_Log("[gameConsole] restore selection: story=%d chapter=%d",
-                        cfgInOut.storyId, cfgInOut.chapterId);
+                const unsigned char* tm = sqlite3_column_text(st, 2);
+                cfgInOut.tableMatrix    = tm ? (const char*)tm : "";
+                cfgInOut.nextBlockScore = sqlite3_column_int(st, 3);
+                cfgInOut.nextBlockSpeed = (float)sqlite3_column_double(st, 4);
+                SDL_Log("[gameConsole] restore selection: story=%d chapter=%d "
+                        "matrix_len=%d",
+                        cfgInOut.storyId, cfgInOut.chapterId,
+                        (int)cfgInOut.tableMatrix.size());
             }
             sqlite3_finalize(st);
         }
@@ -2817,29 +2842,46 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                                 : BOARD_SORT_SCORE_DESC;
                         applyBoardSort(state);
                     }
-                    // [V4] SYNC: Google SSO (stub) -> pull D1 leaderboard ->
-                    // background checksum + upload of best local record.
+                    // [V5] SYNC (single button). Flow:
+                    //   1. Pull the D1 leaderboard (no auth needed).
+                    //   2. Upload the local best record. This needs Google auth;
+                    //      if we have no token (first sync) OR the Worker rejects
+                    //      it (401), transparently open Google sign-in so the
+                    //      player can authenticate, then SYNC again.
                     else if (hitTest(BOARD_SYNC_BTN, mx, my)) {
-                        if (SDL_strlen(CTETRIS_API_URL) > 0) {
-                            state.apiSyncStatus = "Signing in...";
-                            // Google SSO stub: a real ID token is wired here later.
-                            const char* token = googleSsoToken();
+                        if (SDL_strlen(CTETRIS_API_URL) == 0) {
+                            state.apiSyncStatus = "Set CTETRIS_API_URL to enable";
+                        } else {
+                            state.apiSyncStatus = "Syncing...";
                             int rows = fetchLeaderboardFromApi();
-                            if (rows >= 0) {
+                            if (rows < 0) {
+                                state.apiSyncStatus = "Sync failed (server error)";
+                            } else {
                                 loadBoardWithFallback();
                                 applyBoardSort(state);
-                                // Background job: upload local best if it beats D1.
-                                bool up = submitLastRecord(token);
-                                char buf[40];
-                                SDL_snprintf(buf, sizeof(buf),
-                                             up ? "Synced %d (uploaded)"
-                                                : "Synced %d rows", rows);
-                                state.apiSyncStatus = buf;
-                            } else {
-                                state.apiSyncStatus = "Sync failed (offline?)";
+                                const char* token = googleSsoToken();
+                                if (!token || !*token) {
+                                    // First-time sync: no auth yet -> Google SSO.
+                                    std::string sso = ssoVerifyUrl();
+                                    if (!sso.empty()) SDL_OpenURL(sso.c_str());
+                                    state.apiSyncStatus =
+                                        "Sign in with Google, then SYNC";
+                                } else {
+                                    bool up = submitLastRecord(token);
+                                    if (up) {
+                                        char buf[40];
+                                        SDL_snprintf(buf, sizeof(buf),
+                                                     "Synced %d (uploaded)", rows);
+                                        state.apiSyncStatus = buf;
+                                    } else {
+                                        // Token rejected/expired -> re-auth.
+                                        std::string sso = ssoVerifyUrl();
+                                        if (!sso.empty()) SDL_OpenURL(sso.c_str());
+                                        state.apiSyncStatus =
+                                            "Sign in with Google, then SYNC";
+                                    }
+                                }
                             }
-                        } else {
-                            state.apiSyncStatus = "Set CTETRIS_API_URL to enable";
                         }
                     }
                     else {
@@ -2917,22 +2959,27 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                             state.storiesCacheChapter = state.currentStoryChapter;
                         }
                     }
-                    // [F.6] Row clicks: radio selects (updates thumbnail),
-                    // play previews the story dialogue. Both work on ALL rows
-                    // incl. locked, so any story can be viewed/replayed.
+                    // [F.6] Row clicks: clicking ANYWHERE on a row selects it so
+                    // its thumbnail shows (works for locked rows too -- view
+                    // only). The play triangle replays the dialogue, but only
+                    // for ACTIVATED stories (locked stories are not replayable).
                     else {
                         int rowsCheckable = (int)state.storiesCache.size();
                         if (rowsCheckable > STORIES_LIST_VISIBLE)
                             rowsCheckable = STORIES_LIST_VISIBLE;
                         for (int i = 0; i < rowsCheckable; i++) {
                             const StoryRow& sr = state.storiesCache[i];
-                            SDL_FRect radio = storiesRadioRect(i);
-                            SDL_FRect play  = storiesPlayRect(i);
-                            if (hitTest(radio, mx, my) || hitTest(play, mx, my)) {
-                                // Select story in memory + DB
-                                for (auto& r : state.storiesCache)
-                                    r.isSelected = false;
-                                state.storiesCache[i].isSelected = true;
+                            SDL_FRect row  = storiesRowRect(i);
+                            SDL_FRect play = storiesPlayRect(i);
+                            if (!hitTest(row, mx, my)) continue;
+
+                            // Select for thumbnail viewing (any row, in-memory).
+                            for (auto& r : state.storiesCache) r.isSelected = false;
+                            state.storiesCache[i].isSelected = true;
+
+                            // Only activated stories become the gameplay
+                            // selection + are replayable.
+                            if (sr.isActivated) {
                                 dbSelectStory("default", sr.idStory, sr.idChapter);
                                 if (state.cfg) {
                                     state.cfg->storyId        = sr.idStory;
@@ -2941,15 +2988,13 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                                     state.cfg->nextBlockSpeed = sr.nextBlockSpeed;
                                     state.cfg->tableMatrix    = sr.tableMatrix;
                                 }
-                                // [E.3] Play button -> preview story dialogue
-                                // Radio button -> select only, stay in popup
                                 if (hitTest(play, mx, my)) {
                                     state.showStories = false;
                                     state.isRunning   = false;
-                                    state.nextScene   = 2;   // signal: play story preview
+                                    state.nextScene   = 2;   // play story preview
                                 }
-                                break;
                             }
+                            break;
                         }
                     }
                 } else {

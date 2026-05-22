@@ -127,6 +127,19 @@
                  flips `_debugEnabled` from `DEBUG=true`, keeping the browser debug toolbar
                  aligned with the native DEBUG flag.
                - Supports browser-side sync/auth testing without hardcoding a token in code.
+[x] Issue 3.15: SYNC now resolves the Google sign-in URL automatically and re-prompts
+               when the Worker rejects or the stub token is missing.
+               - CTETRIS_SSO_URL is preferred, otherwise CTETRIS_API_URL + "/auth/google"
+                 is opened through SDL_OpenURL().
+               - Missing token or rejected token both return the player to Google sign-in,
+                 then SYNC again, instead of leaving the flow stuck.
+[x] Issue 3.16: Story rows now respect activation state while keeping locked entries
+               view-only.
+               - Clicking any row still selects it for thumbnail viewing.
+               - The play triangle is only drawn for activated stories, so locked rows can
+                 be inspected but not replayed.
+               - Restoring the selected story now joins shared_data to recover tableMatrix
+                 and nextBlock thresholds, so PLAY keeps the correct barrier layout.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameConsole/app.cpp) duy nhất để viết.
