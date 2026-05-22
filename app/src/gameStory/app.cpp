@@ -669,24 +669,6 @@ static int findDialNodeIdx(const std::vector<DialogueNode>& nodes, int nodeId) {
 #define CTETRIS_API_URL ""
 #endif
 
-// Sync states for the intro screen state machine
-enum SyncState {
-    SYNC_IDLE,          // not started yet
-    SYNC_FETCHING,      // HTTP request in flight (WASM async) or running (native)
-    SYNC_UPDATING_DB,   // applying chapter updates to SQLite
-    SYNC_DONE,          // all chapters up to date
-    SYNC_OFFLINE        // fetch failed — using local data
-};
-
-// Per-chapter sync progress tracked across frames
-struct SyncProgress {
-    int  total     = 0;
-    int  done      = 0;
-    std::string currentId;
-    SyncState state = SYNC_IDLE;
-    std::vector<std::string> completedTasks;  // rendered below the progress bar
-};
-
 // forward declaration — defined later in this file
 static std::string httpGetSync(const char* url);
 
@@ -1131,112 +1113,6 @@ static bool applyChapterJson(sqlite3* db, const std::string& jsonBody,
 }
 
 // ---------------------------------------------------------------------------
-// syncFromGist(): compare manifest SHA vs local meta, update changed chapters.
-// Returns immediately (offline) if MANIFEST_GIST_URL is empty or fetch fails.
-// ---------------------------------------------------------------------------
-static SyncProgress g_syncProgress;
-
-static void syncFromGist(sqlite3* db) {
-    g_syncProgress = SyncProgress{};
-    g_syncProgress.state = SYNC_FETCHING;
-
-    const char* manifestUrl = MANIFEST_GIST_URL;
-    if (!manifestUrl || manifestUrl[0] == '\0') {
-        SDL_Log("[gameStory] MANIFEST_GIST_URL not set — offline");
-        g_syncProgress.state = SYNC_OFFLINE;
-        return;
-    }
-
-    g_syncProgress.completedTasks.push_back("manifest: fetching...");
-    std::string manifestBody = httpGetSync(manifestUrl);
-    if (manifestBody.empty()) {
-        SDL_Log("[gameStory] manifest fetch failed — offline");
-        g_syncProgress.completedTasks.back() = "manifest: fetch failed";
-        g_syncProgress.state = SYNC_OFFLINE;
-        return;
-    }
-
-    nlohmann::json manifest;
-    try {
-        manifest = nlohmann::json::parse(manifestBody);
-    } catch (...) {
-        SDL_Log("[gameStory] manifest JSON parse fail — offline");
-        g_syncProgress.completedTasks.back() = "manifest: parse error";
-        g_syncProgress.state = SYNC_OFFLINE;
-        return;
-    }
-    g_syncProgress.completedTasks.back() = "manifest: OK";
-
-    // Read versions[latest] — format: { "c001": { latestCommitId, gistUrl, mediaBaseUrl, updatedDate } }
-    std::string latest = manifest.value("latest", std::string());
-    if (latest.empty() || !manifest.contains(latest) || !manifest[latest].is_object()) {
-        SDL_Log("[gameStory] manifest: no valid latest version ('%s')", latest.c_str());
-        g_syncProgress.state = SYNC_OFFLINE;
-        return;
-    }
-    const auto& latestVer = manifest[latest];
-    SDL_Log("[gameStory] manifest latest: %s", latest.c_str());
-
-    struct ChapterEntry { std::string id, sha, gistUrl, mediaBaseUrl; };
-    std::vector<ChapterEntry> toUpdate;
-    for (auto it = latestVer.begin(); it != latestVer.end(); ++it) {
-        std::string cid      = it.key();
-        std::string newSha   = it.value().value("latestCommitId", std::string());
-        std::string gistUrl  = it.value().value("gistUrl",        std::string());
-        std::string mediaBU  = it.value().value("mediaBaseUrl",   std::string());
-        if (cid.empty() || newSha.empty() || gistUrl.empty()) continue;
-        g_syncProgress.completedTasks.push_back(cid + ": checking...");
-        std::string localSha = metaGetSha(db, cid.c_str());
-        if (localSha == newSha) {
-            SDL_Log("[gameStory] %s SHA match — skip", cid.c_str());
-            g_syncProgress.completedTasks.back() = cid + ": up to date";
-        } else {
-            SDL_Log("[gameStory] %s SHA diff — queue update", cid.c_str());
-            g_syncProgress.completedTasks.back() = cid + ": update available";
-            toUpdate.push_back({cid, newSha, gistUrl, mediaBU});
-        }
-    }
-
-    g_syncProgress.total = (int)toUpdate.size();
-    g_syncProgress.done  = 0;
-
-    if (toUpdate.empty()) {
-        SDL_Log("[gameStory] all chapters up to date");
-        g_syncProgress.state = SYNC_DONE;
-        return;
-    }
-
-    g_syncProgress.state = SYNC_UPDATING_DB;
-    for (const auto& entry : toUpdate) {
-        g_syncProgress.currentId = entry.id;
-        g_syncProgress.completedTasks.push_back(entry.id + ": fetching JSON...");
-        std::string body = httpGetSync(entry.gistUrl.c_str());
-        if (body.empty()) {
-            SDL_Log("[gameStory] %s gistUrl fetch fail — skip", entry.id.c_str());
-            g_syncProgress.completedTasks.back() = entry.id + ": fetch failed";
-        } else {
-            g_syncProgress.completedTasks.back() = entry.id + ": importing...";
-            if (applyChapterJson(db, body, entry.id.c_str(),
-                                 entry.mediaBaseUrl.c_str())) {
-                metaSetSha(db, entry.id.c_str(), entry.sha.c_str(),
-                           entry.mediaBaseUrl.c_str());
-                g_syncProgress.completedTasks.back() = entry.id + ": synced OK";
-#ifdef __EMSCRIPTEN__
-                EM_ASM({ Module['FS'].syncfs(false, function(){}); });
-#endif
-            } else {
-                g_syncProgress.completedTasks.back() = entry.id + ": import error";
-            }
-        }
-        g_syncProgress.done++;
-    }
-
-    g_syncProgress.state = SYNC_DONE;
-    SDL_Log("[gameStory] sync complete: %d/%d chapters updated",
-            g_syncProgress.done, g_syncProgress.total);
-}
-
-// ---------------------------------------------------------------------------
 // Post-sync: check current story conditions → replay or prompt next story.
 // Called once after sync completes (storyId==0 intro path only).
 // Returns the storyId to run next (0 = no dialogue, just proceed to Console).
@@ -1596,6 +1472,229 @@ static void dialRunLoop(SDL_Renderer* renderer,
 }
 
 // =============================================================================
+// Startup flow — deterministic, step-by-step intro replacing the timed bar.
+// Each step is shown with a status (running "...", ok, fail, info, skip) so the
+// player can actually see every background job instead of a single "100%".
+// Flow:
+//   1. init db setup          (existed / created)
+//   2. shared db check        (existed / unexisted)
+//   3. current manifest ver   (from DB; 00.00 if none)
+//   4. internet connection    (passed / fail -> confirm before console)
+//   5. latest manifest ver    (if == current -> launch automatically)
+//   6. shared data fetch      (recursive: manifest -> each c{id}.json)
+//   7. shared db setup        (import rows) -> recheck version -> launch
+// Single-threaded + frame-driven so it animates identically on native + WASM
+// (the WASM async fetch path keeps the event loop alive during requests).
+// =============================================================================
+enum FlowStepStatus { FS_RUN, FS_OK, FS_FAIL, FS_INFO, FS_SKIP };
+struct FlowStep { std::string label; std::string detail; FlowStepStatus status; };
+static std::vector<FlowStep> g_flow;
+
+static int flowAdd(const std::string& label, FlowStepStatus st,
+                   const std::string& detail = "") {
+    g_flow.push_back({ label, detail, st });
+    return (int)g_flow.size() - 1;
+}
+static void flowSet(int i, FlowStepStatus st, const std::string& detail = "") {
+    if (i < 0 || i >= (int)g_flow.size()) return;
+    g_flow[i].status = st;
+    if (!detail.empty()) g_flow[i].detail = detail;
+}
+
+static void flowRender(SDL_Renderer* r, Uint32 elapsed) {
+    SDL_SetRenderDrawColor(r, 30, 30, 30, 255);
+    SDL_RenderClear(r);
+    drawLogo(r, elapsed);
+
+    const float x    = 16.0f;
+    const float top  = STORY_SCREEN_HEIGHT - 210.0f;
+    const float step = 13.0f;
+    const int   maxShow = 12;
+    const int   dots = (int)((elapsed / 250) % 4);   // 0..3 animated dots
+
+    int n = (int)g_flow.size();
+    int start = (n > maxShow) ? (n - maxShow) : 0;
+    for (int i = start; i < n; i++) {
+        const FlowStep& s = g_flow[i];
+        SDL_Color c; const char* tag;
+        switch (s.status) {
+            case FS_OK:   c = {120, 200, 120, 255}; tag = "[ok]"; break;
+            case FS_RUN:  c = {230, 210, 120, 255}; tag = "[..]"; break;
+            case FS_FAIL: c = {220, 110, 110, 255}; tag = "[x ]"; break;
+            case FS_SKIP: c = {135, 135, 145, 255}; tag = "[--]"; break;
+            default:      c = {170, 185, 210, 255}; tag = "[ i]"; break;
+        }
+        std::string line = std::string(tag) + " " + s.label;
+        if (s.status == FS_RUN)        line += std::string(dots, '.');
+        else if (!s.detail.empty())    line += ": " + s.detail;
+        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, 255);
+        SDL_RenderDebugText(r, x, top + (i - start) * step, line.c_str());
+    }
+    drawCorpCredit(r, elapsed, top + maxShow * step + 6.0f);
+}
+
+// Render frames for `ms`, animating dots and pumping events. QUIT exits.
+static void flowDwell(SDL_Renderer* r, Uint32 t0, Uint32 ms) {
+    Uint32 s = SDL_GetTicks();
+    SDL_Event e;
+    do {
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_EVENT_QUIT) std::exit(0);
+        }
+        flowRender(r, SDL_GetTicks() - t0);
+        SDL_RenderPresent(r);
+        SDL_Delay(16);
+    } while (SDL_GetTicks() - s < ms);
+}
+
+// Offline confirmation: block until the player acknowledges, then proceed.
+static void flowConfirmOffline(SDL_Renderer* r, Uint32 t0) {
+    SDL_Event e;
+    bool waiting = true;
+    while (waiting) {
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_EVENT_QUIT) std::exit(0);
+            if (e.type == SDL_EVENT_KEY_DOWN &&
+                (e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER ||
+                 e.key.key == SDLK_SPACE  || e.key.key == SDLK_ESCAPE))
+                waiting = false;
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) waiting = false;
+        }
+        flowRender(r, SDL_GetTicks() - t0);
+        const char* m1 = "No internet connection.";
+        const char* m2 = "Press ENTER to continue offline";
+        SDL_SetRenderDrawColor(r, 230, 200, 110, 255);
+        SDL_RenderDebugText(r,
+            (STORY_SCREEN_WIDTH - (int)SDL_strlen(m1) * 8.0f) / 2.0f,
+            STORY_SCREEN_HEIGHT - 64.0f, m1);
+        SDL_RenderDebugText(r,
+            (STORY_SCREEN_WIDTH - (int)SDL_strlen(m2) * 8.0f) / 2.0f,
+            STORY_SCREEN_HEIGHT - 50.0f, m2);
+        SDL_RenderPresent(r);
+        SDL_Delay(16);
+    }
+}
+
+static bool sharedDataHasRows(sqlite3* db) {
+    if (!db) return false;
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM shared_data;",
+                           -1, &st, nullptr) != SQLITE_OK) return false;
+    bool has = false;
+    if (sqlite3_step(st) == SQLITE_ROW) has = sqlite3_column_int(st, 0) > 0;
+    sqlite3_finalize(st);
+    return has;
+}
+
+// "__manifest__" pseudo-chapter row in shared_meta stores the synced manifest
+// version string in its sha column (reuses metaGetSha/metaSetSha).
+static const char* MANIFEST_META_KEY = "__manifest__";
+
+static void runStartupFlow(SDL_Renderer* r, sqlite3* db, bool dbFileExisted) {
+    g_flow.clear();
+    const Uint32 t0   = SDL_GetTicks();
+    const Uint32 DW   = 280;   // min dwell so a step is actually seen
+    const Uint32 ANIM = 420;   // animated "running" dwell
+
+    // 1. init db setup
+    int s1 = flowAdd("init db setup", dbFileExisted ? FS_OK : FS_RUN,
+                     dbFileExisted ? "existed" : "");
+    if (!dbFileExisted) {
+        flowDwell(r, t0, ANIM);            // animate while "setting up"
+        flowSet(s1, FS_OK, "created");     // schema created by caller
+    }
+    flowDwell(r, t0, DW);
+
+    // 2. shared db check
+    bool sharedHasRows = sharedDataHasRows(db);
+    flowAdd("shared db check", FS_INFO, sharedHasRows ? "existed" : "unexisted");
+    flowDwell(r, t0, DW);
+
+    // 3. current manifest version
+    std::string curVer = db ? metaGetSha(db, MANIFEST_META_KEY) : "";
+    if (curVer.empty()) curVer = "00.00";
+    flowAdd("current manifest version", FS_INFO, curVer);
+    flowDwell(r, t0, DW);
+
+    // 4. internet connection (fetch manifest)
+    int s4 = flowAdd("internet connection", FS_RUN);
+    flowDwell(r, t0, ANIM);
+    const char* manifestUrl = MANIFEST_GIST_URL;
+    std::string manifestBody =
+        (manifestUrl && manifestUrl[0]) ? httpGetSync(manifestUrl) : "";
+    nlohmann::json manifest;
+    bool online = false;
+    if (!manifestBody.empty()) {
+        try { manifest = nlohmann::json::parse(manifestBody); online = true; }
+        catch (...) { online = false; }
+    }
+    if (!online) {
+        flowSet(s4, FS_FAIL, "no connection");
+        flowConfirmOffline(r, t0);
+        return;                            // proceed to console with local data
+    }
+    flowSet(s4, FS_OK, "passed");
+    flowDwell(r, t0, DW);
+
+    // 5. latest manifest version
+    std::string latest = manifest.value("latest", std::string());
+    if (latest.empty() || !manifest.contains(latest) ||
+        !manifest[latest].is_object()) {
+        flowAdd("latest manifest version", FS_FAIL, "invalid manifest");
+        flowConfirmOffline(r, t0);
+        return;
+    }
+    flowAdd("latest manifest version", FS_INFO, latest);
+    flowDwell(r, t0, DW);
+
+    if (latest == curVer && sharedHasRows) {
+        flowAdd("up to date - launching", FS_OK, "");
+        flowDwell(r, t0, 600);
+        return;                            // versions match -> auto proceed
+    }
+
+    // 6 + 7. recursive fetch + import per chapter
+    const auto& lv = manifest[latest];
+    for (auto it = lv.begin(); it != lv.end(); ++it) {
+        std::string cid     = it.key();
+        std::string sha     = it.value().value("latestCommitId", std::string());
+        std::string gistUrl = it.value().value("gistUrl",        std::string());
+        std::string mbu     = it.value().value("mediaBaseUrl",   std::string());
+        if (cid.empty() || sha.empty() || gistUrl.empty()) continue;
+
+        if (metaGetSha(db, cid.c_str()) == sha && sharedHasRows) {
+            flowAdd(cid + " fetch", FS_SKIP, "up to date");
+            flowDwell(r, t0, 160);
+            continue;
+        }
+        int sf = flowAdd(cid + " fetch", FS_RUN);
+        flowDwell(r, t0, ANIM);
+        std::string body = httpGetSync(gistUrl.c_str());
+        if (body.empty()) { flowSet(sf, FS_FAIL, "fetch failed");
+                            flowDwell(r, t0, DW); continue; }
+        flowSet(sf, FS_OK, "fetched");
+
+        int si = flowAdd(cid + " import rows", FS_RUN);
+        flowDwell(r, t0, ANIM);
+        if (applyChapterJson(db, body, cid.c_str(), mbu.c_str())) {
+            metaSetSha(db, cid.c_str(), sha.c_str(), mbu.c_str());
+            flowSet(si, FS_OK, "imported");
+#ifdef __EMSCRIPTEN__
+            EM_ASM({ Module['FS'].syncfs(false, function(){}); });
+#endif
+        } else {
+            flowSet(si, FS_FAIL, "import error");
+        }
+        flowDwell(r, t0, DW);
+    }
+
+    // Persist current version = latest, then recheck (now matches) -> launch.
+    if (db) metaSetSha(db, MANIFEST_META_KEY, latest.c_str(), "");
+    flowAdd("recheck version", FS_OK, latest + " == current");
+    flowDwell(r, t0, 700);
+}
+
+// =============================================================================
 // runGameStory — D.2: signature extended with storyId/chapterId.
 //   storyId == 0 : original logo intro animation (main.cpp startup call)
 //   storyId  > 0 : dialogue mode (triggered from Console after story select)
@@ -1628,6 +1727,19 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
     //   Phase 2 — STATE_LOGO:    full 8-second logo animation, Skip visible.
     //             If user skips, jump straight to post-sync check.
     //   Post-sync: compare story conditions (Issue 2.9).
+
+    // Probe whether the init DB file pre-existed BEFORE storyDbOpen creates it
+    // (drives the "init db setup: existed / created" step).
+    bool dbFileExisted = false;
+    {
+        char* pref = SDL_GetPrefPath("uit", "cTetris");
+        if (pref) {
+            std::string probe = std::string(pref) + "default.sqlite";
+            SDL_free(pref);
+            SDL_IOStream* f = SDL_IOFromFile(probe.c_str(), "rb");
+            if (f) { dbFileExisted = (SDL_GetIOSize(f) > 100); SDL_CloseIO(f); }
+        }
+    }
 
     // Open (or reuse) the DB for sync and post-sync check
     bool dbOpenedHere = false;
@@ -1677,149 +1789,10 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
             nullptr, nullptr, nullptr);
     }
 
-    // --- Phase 1: Sync ---
-    // Native: run syncFromGist() in a background thread so the render loop
-    // below shows live per-chapter progress.
-    // WASM: sync runs synchronously (Asyncify); progress shows after it finishes.
-#ifndef __EMSCRIPTEN__
-    std::atomic<bool> syncDone{false};
-    std::thread syncThread([&syncDone]() {
-        if (g_storyDb) syncFromGist(g_storyDb);
-        else           g_syncProgress.state = SYNC_OFFLINE;
-        syncDone = true;
-    });
-#else
-    if (g_storyDb) syncFromGist(g_storyDb);
-    else           g_syncProgress.state = SYNC_OFFLINE;
-#endif
-
-    // --- Phase 2: Logo animation with real progress bar ---
-    enum IntroPhase { PHASE_LOGO, PHASE_DONE };
-    IntroPhase phase = PHASE_LOGO;
-    SDL_Event event;
-    Uint32 startTime = SDL_GetTicks();
-
-    while (phase != PHASE_DONE) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) std::exit(0);
-
-            // Issue 2.6/2.12: Skip button is hidden during the logo phase.
-            // ESC still allows keyboard exit of the intro animation.
-            if (phase == PHASE_LOGO) {
-                if (event.type == SDL_EVENT_KEY_DOWN &&
-                    event.key.key == SDLK_ESCAPE) {
-                    phase = PHASE_DONE;
-                }
-            }
-        }
-
-        Uint32 elapsedTime = SDL_GetTicks() - startTime;
-        // On native, also wait until background sync finishes so the tasks
-        // console can show all completed steps.
-#ifndef __EMSCRIPTEN__
-        if (elapsedTime > (Uint32)INTRO_DURATION && syncDone) phase = PHASE_DONE;
-#else
-        if (elapsedTime > (Uint32)INTRO_DURATION) phase = PHASE_DONE;
-#endif
-
-        SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
-        SDL_RenderClear(renderer);
-
-        drawLogo(renderer, elapsedTime);
-
-        // Issue 2.8: Real progress bar
-        // If sync updated chapters: bar = done/total (0..100%).
-        // If all SHAs matched (total==0) or offline: bar fills instantly to 100%.
-        float syncProgress = 1.0f;
-        if (g_syncProgress.total > 0) {
-            syncProgress = (float)g_syncProgress.done / (float)g_syncProgress.total;
-        }
-        // Blend sync progress with time progress — whichever is further ahead.
-        float timeProgress = (float)elapsedTime / (float)INTRO_DURATION;
-        float barProgress = (syncProgress > timeProgress) ? syncProgress : timeProgress;
-
-        // Progress bar + percentage + task console
-        {
-            const float barW = 180.0f, barH = 14.0f;
-            const float barX = (STORY_SCREEN_WIDTH  - barW) / 2.0f;
-            const float barY = STORY_SCREEN_HEIGHT - 110.0f;
-
-            // Background track
-            SDL_FRect bgBar = { barX, barY, barW, barH };
-            SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
-            SDL_RenderFillRect(renderer, &bgBar);
-
-            float fill = barProgress;
-            if (fill > 1.0f) fill = 1.0f;
-
-            // Filled portion
-            if (fill > 0.0f) {
-                SDL_FRect fgBar = { barX, barY, barW * fill, barH };
-                SDL_SetRenderDrawColor(renderer, 0, 200, 80, 255);
-                SDL_RenderFillRect(renderer, &fgBar);
-            }
-
-            // Percentage text centered in bar
-            int pct = (int)(fill * 100.0f);
-            char pctBuf[8];
-            SDL_snprintf(pctBuf, sizeof(pctBuf), "%d%%", pct);
-            int pctLen = (int)SDL_strlen(pctBuf);
-            SDL_SetRenderDrawColor(renderer, 10, 10, 10, 220);
-            SDL_RenderDebugText(renderer,
-                barX + (barW - pctLen * 8.0f) / 2.0f,
-                barY + (barH - 8.0f) / 2.0f,
-                pctBuf);
-
-            // Status line above bar
-            char statusBuf[48] = "";
-            if (g_syncProgress.state == SYNC_UPDATING_DB &&
-                !g_syncProgress.currentId.empty()) {
-                SDL_snprintf(statusBuf, sizeof(statusBuf), "Syncing %s...",
-                            g_syncProgress.currentId.c_str());
-            } else if (g_syncProgress.state == SYNC_OFFLINE) {
-                SDL_strlcpy(statusBuf, "Offline - using local data", sizeof(statusBuf));
-            } else if (g_syncProgress.state == SYNC_DONE) {
-                SDL_strlcpy(statusBuf, "Up to date", sizeof(statusBuf));
-            } else if (g_syncProgress.state == SYNC_FETCHING) {
-                SDL_strlcpy(statusBuf, "Fetching manifest...", sizeof(statusBuf));
-            }
-            if (statusBuf[0] != '\0') {
-                int sl2 = (int)SDL_strlen(statusBuf);
-                SDL_SetRenderDrawColor(renderer, 160, 160, 160, 200);
-                SDL_RenderDebugText(renderer,
-                    (STORY_SCREEN_WIDTH - sl2 * 8.0f) / 2.0f,
-                    barY - 14.0f, statusBuf);
-            }
-
-            // Completed task console below bar (newest 6, small text)
-            const float taskGap  = 4.0f;
-            const float taskStep = 10.0f;
-            const int   maxTask  = 6;
-            float taskY = barY + barH + taskGap;
-            int nTasks  = (int)g_syncProgress.completedTasks.size();
-            int taskStart = (nTasks > maxTask) ? (nTasks - maxTask) : 0;
-            for (int ti = taskStart; ti < nTasks; ti++) {
-                SDL_SetRenderDrawColor(renderer, 120, 190, 120, 200);
-                SDL_RenderDebugText(renderer,
-                    barX,
-                    taskY + (ti - taskStart) * taskStep,
-                    g_syncProgress.completedTasks[ti].c_str());
-            }
-
-            // Corp credit below the task console area
-            float corpTopY = taskY + maxTask * taskStep + 2.0f;
-            drawCorpCredit(renderer, elapsedTime, corpTopY);
-        }
-
-        // [ SKIP ] is rendered only by drawDialoguePage() in dialRunLoop().
-        SDL_RenderPresent(renderer);
-        SDL_Delay(16);
-    }
-
-#ifndef __EMSCRIPTEN__
-    // Wait for background sync to finish before querying the DB.
-    syncThread.join();
-#endif
+    // --- Startup flow: deterministic step-by-step intro (replaces the old
+    // timed bar + background sync thread). Runs the whole init/check/sync
+    // sequence on the main thread, rendering each step so the player sees it.
+    runStartupFlow(renderer, g_storyDb, dbFileExisted);
 
     // --- Issue 2.9: Post-sync condition check ---
     // Determine next story to run based on DB state.
@@ -1851,6 +1824,7 @@ int runGameStory(SDL_Window* window, SDL_Renderer* renderer,
     }
 
     // Show "unlock" prompt when a new story is available (negative return)
+    SDL_Event event;
     bool runNextStory = false;
     if (nextStory < 0) {
         int unlockId = -nextStory;

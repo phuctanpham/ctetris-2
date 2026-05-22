@@ -3,7 +3,10 @@
 // =============================================================================
 // Routes:
 //   GET  /leaderboard?limit=N   → top N rows from sync_records (default 50, max 100)
-//   POST /record                → insert one game record (requires Authorization header)
+//   POST /record                → best-only upsert of a game record: keeps one
+//                                 row per (user, story, chapter), overwriting
+//                                 only when the new score is higher.
+//                                 Requires Authorization header.
 //   GET  /health                → {ok: true}
 //
 // Auth: POST /record requires "Authorization: Bearer <token>" header.
@@ -101,10 +104,20 @@ async function handlePostRecord(request: Request, env: Env): Promise<Response> {
 	// Cap score to match client-side cap of 99999
 	const score = Math.min(Math.round(totalScore), 99999);
 
-	await env.DB.prepare(
+	// Best-only upsert: keep a single row per (user, story, chapter) and only
+	// overwrite when the new score beats the stored best. The WHERE on the
+	// DO UPDATE makes a not-better submission a no-op. Relies on the unique
+	// index from migrations/best-only-upsert.sql.
+	const result = await env.DB.prepare(
 		`INSERT INTO sync_records
 		   (name_user, total_score, total_seconds, avg_speed, end_ts, id_story, id_chapter)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(name_user, id_story, id_chapter) DO UPDATE SET
+		   total_score   = excluded.total_score,
+		   total_seconds = excluded.total_seconds,
+		   avg_speed     = excluded.avg_speed,
+		   end_ts        = excluded.end_ts
+		 WHERE excluded.total_score > sync_records.total_score`
 	).bind(
 		nameUser.trim().slice(0, 32),   // max 32 chars
 		score,
@@ -115,7 +128,9 @@ async function handlePostRecord(request: Request, env: Env): Promise<Response> {
 		Math.round(idChapter),
 	).run();
 
-	return jsonResponse({ ok: true }, 201);
+	// changes > 0 => inserted or improved; 0 => existing best kept.
+	const improved = (result.meta?.changes ?? 0) > 0;
+	return jsonResponse({ ok: true, improved }, 201);
 }
 
 // ---------------------------------------------------------------------------

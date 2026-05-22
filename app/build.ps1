@@ -564,6 +564,22 @@ function Import-EmsdkEnv {
             [System.Environment]::SetEnvironmentVariable($parts[0], $parts[1], 'Process')
         }
     }
+    # emsdk_env.bat does not reliably propagate its PATH edits back to the
+    # parent process (setlocal/echo quirks), so emcmake/em++/emcc can stay
+    # unfound even after a successful activate. Explicitly prepend the known
+    # tool directories (idempotent): upstream\emscripten holds emcc/em++/emcmake,
+    # the emsdk root holds emsdk.bat.
+    $emToolDirs = @((Join-Path $EmsdkRoot 'upstream\emscripten'), $EmsdkRoot)
+    foreach ($d in $emToolDirs) {
+        if ((Test-Path $d) -and ($env:PATH -notlike "*$d*")) {
+            $env:PATH = "$d;$env:PATH"
+        }
+    }
+    if (Get-Command emcmake -ErrorAction SilentlyContinue) {
+        Write-Ok "emcmake resolved on PATH"
+    } else {
+        Write-Warn "emcmake still not on PATH after sourcing $bat"
+    }
 }
 
 # =============================================================================
