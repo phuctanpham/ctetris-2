@@ -113,6 +113,13 @@
                 - Build: exit code 0, native Windows compile + link successful.
                 - Updated error message to recommend: Windows: .\build.ps1 native (auto-installs).
                 - Build: exit code 0, CURL integration simplified + robust.
+[x] Issue 3.13: GameConsole now prompts to sync first or play as guest when no chapter data exists.
+               - Pressing PLAY with an empty chapter catalogue opens a reminder modal
+                 instead of immediately launching the game.
+               - PLAY AS GUEST sets `cfg.guestMode = true`; CANCEL keeps the player in
+                 Console so they can sync from the board popup first.
+               - SYNC + submit flow moved into the Board popup, using the new Google SSO
+                 stub token path and updating `apiSyncStatus` there.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameConsole/app.cpp) duy nhất để viết.

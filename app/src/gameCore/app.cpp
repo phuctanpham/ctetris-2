@@ -144,6 +144,11 @@ static void applyTableMatrix(GameState& state, const std::string& tm) {
 // gamecore-save-record-22 / gamecore-update-story-progress-23
 static void onGameOver(GameState& state, Uint32 elapsedMs) {
     if (!s_cfg) return;
+    // [V4] Guest mode: chapter data was never synced, so do not touch the DB.
+    if (s_cfg->guestMode) {
+        SDL_Log("[gameCore] onGameOver: guest mode, record not saved");
+        return;
+    }
     const bool coreOpenedDb = !dbIsOpen();
     if (!dbOpen("default")) {
         SDL_Log("[gameCore] onGameOver: dbOpen fail");

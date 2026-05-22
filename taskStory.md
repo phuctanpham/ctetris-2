@@ -118,6 +118,20 @@
                 - Complements the media workflow so streamed/loaded chapter assets can be
                   decoded without introducing a separate external build dependency.
                 - Keeps the GameStory media pipeline self-contained in `app/src/gameStory/include`.
+[x] Issue 3.12: Dialogue text rendering now uses stb_truetype + embedded font data.
+                - SDL_RenderDebugText was replaced for dialogue speaker/body/choice text
+                  with a cached UTF-8/Unicode TTF path.
+                - New headers `app/src/gameStory/include/stb_truetype.h` and
+                  `app/src/gameStory/include/gameStory_font.h` provide rasterization and
+                  embedded font bytes for Vietnamese-capable rendering.
+                - Removes the ASCII-only limitation from dialogue UI text.
+[x] Issue 3.13: Dialogue media presentation now falls back to chapter thumbnails and
+                keeps BGM playback alive across dialogue flow.
+                - dialNodeImageUrl() falls back to shared_data.thumbnailPath when a node
+                  has no imageUrl, so chapter artwork still appears.
+                - dialPlayBgm() now retains the opened audio device until dialStopBgm(),
+                  preventing music from stopping immediately after start.
+                - Keeps dialogue visuals/audio stable when node-specific assets are missing.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameStory/app.cpp) duy nhất để viết.

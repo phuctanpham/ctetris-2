@@ -38,6 +38,12 @@
 #define STBI_NO_STDIO
 #include "stb_image.h"
 
+// stb_truetype: single-header TTF rasterizer. Used to render Unicode
+// (Vietnamese) dialogue text -- SDL_RenderDebugText is ASCII-only.
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+#include "gameStory_font.h"   // embedded Liberation Sans Bold (Vietnamese-capable)
+
 #include "ctetris_debug.h"
 
 #include <map>
@@ -365,30 +371,162 @@ static bool diagHit(const SDL_FRect& r, float x, float y) {
     return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 }
 
-// Word-wrap renderer (same pattern as gameConsole)
+// ---------------------------------------------------------------------------
+// TTF (stb_truetype) Unicode text rendering. SDL_RenderDebugText is ASCII-only,
+// so Vietnamese dialogue (speaker, body, choices) is rendered through here.
+// Glyphs are rasterized on first use and cached as SDL textures for the app
+// lifetime. Color is applied per draw via texture color/alpha modulation.
+// ---------------------------------------------------------------------------
+static const float    TTF_PIXEL_H = 13.0f;
+static stbtt_fontinfo g_ttf;
+static bool           g_ttfReady   = false;
+static float          g_ttfScale   = 1.0f;
+static int            g_ttfAscent  = 0, g_ttfDescent = 0, g_ttfLineGap = 0;
+
+struct TtfGlyph {
+    SDL_Texture* tex = nullptr;
+    int   w = 0, h = 0, xoff = 0, yoff = 0;
+    float advance = 0.0f;
+};
+static std::map<int, TtfGlyph> g_ttfCache;
+
+static void ttfInit() {
+    if (g_ttfReady) return;
+    if (!stbtt_InitFont(&g_ttf, g_dialogueFontData,
+                        stbtt_GetFontOffsetForIndex(g_dialogueFontData, 0))) {
+        SDL_Log("[gameStory] stbtt_InitFont failed");
+        return;
+    }
+    g_ttfScale = stbtt_ScaleForPixelHeight(&g_ttf, TTF_PIXEL_H);
+    stbtt_GetFontVMetrics(&g_ttf, &g_ttfAscent, &g_ttfDescent, &g_ttfLineGap);
+    g_ttfReady = true;
+}
+
+// Decode one UTF-8 codepoint starting at *i; advances *i past the sequence.
+static int utf8Next(const char* s, int len, int* i) {
+    unsigned char c = (unsigned char)s[*i];
+    int cp, n;
+    if      (c < 0x80)      { cp = c;        n = 1; }
+    else if ((c >> 5) == 0x6)  { cp = c & 0x1F; n = 2; }
+    else if ((c >> 4) == 0xE)  { cp = c & 0x0F; n = 3; }
+    else if ((c >> 3) == 0x1E) { cp = c & 0x07; n = 4; }
+    else                       { cp = 0xFFFD;   n = 1; }
+    int j = *i + 1;
+    for (int k = 1; k < n && j < len; k++, j++) {
+        unsigned char cc = (unsigned char)s[j];
+        if ((cc & 0xC0) != 0x80) break;
+        cp = (cp << 6) | (cc & 0x3F);
+    }
+    *i += n;
+    return cp;
+}
+
+static TtfGlyph* ttfGlyph(SDL_Renderer* r, int cp) {
+    auto it = g_ttfCache.find(cp);
+    if (it != g_ttfCache.end()) return &it->second;
+    TtfGlyph g;
+    int adv = 0, lsb = 0;
+    stbtt_GetCodepointHMetrics(&g_ttf, cp, &adv, &lsb);
+    g.advance = adv * g_ttfScale;
+    int w = 0, h = 0, xo = 0, yo = 0;
+    unsigned char* bmp = stbtt_GetCodepointBitmap(&g_ttf, 0, g_ttfScale,
+                                                  cp, &w, &h, &xo, &yo);
+    if (bmp && w > 0 && h > 0) {
+        std::vector<unsigned char> rgba((size_t)w * h * 4);
+        for (int p = 0; p < w * h; p++) {
+            rgba[p*4+0] = 255; rgba[p*4+1] = 255;
+            rgba[p*4+2] = 255; rgba[p*4+3] = bmp[p];
+        }
+        SDL_Surface* surf = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_RGBA32,
+                                                  rgba.data(), w * 4);
+        if (surf) {
+            g.tex = SDL_CreateTextureFromSurface(r, surf);
+            SDL_DestroySurface(surf);
+            if (g.tex) SDL_SetTextureBlendMode(g.tex, SDL_BLENDMODE_BLEND);
+        }
+        g.w = w; g.h = h; g.xoff = xo; g.yoff = yo;
+    }
+    if (bmp) stbtt_FreeBitmap(bmp, nullptr);
+    auto res = g_ttfCache.emplace(cp, g);
+    return &res.first->second;
+}
+
+// Draw UTF-8 text with top-left at (x,y); returns advance width in pixels.
+static float ttfDrawText(SDL_Renderer* r, float x, float y,
+                         const char* text, SDL_Color color) {
+    ttfInit();
+    if (!g_ttfReady || !text) return 0.0f;
+    float baseline = y + g_ttfAscent * g_ttfScale;
+    float pen = x;
+    int len = (int)SDL_strlen(text);
+    int i = 0, prev = 0;
+    while (i < len) {
+        int cp = utf8Next(text, len, &i);
+        if (cp == '\n') continue;
+        TtfGlyph* g = ttfGlyph(r, cp);
+        if (prev) pen += stbtt_GetCodepointKernAdvance(&g_ttf, prev, cp) * g_ttfScale;
+        if (g->tex) {
+            SDL_SetTextureColorMod(g->tex, color.r, color.g, color.b);
+            SDL_SetTextureAlphaMod(g->tex, color.a);
+            SDL_FRect dst = { pen + g->xoff, baseline + g->yoff,
+                              (float)g->w, (float)g->h };
+            SDL_RenderTexture(r, g->tex, nullptr, &dst);
+        }
+        pen += g->advance;
+        prev = cp;
+    }
+    return pen - x;
+}
+
+// Measure pixel width of a UTF-8 substring [text, text+len).
+static float ttfMeasure(SDL_Renderer* r, const char* text, int len) {
+    ttfInit();
+    if (!g_ttfReady) return 0.0f;
+    float pen = 0; int i = 0, prev = 0;
+    while (i < len) {
+        int cp = utf8Next(text, len, &i);
+        TtfGlyph* g = ttfGlyph(r, cp);
+        if (prev) pen += stbtt_GetCodepointKernAdvance(&g_ttf, prev, cp) * g_ttfScale;
+        pen += g->advance; prev = cp;
+    }
+    return pen;
+}
+
+// Greedy word-wrap by pixel width. Returns the number of lines drawn.
+static int ttfDrawWrapped(SDL_Renderer* r, const char* text,
+                          float x, float y, float maxW,
+                          float lineH, int maxLines, SDL_Color color) {
+    ttfInit();
+    if (!g_ttfReady || !text) return 0;
+    int len = (int)SDL_strlen(text);
+    int lines = 0, i = 0, wordStart = 0;
+    std::string cur;
+    auto flush = [&](const std::string& s) {
+        ttfDrawText(r, x, y + lines * lineH, s.c_str(), color);
+        lines++;
+    };
+    while (i <= len && lines < maxLines) {
+        if (i == len || text[i] == ' ') {
+            std::string word(text + wordStart, i - wordStart);
+            std::string trial = cur.empty() ? word : cur + " " + word;
+            float w = ttfMeasure(r, trial.c_str(), (int)trial.size());
+            if (w <= maxW || cur.empty()) cur = trial;
+            else { flush(cur); cur = word; }
+            wordStart = i + 1;
+            if (i == len) break;
+        }
+        i++;
+    }
+    if (lines < maxLines && !cur.empty()) flush(cur);
+    return lines;
+}
+
+// Word-wrap renderer -- now Unicode-capable via stb_truetype.
 static int diagDrawWrapped(SDL_Renderer* r, const char* text,
                             float x, float y, SDL_Color color) {
-    SDL_SetRenderDrawColor(r, color.r, color.g, color.b, color.a);
-    int len = (int)SDL_strlen(text);
-    int pos = 0, lines = 0;
-    char buf[128];
-    while (pos < len && lines < DIAG_MAX_LINES) {
-        int rem  = len - pos;
-        int take = (rem > DIAG_MAX_CHARS) ? DIAG_MAX_CHARS : rem;
-        if (take == DIAG_MAX_CHARS && pos + take < len) {
-            int back = take;
-            while (back > 0 && text[pos + back - 1] != ' ') back--;
-            if (back > 0) take = back;
-        }
-        if (take >= (int)sizeof(buf)) take = (int)sizeof(buf) - 1;
-        SDL_memcpy(buf, text + pos, take);
-        buf[take] = '\0';
-        SDL_RenderDebugText(r, x, y + lines * DIAG_LINE_H, buf);
-        pos += take;
-        while (pos < len && text[pos] == ' ') pos++;
-        lines++;
-    }
-    return lines;
+    return ttfDrawWrapped(r, text, x, y,
+                          DIAG_TB_W - 16.0f, DIAG_LINE_H,
+                          DIAG_MAX_LINES, color);
 }
 
 static void drawDialoguePage(SDL_Renderer* renderer,
@@ -441,12 +579,10 @@ static void drawDialoguePage(SDL_Renderer* renderer,
         DIAG_TB_BORDER.r, DIAG_TB_BORDER.g, DIAG_TB_BORDER.b, 255);
     SDL_RenderRect(renderer, &tb);
 
-    // speaker name
+    // speaker name (Unicode via TTF)
     if (!node.speaker.empty()) {
-        SDL_SetRenderDrawColor(renderer,
-            DIAG_SPEAKER.r, DIAG_SPEAKER.g, DIAG_SPEAKER.b, 255);
-        SDL_RenderDebugText(renderer, DIAG_TXT_X, DIAG_SPK_Y,
-                            node.speaker.c_str());
+        ttfDrawText(renderer, DIAG_TXT_X, DIAG_SPK_Y,
+                    node.speaker.c_str(), DIAG_SPEAKER);
     }
     // separator
     SDL_SetRenderDrawColor(renderer,
@@ -470,13 +606,10 @@ static void drawDialoguePage(SDL_Renderer* renderer,
             SDL_SetRenderDrawColor(renderer,
                 DIAG_TEXT.r, DIAG_TEXT.g, DIAG_TEXT.b, 255);
             SDL_RenderRect(renderer, &cr);
-            if (i == selChoice) {
-                SDL_SetRenderDrawColor(renderer,
-                    DIAG_SPEAKER.r, DIAG_SPEAKER.g, DIAG_SPEAKER.b, 255);
-            }
-            const char* lbl = choices[i].label.c_str();
-            SDL_RenderDebugText(renderer,
-                cr.x + 8.0f, cr.y + (cr.h - 8.0f) / 2.0f, lbl);
+            SDL_Color lblColor = (i == selChoice) ? DIAG_SPEAKER : DIAG_TEXT;
+            ttfDrawText(renderer, cr.x + 8.0f,
+                        cr.y + (cr.h - TTF_PIXEL_H) / 2.0f,
+                        choices[i].label.c_str(), lblColor);
         }
         SDL_SetRenderDrawColor(renderer,
             DIAG_HINT.r, DIAG_HINT.g, DIAG_HINT.b, 255);
@@ -556,12 +689,17 @@ static std::string httpGetSync(const char* url);
 // ---------------------------------------------------------------------------
 static std::map<std::string, SDL_Texture*> g_imgCache;
 static SDL_AudioStream* g_bgmStream  = nullptr;
+static SDL_AudioDeviceID g_bgmDev    = 0;
 static std::string      g_bgmUrl;
 
 static void dialStopBgm() {
     if (g_bgmStream) {
         SDL_DestroyAudioStream(g_bgmStream);
         g_bgmStream = nullptr;
+    }
+    if (g_bgmDev) {
+        SDL_CloseAudioDevice(g_bgmDev);
+        g_bgmDev = 0;
     }
     g_bgmUrl.clear();
 }
@@ -613,9 +751,11 @@ static void dialPlayBgm(const std::string& url) {
         SDL_BindAudioStream(dev, g_bgmStream);
         SDL_PutAudioStreamData(g_bgmStream, wav, (int)wavLen);
         SDL_ResumeAudioDevice(dev);
+        g_bgmDev = dev;          // retain device so playback keeps going
+    } else {
+        SDL_CloseAudioDevice(dev);
     }
     SDL_free(wav);
-    SDL_CloseAudioDevice(dev);
     g_bgmUrl = url;
 }
 
@@ -1243,6 +1383,33 @@ static std::string dialMediaUrl(const std::string& filename, int chapterId) {
     return base + filename;
 }
 
+// Chapter thumbnail used as fallback when a dialogue node has no imageUrl.
+static std::string dialChapterThumbnailUrl(int storyId, int chapterId) {
+    if (!g_storyDb) return "";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_storyDb,
+        "SELECT thumbnailPath FROM shared_data "
+        "WHERE idStory=? AND idChapter=?;",
+        -1, &st, nullptr) != SQLITE_OK) return "";
+    sqlite3_bind_int(st, 1, storyId);
+    sqlite3_bind_int(st, 2, chapterId);
+    std::string thumb;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        const unsigned char* p = sqlite3_column_text(st, 0);
+        if (p) thumb = (const char*)p;
+    }
+    sqlite3_finalize(st);
+    return dialMediaUrl(thumb, chapterId);
+}
+
+// Picks node image URL with chapter-thumbnail fallback when node has none.
+static std::string dialNodeImageUrl(const DialogueNode& node,
+                                     int storyId, int chapterId) {
+    if (!node.imageUrl.empty())
+        return dialMediaUrl(node.imageUrl, chapterId);
+    return dialChapterThumbnailUrl(storyId, chapterId);
+}
+
 // D.1-D.7: inner dialogue event + render loop
 static void dialRunLoop(SDL_Renderer* renderer,
                         const std::vector<DialogueNode>& nodes,
@@ -1278,7 +1445,7 @@ static void dialRunLoop(SDL_Renderer* renderer,
     // Load choices and media for first node
     if (nodes[0].hasChoices)
         curChoices = storyDbLoadChoices(storyId, chapterId, nodes[0].nodeId);
-    curImg = dialLoadImage(renderer, dialMediaUrl(nodes[0].imageUrl, chapterId));
+    curImg = dialLoadImage(renderer, dialNodeImageUrl(nodes[0], storyId, chapterId));
 
     // D.6 initial BGM
     diagUpdateBgm(dialMediaUrl(nodes[0].bgmUrl, chapterId));
@@ -1365,7 +1532,7 @@ static void dialRunLoop(SDL_Renderer* renderer,
         if (nodes[curIdx].hasChoices)
             curChoices = storyDbLoadChoices(storyId, chapterId,
                                             nodes[curIdx].nodeId);
-        curImg = dialLoadImage(renderer, dialMediaUrl(nodes[curIdx].imageUrl, chapterId));
+        curImg = dialLoadImage(renderer, dialNodeImageUrl(nodes[curIdx], storyId, chapterId));
         diagUpdateBgm(dialMediaUrl(nodes[curIdx].bgmUrl, chapterId));
     }
 

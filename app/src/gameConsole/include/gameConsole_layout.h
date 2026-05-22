@@ -12,4 +12,7 @@ struct SettingsConfig {
     int         nextBlockScore    = 0;
     float       nextBlockSpeed    = 0.0f;
     std::string tableMatrix       = "";
+    // Guest mode: player started without synced chapter data. The core runs
+    // normally but no score/record is written back to the database.
+    bool        guestMode         = false;
 };

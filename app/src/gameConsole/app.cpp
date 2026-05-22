@@ -396,6 +396,7 @@ struct AppState {
     bool showBoard    = false;
     bool showSettings = false;   // [A.3] Settings popup visibility
     bool showStories  = false;   // [F.2] Stories popup visibility
+    bool showPlayReminder = false;   // [V4] "sync first / play as guest" prompt
     int  currentStoryChapter = 1;   // [F.3] active chapter shown in stories popup
     std::vector<StoryRow> storiesCache;
     int  storiesCacheChapter = -1;
@@ -1440,8 +1441,18 @@ static int fetchLeaderboardFromApi() {
     return (int)arr.size();
 }
 
+// Google SSO token provider (STUB).
+// V4 replaces the old email-OTP flow with Google single sign-on. Until the
+// backend OAuth endpoint + client ID exist, this returns a dev token taken from
+// the CTETRIS_DEV_TOKEN env var (empty -> Worker returns 401, which the caller
+// surfaces as a sync failure). Swap the body for a real Google ID token later.
+static const char* googleSsoToken() {
+    const char* t = SDL_getenv("CTETRIS_DEV_TOKEN");
+    return t ? t : "";
+}
+
 // Submit last session record to Worker API.
-// `token` is a Bearer token from 3rd-party OTP service (non-empty = authorized).
+// `token` is a Bearer token from Google SSO (non-empty = authorized).
 static bool submitLastRecord(const char* token) {
     const char* apiUrl = CTETRIS_API_URL;
     if (!apiUrl || !*apiUrl || !g_db) return false;
@@ -1571,14 +1582,13 @@ static const SDL_FRect BOARD_CLOSE = { BOARD_POPUP.x + BOARD_POPUP.w - 22.0f,
 static const SDL_FRect SETTINGS_POPUP = { 5.0f, 20.0f, 260.0f, 440.0f };
 static const SDL_FRect SETTINGS_CLOSE = { SETTINGS_POPUP.x + SETTINGS_POPUP.w - 22.0f,
                                           SETTINGS_POPUP.y + 4.0f, 18.0f, 18.0f };
-static const float API_BTN_W = 220.0f;
-static const float API_BTN_H = 22.0f;
-static const float API_BTN_X = SETTINGS_POPUP.x + (SETTINGS_POPUP.w - API_BTN_W) / 2.0f;
-static const SDL_FRect SETTINGS_SYNC_BTN = {
-    API_BTN_X, SETTINGS_POPUP.y + 196.0f, API_BTN_W, API_BTN_H
+// [V4] Play reminder modal (shown when PLAY pressed but no chapter data yet).
+static const SDL_FRect REMINDER_POPUP = { 20.0f, 160.0f, 230.0f, 160.0f };
+static const SDL_FRect REMINDER_GUEST_BTN = {
+    REMINDER_POPUP.x + 20.0f, REMINDER_POPUP.y + 96.0f, 190.0f, 22.0f
 };
-static const SDL_FRect SETTINGS_SUBMIT_BTN = {
-    API_BTN_X, SETTINGS_POPUP.y + 224.0f, API_BTN_W, API_BTN_H
+static const SDL_FRect REMINDER_CANCEL_BTN = {
+    REMINDER_POPUP.x + 20.0f, REMINDER_POPUP.y + 124.0f, 190.0f, 22.0f
 };
 
 // [F.2] Stories popup geometry -- same footprint as Settings/Guide for visual
@@ -1764,6 +1774,12 @@ static const SDL_FRect BOARD_HDR_SCORE_BTN  = {
 };
 static const SDL_FRect BOARD_HDR_TIME_BTN   = {
     BOARD_HDR_TIME_X - 2.0f, BOARD_HDR_Y - 3.0f, 42.0f, 14.0f
+};
+// SYNC button lives in the board popup footer (moved here from Settings in V4).
+// Single button: Google SSO (stub) -> pull D1 leaderboard -> background checksum
+// + upload best record. No separate SUBMIT button (that runs as a side effect).
+static const SDL_FRect BOARD_SYNC_BTN = {
+    BOARD_POPUP.x + 8.0f, BOARD_POPUP.y + BOARD_POPUP.h - 34.0f, 110.0f, 18.0f
 };
 
 static int drawWrappedText(SDL_Renderer* renderer, const char* text,
@@ -1998,11 +2014,74 @@ static void drawBoardLightbox(SDL_Renderer* renderer, const AppState& state) {
     drawSB(renderer, sb, g_boardTotal, BOARD_VISIBLE,
            state.sb.upHeld, state.sb.downHeld, state.sb.dragging);
 
+    // SYNC button (Google SSO stub -> pull D1 -> background checksum/upload)
+    bool hasCfgUrl = (SDL_strlen(CTETRIS_API_URL) > 0);
+    SDL_Color syncBg = hasCfgUrl ? SDL_Color{50, 100, 160, 255}
+                                 : SDL_Color{60, 60, 70, 255};
+    SDL_SetRenderDrawColor(renderer, syncBg.r, syncBg.g, syncBg.b, 255);
+    SDL_RenderFillRect(renderer, &BOARD_SYNC_BTN);
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderRect(renderer, &BOARD_SYNC_BTN);
+    SDL_RenderDebugText(renderer, BOARD_SYNC_BTN.x + 8.0f,
+                        BOARD_SYNC_BTN.y + (BOARD_SYNC_BTN.h - 8.0f) / 2.0f,
+                        hasCfgUrl ? "SYNC (Google)" : "SYNC (no URL)");
+
+    // Sync status text to the right of the button (replaces old settings line)
+    if (!state.apiSyncStatus.empty()) {
+        SDL_SetRenderDrawColor(renderer, 160, 200, 160, 255);
+        SDL_RenderDebugText(renderer, BOARD_SYNC_BTN.x + BOARD_SYNC_BTN.w + 6.0f,
+                            BOARD_SYNC_BTN.y + (BOARD_SYNC_BTN.h - 8.0f) / 2.0f,
+                            state.apiSyncStatus.c_str());
+    }
+
     SDL_RenderDebugText(renderer, BOARD_POPUP.x + 8,
                         BOARD_POPUP.y + BOARD_POPUP.h - 14,
-                        "W/S to scroll, ESC close");
+                        "W/S scroll, ESC close");
 
     drawCloseButton(renderer, BOARD_CLOSE);
+}
+
+// [V4] Play reminder modal. Appears when PLAY is pressed before any chapter
+// data has been synced. Two choices: play as guest (no DB) or cancel + sync.
+static void drawPlayReminder(SDL_Renderer* renderer, const AppState& state) {
+    (void)state;
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
+    SDL_FRect screen = { 0, 0, (float)CONSOLE_SCREEN_WIDTH, (float)CONSOLE_SCREEN_HEIGHT };
+    SDL_RenderFillRect(renderer, &screen);
+
+    SDL_SetRenderDrawColor(renderer, 70, 60, 90, 255);
+    SDL_RenderFillRect(renderer, &REMINDER_POPUP);
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderRect(renderer, &REMINDER_POPUP);
+
+    SDL_RenderDebugText(renderer, REMINDER_POPUP.x + 10.0f,
+                        REMINDER_POPUP.y + 12.0f, "NO CHAPTER DATA");
+    SDL_SetRenderDrawColor(renderer, 200, 200, 210, 255);
+    SDL_RenderDebugText(renderer, REMINDER_POPUP.x + 10.0f,
+                        REMINDER_POPUP.y + 34.0f, "Connect to internet and");
+    SDL_RenderDebugText(renderer, REMINDER_POPUP.x + 10.0f,
+                        REMINDER_POPUP.y + 46.0f, "SYNC to load a chapter,");
+    SDL_RenderDebugText(renderer, REMINDER_POPUP.x + 10.0f,
+                        REMINDER_POPUP.y + 58.0f, "or skip to play as guest.");
+
+    // Guest button (green)
+    SDL_SetRenderDrawColor(renderer, 60, 130, 70, 255);
+    SDL_RenderFillRect(renderer, &REMINDER_GUEST_BTN);
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderRect(renderer, &REMINDER_GUEST_BTN);
+    SDL_RenderDebugText(renderer, REMINDER_GUEST_BTN.x + 8.0f,
+                        REMINDER_GUEST_BTN.y + (REMINDER_GUEST_BTN.h - 8.0f) / 2.0f,
+                        "PLAY AS GUEST");
+
+    // Cancel button (grey)
+    SDL_SetRenderDrawColor(renderer, 90, 90, 100, 255);
+    SDL_RenderFillRect(renderer, &REMINDER_CANCEL_BTN);
+    SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
+    SDL_RenderRect(renderer, &REMINDER_CANCEL_BTN);
+    SDL_RenderDebugText(renderer, REMINDER_CANCEL_BTN.x + 8.0f,
+                        REMINDER_CANCEL_BTN.y + (REMINDER_CANCEL_BTN.h - 8.0f) / 2.0f,
+                        "CANCEL (sync first)");
 }
 
 // [A.3/D.2/E.2] Settings popup body. Volume slider + color swatches.
@@ -2096,41 +2175,9 @@ static void drawSettingsLightbox(SDL_Renderer* renderer, const AppState& state) 
         }
     }
 
-    // ===== [V3] ONLINE SYNC SECTION =====
-    {
-        SDL_SetRenderDrawColor(renderer, 140, 140, 150, 255);
-        SDL_RenderDebugText(renderer, SETTINGS_POPUP.x + 20.0f,
-                            SETTINGS_POPUP.y + 182.0f, "ONLINE SYNC");
-
-        bool hasCfgUrl = (SDL_strlen(CTETRIS_API_URL) > 0);
-        SDL_Color syncBg = hasCfgUrl
-            ? SDL_Color{50, 100, 160, 255}
-            : SDL_Color{60, 60, 70, 255};
-        SDL_SetRenderDrawColor(renderer, syncBg.r, syncBg.g, syncBg.b, 255);
-        SDL_RenderFillRect(renderer, &SETTINGS_SYNC_BTN);
-        SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
-        SDL_RenderRect(renderer, &SETTINGS_SYNC_BTN);
-        SDL_RenderDebugText(renderer,
-            SETTINGS_SYNC_BTN.x + 8.0f,
-            SETTINGS_SYNC_BTN.y + (SETTINGS_SYNC_BTN.h - 8.0f) / 2.0f,
-            hasCfgUrl ? "SYNC BOARD (pull)" : "SYNC (no API URL)");
-
-        SDL_SetRenderDrawColor(renderer, 80, 50, 130, 255);
-        SDL_RenderFillRect(renderer, &SETTINGS_SUBMIT_BTN);
-        SDL_SetRenderDrawColor(renderer, SOFT_WHITE.r, SOFT_WHITE.g, SOFT_WHITE.b, 255);
-        SDL_RenderRect(renderer, &SETTINGS_SUBMIT_BTN);
-        SDL_RenderDebugText(renderer,
-            SETTINGS_SUBMIT_BTN.x + 8.0f,
-            SETTINGS_SUBMIT_BTN.y + (SETTINGS_SUBMIT_BTN.h - 8.0f) / 2.0f,
-            "SUBMIT SCORE (OTP token)");
-
-        if (state.cfg && !state.apiSyncStatus.empty()) {
-            SDL_SetRenderDrawColor(renderer, 160, 200, 160, 255);
-            SDL_RenderDebugText(renderer, SETTINGS_POPUP.x + 8.0f,
-                                SETTINGS_POPUP.y + 252.0f,
-                                state.apiSyncStatus.c_str());
-        }
-    }
+    // [V4] Online sync moved to the BOARD popup (single SYNC button).
+    // The SUBMIT button was removed: upload now runs as a background side
+    // effect of a successful SYNC. See drawBoardLightbox / BOARD_SYNC_BTN.
 
     // Hint footer
     SDL_SetRenderDrawColor(renderer, 160, 160, 160, 255);
@@ -2358,6 +2405,19 @@ static void playBackgroundMusic() {
 }
 
 // [A.2/A.3] activateButton -- 5 cases: GUIDE, BOARD, PLAY, SETTINGS, QUIT
+// [V4] True when chapter catalogue (shared_data) has at least one row, i.e.
+// the init tables exist AND were populated by a successful gameStory sync.
+static bool dbHasChapters() {
+    if (!g_db) return false;
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(g_db, "SELECT COUNT(*) FROM shared_data;",
+                           -1, &st, nullptr) != SQLITE_OK) return false;
+    int cnt = 0;
+    if (sqlite3_step(st) == SQLITE_ROW) cnt = sqlite3_column_int(st, 0);
+    sqlite3_finalize(st);
+    return cnt > 0;
+}
+
 static void activateButton(AppState& state, int index) {
     switch (index) {
         case BTN_IDX_GUIDE:
@@ -2367,7 +2427,16 @@ static void activateButton(AppState& state, int index) {
             state.showBoard = true; state.boardScroll = 0;
             sbResetInteraction(state.sb); break;
         case BTN_IDX_PLAY:
-            state.isRunning = false; state.nextScene = 1; break;
+            // [V4] If no chapter data is loaded yet, prompt the player to sync
+            // first. They may skip and play in guest mode (no DB writes).
+            if (!dbHasChapters()) {
+                state.showPlayReminder = true;
+                sbResetInteraction(state.sb);
+            } else {
+                if (state.cfg) state.cfg->guestMode = false;
+                state.isRunning = false; state.nextScene = 1;
+            }
+            break;
         case BTN_IDX_STORIES:
             // [F.4] Open stories popup. Load DB rows for current chapter +
             // refresh max-chapter counter. dbLoadStories already logs counts.
@@ -2536,7 +2605,8 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                 if (key == SDLK_ESCAPE) {
                     // [A.4/F.2] ESC closes any open lightbox first; only when
                     // none are open does it jump focus to QUIT button.
-                    if (state.showGuide)         { state.showGuide = false;    sbResetInteraction(state.sb); }
+                    if (state.showPlayReminder)  { state.showPlayReminder = false; }
+                    else if (state.showGuide)    { state.showGuide = false;    sbResetInteraction(state.sb); }
                     else if (state.showBoard)    { state.showBoard = false;    sbResetInteraction(state.sb); }
                     else if (state.showSettings) {
                         state.showSettings = false;
@@ -2566,7 +2636,8 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                     applyVolumeToStream(state.cfg->volume);
                 }
                 // [A.4] Block main-button TAB/arrow nav while ANY popup open
-                else if (!state.showGuide && !state.showBoard && !state.showSettings && !state.showStories) {
+                else if (!state.showGuide && !state.showBoard && !state.showSettings &&
+                         !state.showStories && !state.showPlayReminder) {
                     if ((key == SDLK_TAB && !shiftHeld) || isLeft || isDown)
                         state.focusIndex = (state.focusIndex + 1) % NUM_MAIN_BUTTONS;
                     else if ((key == SDLK_TAB && shiftHeld) || isRight || isUp)
@@ -2581,7 +2652,18 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                 float mx = event.button.x;
                 float my = event.button.y;
 
-                if (state.showGuide) {
+                if (state.showPlayReminder) {
+                    // [V4] Modal: PLAY AS GUEST -> launch core with guestMode;
+                    // CANCEL -> dismiss so the player can SYNC from the board.
+                    if (hitTest(REMINDER_GUEST_BTN, mx, my)) {
+                        state.showPlayReminder = false;
+                        if (state.cfg) state.cfg->guestMode = true;
+                        state.isRunning = false;
+                        state.nextScene = 1;
+                    } else if (hitTest(REMINDER_CANCEL_BTN, mx, my)) {
+                        state.showPlayReminder = false;
+                    }
+                } else if (state.showGuide) {
                     if (hitTest(GUIDE_CLOSE, mx, my)) {
                         state.showGuide = false;
                         sbResetInteraction(state.sb);
@@ -2612,6 +2694,31 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                                 ? BOARD_SORT_SCORE_ASC
                                 : BOARD_SORT_SCORE_DESC;
                         applyBoardSort(state);
+                    }
+                    // [V4] SYNC: Google SSO (stub) -> pull D1 leaderboard ->
+                    // background checksum + upload of best local record.
+                    else if (hitTest(BOARD_SYNC_BTN, mx, my)) {
+                        if (SDL_strlen(CTETRIS_API_URL) > 0) {
+                            state.apiSyncStatus = "Signing in...";
+                            // Google SSO stub: a real ID token is wired here later.
+                            const char* token = googleSsoToken();
+                            int rows = fetchLeaderboardFromApi();
+                            if (rows >= 0) {
+                                loadBoardWithFallback();
+                                applyBoardSort(state);
+                                // Background job: upload local best if it beats D1.
+                                bool up = submitLastRecord(token);
+                                char buf[40];
+                                SDL_snprintf(buf, sizeof(buf),
+                                             up ? "Synced %d (uploaded)"
+                                                : "Synced %d rows", rows);
+                                state.apiSyncStatus = buf;
+                            } else {
+                                state.apiSyncStatus = "Sync failed (offline?)";
+                            }
+                        } else {
+                            state.apiSyncStatus = "Set CTETRIS_API_URL to enable";
+                        }
                     }
                     else {
                         SBLayout sb = layoutSB(BOARD_SB_X, BOARD_SB_Y, BOARD_SB_H,
@@ -2662,32 +2769,7 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
                                     break;
                                 }
                             }
-                            if (hitTest(SETTINGS_SYNC_BTN, mx, my)) {
-                                // gameconsole-tich-hop-backend-13: pull leaderboard
-                                if (SDL_strlen(CTETRIS_API_URL) > 0) {
-                                    state.apiSyncStatus = "Syncing...";
-                                    int rows = fetchLeaderboardFromApi();
-                                    if (rows >= 0) {
-                                        char buf[32];
-                                        SDL_snprintf(buf, sizeof(buf),
-                                                     "Synced %d rows", rows);
-                                        state.apiSyncStatus = buf;
-                                        loadBoardWithFallback();
-                                        applyBoardSort(state);
-                                    } else {
-                                        state.apiSyncStatus = "Sync failed (offline?)";
-                                    }
-                                } else {
-                                    state.apiSyncStatus = "Set CTETRIS_API_URL to enable";
-                                }
-                            } else if (hitTest(SETTINGS_SUBMIT_BTN, mx, my)) {
-                                // OTP token: in V3 this comes from 3rd-party auth flow.
-                                // Stub: pass empty token -> Worker returns 401 (expected).
-                                const char* token = "";  // TODO: populate from OTP service
-                                bool ok = submitLastRecord(token);
-                                state.apiSyncStatus = ok ? "Score submitted!"
-                                                         : "Submit failed (need OTP token)";
-                            }
+                            // [V4] SYNC/SUBMIT buttons moved to the BOARD popup.
                         }
                     }
                 } else if (state.showStories) {
@@ -2807,7 +2889,8 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
 
         drawBackground(renderer);
         // [A.4/F.2] Main buttons hidden whenever ANY popup is open
-        if (!state.showGuide && !state.showBoard && !state.showSettings && !state.showStories) {
+        if (!state.showGuide && !state.showBoard && !state.showSettings &&
+            !state.showStories && !state.showPlayReminder) {
             for (int i = 0; i < NUM_MAIN_BUTTONS; i++)
                 drawButton(renderer, MAIN_BUTTONS[i], i == state.focusIndex);
         }
@@ -2815,6 +2898,7 @@ int runGameConsole(SDL_Window* window, SDL_Renderer* renderer,
         if (state.showBoard)    drawBoardLightbox(renderer, state);
         if (state.showSettings) drawSettingsLightbox(renderer, state);
         if (state.showStories)  drawStoriesLightbox(renderer, state);
+        if (state.showPlayReminder) drawPlayReminder(renderer, state);
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }

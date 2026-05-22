@@ -106,6 +106,11 @@
                              - PLAY now goes directly to the game scene; dialogue replay is reserved for
                                  the stories popup (`nextScene=2`).
                              - Prevents duplicate story launch behavior and keeps scene ownership clearer.
+[x] Issue 3.5: gameCore guest-mode guard skips DB writes when no chapter data is synced.
+               - onGameOver() now exits early when `s_cfg->guestMode` is true.
+               - Prevents score/record writes for guest sessions launched from the console
+                 reminder modal.
+               - Keeps offline or unsynced play sessions from touching `sync_Records`.
 
 ## Rules:
     - Chỉ có 1 file c++ (app/src/gameCore/app.cpp) duy nhất để viết.
