@@ -60,15 +60,15 @@
     \let\origaddcontentsline\addcontentsline
     \renewcommand{\addcontentsline}[3]{%
       \def\tempa{##2}%
-      \def\tempb{section}%
       \def\tempc{subsection}%
       \def\tempd{subsubsection}%
+      \def\tempe{paragraph}%
       % Map the original commands to sequential outline levels
-      \ifx\tempa\tempb
+      \ifx\tempa\tempc
         \origaddcontentsline{##1}{section}{##3}%
-      \else\ifx\tempa\tempc
-        \origaddcontentsline{##1}{subsection}{##3}%
       \else\ifx\tempa\tempd
+        \origaddcontentsline{##1}{subsection}{##3}%
+      \else\ifx\tempa\tempe
         \origaddcontentsline{##1}{subsubsection}{##3}%
       \else
         \origaddcontentsline{##1}{##2}{##3}%
@@ -111,7 +111,7 @@
 \InputGroupedContentFile{10-gameCoreGuide.tex}
 
 % D/ KIỂM THỬ VÀ KIỂM SOÁT CHẤT LƯỢNG
-\ContentGroup{D}
+\ContentGroup{D}{Kiểm thử và kiểm soát chất lượng}
 
 \InputGroupedContentFile{11-testStrategy.tex} \clearpage
 

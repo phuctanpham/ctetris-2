@@ -75,6 +75,8 @@ bld/
 *.tmp_proj
 *_wpftmp.csproj
 *.log
+*.aux
+*.pdf
 *.vspscc
 *.vssscc
 .builds
