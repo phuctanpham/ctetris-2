@@ -66,6 +66,7 @@ SRS phát biểu ràng buộc contract:
 
 \subsubsection{Cây tính năng Hệ thống (System Feature Tree)}
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
     grow=right,
     level 1/.style={sibling distance=3.2cm, level distance=4.5cm},
@@ -95,6 +96,7 @@ SRS phát biểu ràng buộc contract:
         child { node {Lưu/Đọc thiết lập} }
     };
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \subsubsection{Câu chuyện người dùng (Storyboard)}
@@ -170,6 +172,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 \noindent V2 bổ sung hai trạng thái popup mới (\textbf{Settings\_Popup}, \textbf{Stories\_Popup}) và luồng khởi động có kiểm tra DB (\textbf{DB\_Guard}).
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
     node distance=2.8cm,
     state/.style={circle, draw=blue!60, fill=blue!5, thick,
@@ -211,6 +214,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     % QUIT
     \draw[arrow] (main) -- node[above,font=\scriptsize,align=center]{QUIT\\(WASM)} (reload);
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 % ---- DB Schema ----
@@ -219,6 +223,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 \noindent File DB: \texttt{SDL\_GetPrefPath("uit","cTetris") + "<idUser>.sqlite"} (mặc định \texttt{default.sqlite}).
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
     every node/.style={font=\scriptsize},
     tbl/.style={rectangle, draw=black, fill=white, thick,
@@ -303,6 +308,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     node[pos=0.75, above, font=\scriptsize]{leaderboard seed} 
     ($(sett.south) + (0, -1.0)$) -| (sync.south);
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \vspace{4pt}
@@ -314,6 +320,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 \noindent Struct được khai báo trong \texttt{gameConsole\_layout.h} và truyền qua tham chiếu giữa \texttt{runGameConsole()} và \texttt{runGameCore()}. Đã vẽ lại theo chuẩn sơ đồ.
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
     every node/.style={font=\scriptsize},
     cfg/.style={rectangle, draw=black, fill=blue!5, thick,
@@ -360,12 +367,14 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \draw[dashed arrow] (cfg.south) -- (db.north);
 
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 % ---- Luồng WASM Persistence ----
 \subsubsection{Luồng khởi động V2 (Activity Diagram — mở rộng)}
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
     node distance=0.7cm,
     every node/.style={font=\scriptsize},
@@ -401,6 +410,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
     \draw[arrow] (unl) -- (brd);
     \draw[arrow] (brd) -- (loop);
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 % ---- Yêu cầu chức năng V2 ----
@@ -423,6 +433,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
 
 \subsubsection{Cây tính năng V2 (Feature Tree — delta)}
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
     grow=right,
     level 1/.style={sibling distance=4.0cm, level distance=4.5cm},
@@ -453,6 +464,7 @@ Mô tả quá trình tương tác của người chơi tại Hub Screen.
         child { node {Smart Sort\\Engine} }
     };
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \subsubsection{Tiêu chí Thành công V2}

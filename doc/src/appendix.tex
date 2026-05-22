@@ -25,7 +25,7 @@
 % FIX: Safely capture the exact hyperlink anchor (\@currentHref) and write it to the .toa file
 \newcommand{\IncludeAppendixPDF}[3]{%
     \clearpage
-    % Reset numbering so each input file starts from page 1
+    % Reset numbering for each appendix file so the footer shows page 1/total.
     \pagenumbering{arabic}\setcounter{page}{1}%
     % Ensure footer is aware this file's last-page label (we'll create it on the included pages)
     \ApplyStandardFooter{#1}{#3}%
@@ -47,7 +47,7 @@
 % FIX: Apply the exact same robust linking to .tex files so they appear in the .toa file
 \providecommand{\InputAppendixUnit}[2]{%
     \clearpage
-    % Reset numbering so each input file starts from page 1
+    % Reset numbering for each appendix file so the footer shows page 1/total.
     \pagenumbering{arabic}\setcounter{page}{1}%
     % Apply footer for this unit; the included .tex is expected to provide a \label for its last page
     \ApplyStandardFooter{#1}{app:#1}%

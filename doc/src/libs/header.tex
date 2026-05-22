@@ -1,5 +1,12 @@
 % --- header.tex ---
 \usepackage{fancyhdr}
+% Allow multi-page, auto-sizing tables when needed
+\usepackage{xltabular}
+% Make existing tabularx environments use xltabular (allows page breaks)
+\let\oldtabularx\tabularx
+\let\oldendtabularx\endtabularx
+\let\tabularx\xltabular
+\let\endtabularx\endxltabular
 \setlength{\headheight}{15.5pt} % Thêm dòng này để fix cảnh báo chiều cao
 %\setlength{\headheight}{14.5pt}
 \addtolength{\topmargin}{-2.5pt}

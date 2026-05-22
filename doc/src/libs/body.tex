@@ -8,9 +8,12 @@
   \setmainfont{Liberation Serif}
 }
 \usepackage[vietnamese]{babel}
+\pdfvariable minorversion=7
 
 % Page layout and spacing
 \usepackage[left=3cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+% Avoid strict vertical justification to reduce "Overfull \\vbox while \output is active" warnings
+\raggedbottom
 \usepackage{titlesec}
 \usepackage{setspace}
 
@@ -21,10 +24,8 @@
 
 % Core packages
 \usepackage{float}
-\usepackage{svg}
 \usepackage{graphicx}
 \graphicspath{{assets/}{../assets/}{../../assets/}}
-\svgpath{{assets/}{../assets/}{../../assets/}}
 \usepackage{enumitem}
 \usepackage{array}
 \usepackage{tabularx}

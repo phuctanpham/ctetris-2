@@ -56,6 +56,7 @@ dialogues / choices} là read-only.
 \noindent\textbf{Biểu đồ thành phần:}
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
   comp/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=3pt,
                minimum width=2.9cm,minimum height=0.65cm,align=center,font=\small},
@@ -88,6 +89,7 @@ dialogues / choices} là read-only.
   \draw[use]  (sync.east)to[bend left=15]node[above,font=\tiny]{httpGetSync()}(gist.south);
   \draw[use]  (sync)--(http);
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 % ----------------------------------------------------------

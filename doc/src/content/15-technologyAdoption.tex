@@ -28,6 +28,7 @@
 \subsubsection{Tổng quan}
 \textbf{cTetris} được xây dựng theo triết lý \textit{``một nguồn mã, đa nền tảng''}: cùng một codebase C++17 biên dịch thành native executable (macOS / Windows / Ubuntu) và WebAssembly bundle (trình duyệt), không có nhánh logic riêng cho từng nền tảng.
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[node distance=0.4cm]
   % Row 1 — Entry
   \node[techBox=frontendColor, text width=9cm]
@@ -50,6 +51,7 @@
     \draw[arrow](\c.south)--(wasm.north -| \c);
   }
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \subsubsection{Bảng chi tiết thư viện Frontend}
@@ -77,6 +79,7 @@
 \subsubsection{Quy trình render mỗi frame}
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
   b/.style={techBoxSm=frontendColor, text width=2.0cm},
   a/.style={sdsArrow=frontendColor}
@@ -90,6 +93,7 @@
   \foreach \x/\y in {p1/p2,p2/p3,p3/p4,p4/p5,p5/p6}
     {\draw[a](\x)--(\y);}
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \noindent\textbf{Tỉ lệ màn hình:} 270$\times$480 px (9:16 portrait) cố định cho tất cả 3 module; không responsive --- tránh layout drift giữa Desktop và WASM canvas.
@@ -101,6 +105,7 @@
 ``Backend'' của cTetris là toàn bộ \textbf{game logic C++17} chạy cục bộ cộng với hai kênh kết nối mạng: \textbf{GitHub Gist} (content delivery, V2) và \textbf{Cloudflare Worker + D1} (leaderboard cloud, V3).
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
   box/.style={techBoxSm=backendColor, text width=2.6cm},
   cloud/.style={techBoxSm=devopsColor, text width=2.6cm},
@@ -140,6 +145,7 @@
   \node[font=\tiny,vTag=versionRed]   at (0.0,-5.6){V3};
   \node[font=\tiny,vTag=versionRed]   at (4.5,-5.6){V3};
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \subsubsection{Bảng chi tiết Backend}
@@ -386,7 +392,7 @@ Hệ thống CI/CD gồm 4 workflow độc lập, mỗi cái bảo vệ một kh
   \hline
   \texttt{deploy-pages.yml}   & push \texttt{main}/\texttt{test}\newline path: \texttt{app/**} & Build WASM $\rightarrow$ deploy GitHub Pages & Configurable:\newline ubuntu / windows / macos \\
   \hline
-  \texttt{sync-chapters.yml}  & push \texttt{main}/\texttt{test}, manual\newline path: \texttt{chapters/src/**} & Validate Token $\rightarrow$ Upsert Gist $\rightarrow$ Echo Manifest URL & ubuntu-latest \\
+  \texttt{sync-chapters.yml}  & push \texttt{main}/\texttt{test}, manual\newline path: \texttt{chapters/\allowbreak src/**} & Validate Token $\rightarrow$ Upsert Gist $\rightarrow$ Echo Manifest URL & ubuntu-latest \\
   \hline
   \texttt{test-build.yml}     & push nhánh khác\newline path: \texttt{app/**} & Build native + WASM trên 3 OS song song & matrix:\newline windows / ubuntu / macos \\
   \hline

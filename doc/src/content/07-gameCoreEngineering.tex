@@ -840,8 +840,8 @@ sqlite3           & always & Write-only via \texttt{gameConsole\_db.h} (no direc
                               \texttt{dbInsertRecord}, \texttt{dbUpsertStoryProgress},
                               \texttt{dbCheckAndUnlockStories} \\
 \texttt{gameConsole\_layout.h} & always & \texttt{SettingsConfig} definition \\
-Emscripten        & \texttt{\#ifdef \_\_EMSCRIPTEN\_\_} &
-  \foreignlanguage{english}{\texttt{emscripten\_run\_script(}\allowbreak\texttt{"window.location.reload()")}} for WASM reload \\ \\
+  Emscripten        & \texttt{\#ifdef \_\_EMSCRIPTEN\_\_} &
+  \foreignlanguage{english}{\texttt{emscripten\_run\_script(}\allowbreak\texttt{"window.\allowbreak{}location.\allowbreak{}reload()"})} for WASM reload \\\\ 
 \hline
 \end{tabularx}
 

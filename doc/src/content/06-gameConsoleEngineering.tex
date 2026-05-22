@@ -87,6 +87,7 @@ Group 3 & \texttt{sync\_Records} &
 \noindent\textbf{Biểu đồ thành phần:}
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
   comp/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=3pt,
                minimum width=2.7cm,minimum height=0.65cm,align=center,font=\small},
@@ -116,6 +117,7 @@ Group 3 & \texttt{sync\_Records} &
   \draw[use](rend)--(sdl);
   \draw[use](app.south)to[bend right=10](sdl.north);
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \noindent\textbf{Flag-based render pipeline} ---
@@ -123,6 +125,7 @@ Group 3 & \texttt{sync\_Records} &
 kiểm soát render độc lập:
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
   b/.style={sdsBox=pillarBlue!60,text width=3.0cm},
   t/.style={sdsBox=versionGreen!60,text width=3.0cm},
@@ -143,6 +146,7 @@ kiểm soát render độc lập:
   \draw[arr,dashed,versionGreen](p3.south)--(p4);
   \node[font=\tiny,gray] at (5.4,-1.8){flags are mutually exclusive at runtime};
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 % ─────────────────────────────────────────────────────────
@@ -151,6 +155,7 @@ kiểm soát render độc lập:
 \subsubsection{Startup Guard \& DB Init Sequence}
 
 \begin{center}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tikzpicture}[
   proc/.style={rectangle,draw=pillarBlue,fill=pillarBlue!8,rounded corners=2pt,
                minimum width=4.8cm,minimum height=0.55cm,align=center,font=\scriptsize},
@@ -183,6 +188,7 @@ kiểm soát render độc lập:
   \draw[arr](d1)--node[left,font=\tiny]{yes}(p5);
   \draw[arr](p5)--(p6);\draw[arr](p6)--(p7);\draw[arr](p7)--(p8);
 \end{tikzpicture}
+\end{adjustbox}
 \end{center}
 
 \subsubsection{Smart Sort Router --- \texttt{applyBoardSort()}}

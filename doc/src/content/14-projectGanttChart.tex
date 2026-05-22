@@ -347,7 +347,7 @@ Integrate & W12--W13 & GameOver→SQLite auto flow verify & V3 \\
 
 {\small
 % Custom p{} column fixed the exactly 46pt \hbox overflow
-\begin{tabularx}{\linewidth}{|>{\raggedright\arraybackslash}p{3.8cm}|c|c|c|L|}
+\begin{tabularx}{\linewidth}{|>{\hsize=1.2\hsize}X|c|c|c|>{\hsize=0.8\hsize}X|}
 \hline
 \rowcolor{gray!20}
 \textbf{Giai đoạn tích hợp} & \textbf{Tuần} & \textbf{MD tích lũy} & \textbf{Functions} & \textbf{Nội dung} \\
@@ -363,7 +363,7 @@ WASM Build + Deploy V1 & W5--W6 & 118.5 & 69 & GitHub Pages; bundle .html+.js+.w
 \hline
 DB Lifecycle Verify V2 & W11 & 248.5 & 139 & Console+Core không double-open; IDBFS flush \\
 \hline
-SettingsConfig E2E & W11 & 255 & 143 & Console→gameStory→Core; story unlock cascade \\
+SettingsConfig E2E & W11 & 255 & 143 & \shortstack[l]{Console$\rightarrow$gameStory$\rightarrow$Core;\\story unlock cascade} \\
 \hline
 System Test V2 & W11--W12 & 260 & 147 & IDBFS persistence, sort modes, offline fallback \\
 \hline

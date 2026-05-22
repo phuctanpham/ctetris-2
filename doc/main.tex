@@ -58,7 +58,17 @@
 % ==========================================
 % 3. NỘI DUNG CHÍNH (MAIN CONTENT)
 % ==========================================
-\input{src/content.tex}
+{%
+  % While we input the content block, override the footer to target the
+  % merged-document content total label `ContentLastPage` so all content
+  % pages reference the same total.
+  \renewcommand{\ApplyStandardFooter}[2]{%
+    \OrigApplyStandardFooter{#1}{ContentLastPage}%
+  }%
+  \input{src/content.tex}%
+}%
+\phantomsection
+\label{ContentLastPage}
 \clearpage
 
 % ==========================================

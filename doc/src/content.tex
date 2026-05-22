@@ -27,9 +27,17 @@
   {0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
 \begin{document}
 
-% FIX 1: Disable sub-document footer overrides to maintain the global total page count
+% The content wrapper controls the footer for every included file, so suppress
+% any per-file footer overrides regardless of whether this file is compiled
+% standalone or included by the merged main document.
 \renewcommand{\StandaloneDocumentSetup}[2]{} 
 \renewcommand{\StandaloneSectionSetup}[2]{}  
+
+% Choose the correct total-page label depending on merge context
+\newcommand{\ContentTotalLabel}{LastPage}
+\ifdefined\MainDocumentBuildFlag
+  \renewcommand{\ContentTotalLabel}{ContentLastPage}
+\fi
 \onehalfspacing
 
 % Numbering definitions
@@ -52,9 +60,9 @@
 }
 
 \newcommand{\InputContentFile}[1]{%
-  % Dynamically apply the current filename to the footer. 
-  % We use the built-in "LastPage" label (from the lastpage package) because manual labels at the end of the document can sometimes fail to resolve.
-  \ApplyStandardFooter{#1}{LastPage}%
+  % Dynamically apply the current filename to the footer. Use
+  % \ContentTotalLabel which is `ContentLastPage` when merged, otherwise `LastPage`.
+  \ApplyStandardFooter{#1}{\ContentTotalLabel}%
   \IfFileExists{src/content/#1}{\input{src/content/#1}}{\input{content/#1}}%
 }
 
