@@ -21,25 +21,47 @@
 	}%
 } 
 
-% Dùng providecommand để main.tex có thể ghi đè an toàn khi build chung
-% Accepts 2 arguments: {filename}{Bookmark Title}
+\makeatletter
+% FIX: Safely capture the exact hyperlink anchor (\@currentHref) and write it to the .toa file
+\newcommand{\IncludeAppendixPDF}[3]{%
+    \clearpage
+    \phantomsection
+    \pdfbookmark[1]{#2}{#3}% Adds bookmark to the PDF Viewer Pane at level 1
+    % Writes to the printed Phụ lục TOC (no page number) with the perfect anchor target
+    \protected@write\@auxout{}{\string\@writefile{toa}{\string\contentsline{section}{#2}{}{\@currentHref}}}%
+    \IfFileExists{src/appendix/#1}{%
+        \includepdf[pages=-]{src/appendix/#1}%
+    }{%
+        \IfFileExists{appendix/#1}{%
+            \includepdf[pages=-]{appendix/#1}%
+        }{%
+            \includepdf[pages=-]{../appendix/#1}%
+        }%
+    }%
+}
+
+% FIX: Apply the exact same robust linking to .tex files so they appear in the .toa file
 \providecommand{\InputAppendixUnit}[2]{%
 	\clearpage
 	\phantomsection
-	\pdfbookmark[1]{#2}{app:#1}
-	\pagenumbering{arabic}% This safely and strictly hard-resets the page counter to 1
+	\pdfbookmark[1]{#2}{app:#1}%
+	\protected@write\@auxout{}{\string\@writefile{toa}{\string\contentsline{section}{#2}{}{\@currentHref}}}%
 	\InputAppendixFile{#1}%
 }
+\makeatother
 
-\includepdf[pages=-, addtotoc={1, section, 1, {Team Contract}, app:contract}]{appendix/01-teamContract.pdf}
-%\InputAppendixUnit{01-teamContract.tex}{Team Contract}
+% --- Phụ lục Nội Dung ---
+
+\IncludeAppendixPDF{01-teamContract.pdf}{Team Contract}{app:contract}
+
 \InputAppendixUnit{02-teamContractValidation.tex}{Team Contract Validation}
 \InputAppendixUnit{03-meetingMinute.tex}{Meeting Minutes}
 \InputAppendixUnit{04-teamConflictSolving.tex}{Team Conflict Solving}
 
-\includepdf[pages=-, addtotoc={1, section, 1, {CV - Phucpt}, app:cv1}]{appendix/05-cvPhucpt.pdf}
-\includepdf[pages=-, addtotoc={1, section, 1, {CV - Truongtm}, app:cv2}]{appendix/06-cvTruongtm.pdf}
-\includepdf[pages=-, addtotoc={1, section, 1, {CV - Kiennt}, app:cv3}]{appendix/07-cvKiennt.pdf}
-\includepdf[pages=-, addtotoc={1, section, 1, {CV - Thaidg}, app:cv4}]{appendix/08-cvThaidg.pdf}
-\includepdf[pages=-, addtotoc={1, section, 1, {CV - Vint}, app:cv5}]{appendix/09-cvVint.pdf}
+\IncludeAppendixPDF{05-cvPhucpt.pdf}{CV - Phucpt}{app:cv1}
+\IncludeAppendixPDF{06-cvTruongtm.pdf}{CV - Truongtm}{app:cv2}
+\IncludeAppendixPDF{07-cvKiennt.pdf}{CV - Kiennt}{app:cv3}
+\IncludeAppendixPDF{08-cvThaidg.pdf}{CV - Thaidg}{app:cv4}
+\IncludeAppendixPDF{09-cvVint.pdf}{CV - Vint}{app:cv5}
+
 \end{document}
