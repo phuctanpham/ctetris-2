@@ -23,9 +23,6 @@
 % MACRO OVERRIDES FOR MERGED DOCUMENT
 % ==========================================
 \let\OrigApplyStandardFooter\ApplyStandardFooter
-\renewcommand{\ApplyStandardFooter}[2]{%
-    \OrigApplyStandardFooter{#1}{LastPage}%
-}
 
 \begin{document}
 
@@ -76,11 +73,12 @@
 % ==========================================
 % FIX: Place the PDF Viewer bookmark HERE so it shows up at the bottom of the list!
 \phantomsection
-\addcontentsline{toc}{part}{\textbf{Phụ lục}}
 \pdfbookmark[0]{Phụ lục}{appendix-start}
 
 \appendix
 \setlength{\headheight}{16pt}
+
+\let\ApplyStandardFooter\OrigApplyStandardFooter
 
 \IfFileExists{src/appendix.tex}{\input{src/appendix.tex}}{\input{appendix.tex}}
 
