@@ -55,18 +55,29 @@
 % ==========================================
 % 3. NỘI DUNG CHÍNH (MAIN CONTENT)
 % ==========================================
-{%
-  % While we input the content block, override the footer to target the
-  % merged-document content total label `ContentLastPage` so all content
-  % pages reference the same total.
-  \renewcommand{\ApplyStandardFooter}[2]{%
-    \OrigApplyStandardFooter{#1}{ContentLastPage}%
-  }%
-  \input{src/content.tex}%
-}%
-\phantomsection
-\label{ContentLastPage}
+% FIX: Temporarily redirect the total page count to use the exact last label 
+% of content.tex (LastPageReferences) instead of the global document LastPage. 
+% This preserves content.tex's footer exactly as if it were compiled alone.
+\renewcommand{\ApplyStandardFooter}[2]{%
+    \OrigApplyStandardFooter{#1}{LastPageReferences}%
+}
+
+\input{src/content.tex}
 \clearpage
+
+% FIX: Restore original behavior for appendices so they can use their own 
+% independent page counts (e.g., Page 1/2, 2/2).
+\let\ApplyStandardFooter\OrigApplyStandardFooter
+
+% FIX: content.tex disabled these macros to prevent inner files from overriding the footer.
+% We MUST restore them before processing the appendices so they behave identically to compiling appendix.tex standalone.
+\renewcommand{\StandaloneDocumentSetup}[2]{%
+  \pagenumbering{arabic}%
+  \ApplyStandardFooter{#1}{#2}%
+}
+\renewcommand{\StandaloneSectionSetup}[2]{%
+  \ApplyStandardFooter{#1}{#2}%
+}
 
 % ==========================================
 % 4. NỘI DUNG PHỤ LỤC (APPENDIX CONTENT)
@@ -77,8 +88,6 @@
 
 \appendix
 \setlength{\headheight}{16pt}
-
-\let\ApplyStandardFooter\OrigApplyStandardFooter
 
 \IfFileExists{src/appendix.tex}{\input{src/appendix.tex}}{\input{appendix.tex}}
 

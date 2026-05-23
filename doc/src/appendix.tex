@@ -27,21 +27,27 @@
     \clearpage
     % Reset numbering for each appendix file so the footer shows page 1/total.
     \pagenumbering{arabic}\setcounter{page}{1}%
-    % Ensure footer is aware this file's last-page label (we'll create it on the included pages)
+    % FIX: Define the hyperref page anchor to prevent "duplicate destination" warnings
+    \def\theHpage{pdf.#3.\arabic{page}}%
+    % Ensure footer is aware this file's last-page label (we'll create it after the included pages)
     \ApplyStandardFooter{#1}{#3}%
     \phantomsection
     \pdfbookmark[1]{#2}{#3}% Adds bookmark to the PDF Viewer Pane at level 1
     % Writes to the printed Phụ lục TOC (no page number) with the perfect anchor target
     \protected@write\@auxout{}{\string\@writefile{toa}{\string\contentsline{section}{#2}{}{\@currentHref}}}%
     \IfFileExists{src/appendix/#1}{%
-        \includepdf[pages=-,pagecommand={\thispagestyle{plain}\label{#3}}]{src/appendix/#1}%
+        \includepdf[pages=-,pagecommand={\thispagestyle{plain}}]{src/appendix/#1}%
     }{%
         \IfFileExists{appendix/#1}{%
-            \includepdf[pages=-,pagecommand={\thispagestyle{plain}\label{#3}}]{appendix/#1}%
+            \includepdf[pages=-,pagecommand={\thispagestyle{plain}}]{appendix/#1}%
         }{%
-            \includepdf[pages=-,pagecommand={\thispagestyle{plain}\label{#3}}]{../appendix/#1}%
+            \includepdf[pages=-,pagecommand={\thispagestyle{plain}}]{../appendix/#1}%
         }%
     }%
+    % Apply the label once at the end, decrementing the page counter to capture the correct final page number
+    \addtocounter{page}{-1}%
+    \label{#3}%
+    \addtocounter{page}{1}%
 }
 
 % FIX: Apply the exact same robust linking to .tex files so they appear in the .toa file
@@ -49,7 +55,10 @@
     \clearpage
     % Reset numbering for each appendix file so the footer shows page 1/total.
     \pagenumbering{arabic}\setcounter{page}{1}%
-    % Apply footer for this unit; the included .tex is expected to provide a \label for its last page
+    % FIX: Define the hyperref page anchor to prevent "duplicate destination" warnings
+    \def\theHpage{unit.#1.\arabic{page}}%
+    % Apply footer for this unit;
+    % the included .tex is expected to provide a \label for its last page
     \ApplyStandardFooter{#1}{app:#1}%
     \phantomsection
     \pdfbookmark[1]{#2}{app:#1}%

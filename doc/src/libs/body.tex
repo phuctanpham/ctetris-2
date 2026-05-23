@@ -232,3 +232,37 @@
     filecolor=magenta,
     urlcolor=blue,
 }
+
+\newcommand{\meonhanh}[1]{%
+  \vspace{4pt}%
+  \noindent\colorbox{yellow!18}{\begin{minipage}{0.96\linewidth}%
+    \vspace{2pt}\textbf{Mẹo nhanh:} #1\vspace{2pt}%
+  \end{minipage}}%
+  \vspace{4pt}%
+}
+\newcommand{\luuyu}[1]{%
+  \vspace{4pt}%
+  \noindent\colorbox{cyan!12}{\begin{minipage}{0.96\linewidth}%
+    \vspace{2pt}\textbf{Lưu ý:} #1\vspace{2pt}%
+  \end{minipage}}%
+  \vspace{4pt}%
+}
+% Khai báo bí danh màu sắc an toàn để tránh lỗi phân tích của xcolor (Undefined color '8')
+\colorlet{tBlue}{blue!80}
+\colorlet{tGreen}{green!80!black}
+\colorlet{tOrange}{orange!80}
+\colorlet{tPurple}{purple!80}
+
+% Thiết lập chung cho các biểu đồ kỹ thuật
+\tikzset{
+  techBoxSm/.style={rectangle, draw=#1, fill=#1!8, rounded corners=3pt, align=center, font=\scriptsize, inner sep=4pt},
+  techBox/.style={rectangle, draw=#1, fill=#1!8, rounded corners=3pt, align=center, font=\small, inner sep=5pt},
+  comp/.style={rectangle, draw=gray!60, fill=gray!8, rounded corners=2pt, align=center, font=\scriptsize, minimum height=0.7cm, text width=2.4cm},
+  arrow/.style={-{Stealth[length=4pt]}, thick},
+  sdsArrow/.style={-{Stealth[length=4pt]}, thick, #1},
+  vTag/.style={rectangle, draw=#1, fill=#1!10, rounded corners=2pt, inner sep=2pt, font=\tiny\bfseries}
+}
+% ====== THÊM GÓI NÀY ĐỂ VẼ BIỂU ĐỒ DASHBOARD ======
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+% ===================================================

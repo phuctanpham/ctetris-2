@@ -27,17 +27,9 @@
   {0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
 \begin{document}
 
-% The content wrapper controls the footer for every included file, so suppress
-% any per-file footer overrides regardless of whether this file is compiled
-% standalone or included by the merged main document.
+% FIX 1: Disable sub-document footer overrides to maintain the global total page count
 \renewcommand{\StandaloneDocumentSetup}[2]{} 
 \renewcommand{\StandaloneSectionSetup}[2]{}  
-
-% Choose the correct total-page label depending on merge context
-\newcommand{\ContentTotalLabel}{LastPage}
-\ifdefined\MainDocumentBuildFlag
-  \renewcommand{\ContentTotalLabel}{ContentLastPage}
-\fi
 \onehalfspacing
 
 % Numbering definitions
@@ -60,9 +52,9 @@
 }
 
 \newcommand{\InputContentFile}[1]{%
-  % Dynamically apply the current filename to the footer. Use
-  % \ContentTotalLabel which is `ContentLastPage` when merged, otherwise `LastPage`.
-  \ApplyStandardFooter{#1}{\ContentTotalLabel}%
+  % Dynamically apply the current filename to the footer. 
+  % We use the built-in "LastPage" label (from the lastpage package) because manual labels at the end of the document can sometimes fail to resolve.
+  \ApplyStandardFooter{#1}{LastPage}%
   \IfFileExists{src/content/#1}{\input{src/content/#1}}{\input{content/#1}}%
 }
 
@@ -85,8 +77,7 @@
       \else\ifx\tempa\tempd
         \origaddcontentsline{##1}{subsection}{##3}%
       \else\ifx\tempa\tempe
-  
-      \origaddcontentsline{##1}{subsubsection}{##3}%
+        \origaddcontentsline{##1}{subsubsection}{##3}%
       \else
         \origaddcontentsline{##1}{##2}{##3}%
       \fi\fi\fi

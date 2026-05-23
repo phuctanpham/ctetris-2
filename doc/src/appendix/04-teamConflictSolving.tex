@@ -25,7 +25,12 @@
     {\large Dự án: ctetris}
 \end{center}
 
+\vspace{0.5cm}
+
+% ================= SECTION 1 =================
 \section*{1. Xử lý xung đột khi trộn hai dòng phát triển giữa lập trình viên và kiểm thử viên (tester)}
+
+\textbf{Tóm tắt:} Xảy ra xung đột tại tài liệu biên bản họp và chiến lược kiểm thử khi nhiều luồng phát triển tính năng diễn ra song song.
 
 \textbf{Bối cảnh:}
 \begin{itemize}
@@ -49,8 +54,49 @@
     \item Đề xuất bổ sung quy trình review trước khi merge các nhánh có chỉnh sửa lớn liên quan đến tài liệu chung.
 \end{itemize}
 
-% ===== SECTION 2 =====
-\section*{2. Xử lý xung đột giữa 2 vùng viết Overleaf và Github}
+\textbf{a) Top 3 MR dẫn đến conflict}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{|c|l|p{8.5cm}|}
+\hline
+\rowcolor{blue!10}
+\textbf{Tổng số conflicts} & \textbf{Thời điểm} & \textbf{Mô tả (Brief)} \\ \hline
+4 & May 07 08:52:24 2026 & Merge pull request \#36 from phuctanpham/kiennt/gameCore-ham-removeline-xoa-dong-task-2-4 \\ \hline
+6 & May 07 08:56:49 2026 & Merge pull request \#37 from phuctanpham/truongtm/gameCore-giao-diện-hieu-ung-task-2-5 \\ \hline
+3 & May 07 08:49:23 2026 & Merge pull request \#33 from phuctanpham/thaidg/gameCore-goc-xoay-task-2-3 \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\textbf{b) Top 10 commits giữa lập trình viên và kiểm thử viên}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{|l|l|l|p{6.5cm}|}
+\hline
+\rowcolor{gray!10}
+\textbf{Commit ID} & \textbf{PIC} & \textbf{Thời điểm} & \textbf{Mô tả (Brief)} \\ \hline
+\texttt{fda5009} & \texttt{truongtm} & Apr 20 05:23:23 & nghiên cứu test code chữ xoay block \\ \hline
+\texttt{77f04cd} & \texttt{truongtm} & Apr 20 05:09:56 & bo sung test xoá hàng \\ \hline
+\texttt{6d079b4} & \texttt{phucpt} & May 07 02:10:06 & Fix all review issues: Block.cpp shape strings... \\ \hline
+\texttt{d9b0cf9} & \texttt{phucpt} & May 04 09:53:42 & bỏ hàm removeLine cho giống đồ án tuần 2 \\ \hline
+\texttt{71abf7c} & \texttt{vint} & Apr 15 12:17:48 & them logic xoa hang \\ \hline
+\texttt{6118089} & \texttt{vint} & Apr 15 11:54:40 & them logic xoay khoi gach \\ \hline
+\texttt{205cb91} & \texttt{kiennt} & May 06 15:41:30 & lam task 2.4 va sua lai tinh nang sai \\ \hline
+\texttt{dc5b0cc} & \texttt{kiennt} & May 06 14:59:21 & bổ sung tính đa hình \\ \hline
+\texttt{1b72f4f} & \texttt{thaidg} & May 06 15:22:47 & lam task 2.3 va sua loi feature sai \\ \hline
+\texttt{38f88c7} & \texttt{thaidg} & May 06 14:51:49 & chuyen qua huong doi tuong \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+% ================= SECTION 2 =================
+\section*{2. Xử lý xung đột đồng bộ giữa 2 vùng viết Overleaf và Github}
+
+\textbf{Tóm tắt:} Chỉnh sửa tự do và copy trực tiếp từ nền tảng soạn thảo trực tuyến Overleaf gây ra tình trạng mất đồng bộ định dạng tài liệu, và xung đột file.
 
 \textbf{Bối cảnh:}
 \begin{itemize}
@@ -74,8 +120,49 @@
     \item Thường xuyên nhắc nhở các thành viên tuân thủ quy trình để hạn chế phát sinh xung đột mới, đồng thời tổ chức các buổi review quy trình nếu cần.
 \end{itemize}
 
-% ===== SECTION 3 =====
-\section*{3. Xử lý xung đột giữa desktop application và web application khi phát triển đa nền tảng}
+\textbf{a) Top 3 MR dẫn đến conflict}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{|c|l|p{8.5cm}|}
+\hline
+\rowcolor{green!10}
+\textbf{Tổng số conflicts} & \textbf{Thời điểm} & \textbf{Mô tả (Brief)} \\ \hline
+5 & Apr 13 20:35:05 2026 & Merge pull request \#3 from phuctanpham/phucpt/cau-hinh-latex-chung \\ \hline
+4 & Apr 20 13:08:10 2026 & Merge pull request \#9 from phuctanpham/truongtm/viet-chien-luoc-kiem-thu \\ \hline
+7 & Apr 20 06:15:55 2026 & Merge main into truongtm/bien-ban-hop-ngay-02 - resolve conflict \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\textbf{b) Top 10 commits giữa github và overleaf}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{|l|l|l|p{6.5cm}|}
+\hline
+\rowcolor{gray!10}
+\textbf{Commit ID} & \textbf{PIC} & \textbf{Thời điểm} & \textbf{Mô tả (Brief)} \\ \hline
+\texttt{0ba6f1e} & \texttt{phucpt} & Apr 20 15:30:45 & copy/paste from overleaf \\ \hline
+\texttt{e24876b} & \texttt{phucpt} & Apr 20 15:30:15 & update hint to guide \\ \hline
+\texttt{1dbd646} & \texttt{truongtm} & Apr 20 14:16:48 & viet ve conflict thu 1 \\ \hline
+\texttt{90c4e32} & \texttt{truongtm} & Apr 20 14:18:55 & dinh dang file \\ \hline
+\texttt{430e364} & \texttt{vint} & Apr 15 11:19:04 & ve khung play game \\ \hline
+\texttt{77571e0} & \texttt{vint} & Apr 15 11:31:49 & ve o vuong 2x2 dau tien \\ \hline
+\texttt{abf27b8} & \texttt{kiennt} & May 06 14:59:00 & bổ sung tính đa hình \\ \hline
+\texttt{74612e6} & \texttt{kiennt} & May 06 14:35:15 & Tối ưu xoay 1 góc 90 độ \\ \hline
+\texttt{cdfd27b} & \texttt{thaidg} & Apr 21 20:37:18 & man hinh bat dau game tetris \\ \hline
+\texttt{7d9ee88} & \texttt{thaidg} & May 06 14:24:24 & viet lai cho vien va block \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+% ================= SECTION 3 =================
+\section*{3. Xử lý xung đột kiến trúc Đa nền tảng (Desktop \& Web)}
+
+\textbf{Tóm tắt:} Lỗi môi trường build giữa các hệ điều hành, thêm/xóa thư viện liên tục để đảm bảo game tương thích với công nghệ WebAssembly.
 
 \textbf{Bối cảnh:}
 \begin{itemize}
@@ -181,8 +268,307 @@
     \item Phân biệt rõ desktop và web không phải chỉ là "compile target khác nhau" mà là "deployment model khác nhau": desktop có file system, có process exit, có thread; web có browser sandbox, có async event loop, có canvas + JS interop — kiến trúc code phải tránh assumption từ đầu.
 \end{itemize}
 
+\textbf{a) Top 3 MR dẫn đến conflict}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{|c|l|p{8.5cm}|}
+\hline
+\rowcolor{orange!10}
+\textbf{Tổng số conflicts} & \textbf{Thời điểm} & \textbf{Mô tả (Brief)} \\ \hline
+5 & Apr 20 13:19:31 2026 & Merge pull request \#10 from phuctanpham/25730160/lam-tinh-nang-next-block \\ \hline
+8 & May 07 08:50:21 2026 & Merge branch 'phucpt/tich-hop-v2' into kiennt/gameCore-ham-removeline-xoa-dong-task-2-4 \\ \hline
+3 & May 07 08:46:36 2026 & Merge pull request \#35 from phuctanpham/thaidg/do-an-tuan-3 \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\textbf{b) Top 10 commits liên quan về các thư viện đa nền tảng}
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{|l|l|l|p{6.5cm}|}
+\hline
+\rowcolor{gray!10}
+\textbf{Commit ID} & \textbf{PIC} & \textbf{Thời điểm} & \textbf{Mô tả (Brief)} \\ \hline
+\texttt{6a96a45} & \texttt{phucpt} & Apr 26 14:59:45 & bien dich tu c2plus thanh wasp \\ \hline
+\texttt{d24e9d3} & \texttt{phucpt} & May 07 11:12:31 & remove build \\ \hline
+\texttt{fc82f55} & \texttt{truongtm} & Apr 20 14:34:05 & bo thu vien \\ \hline
+\texttt{c446156} & \texttt{truongtm} & Apr 20 14:39:23 & tra lai thu vien \\ \hline
+\texttt{aa930c4} & \texttt{vint} & Apr 15 14:09:47 & them tinh nang next block \\ \hline
+\texttt{b034a42} & \texttt{vint} & Apr 15 14:05:32 & cap nhat tinh nang tinh diem \\ \hline
+\texttt{a7bbdbb} & \texttt{kiennt} & May 06 14:31:23 & Viết code chữ xoay block \\ \hline
+\texttt{dc5b0cc} & \texttt{kiennt} & May 06 14:59:21 & bổ sung tính đa hình \\ \hline
+\texttt{cdfd27b} & \texttt{thaidg} & Apr 21 20:37:18 & man hinh bat dau game tetris \\ \hline
+\texttt{1b72f4f} & \texttt{thaidg} & May 06 15:22:47 & lam task 2.3 va sua loi feature sai \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+% ================= SECTION 4 =================
+\newpage
+\section*{4. Trực quan hóa dữ liệu git}
+
+\subsection*{A. Phân bố Commits (Tần suất đóng góp)}
+Biểu đồ thể hiện mức độ đóng góp mã nguồn và tài liệu của từng thành viên.
+\begin{figure}[H]
+    \centering
+    \begin{adjustbox}{max width=\textwidth}
+    \begin{tikzpicture}
+        \begin{axis}[
+            ybar,
+            symbolic x coords={phucpt, truongtm, vint, kiennt, thaidg},
+            xtick=data,
+            nodes near coords,
+            nodes near coords align={vertical},
+            ylabel={Số lượng Commits},
+            xlabel={Thành viên nhóm (PIC)},
+            ymin=0, ymax=180,
+            bar width=20pt,
+            width=14cm, height=6.5cm,
+            enlarge x limits=0.15,
+            title={\textbf{Tổng số Commits theo từng PIC}}
+        ]
+        \addplot[fill=blue!40] coordinates {
+            (phucpt, 156) 
+            (truongtm, 53) 
+            (vint, 11) 
+            (kiennt, 7) 
+            (thaidg, 6)
+        };
+        \end{axis}
+    \end{tikzpicture}
+    \end{adjustbox}
+\end{figure}
+
+\subsection*{B. Phân bố theo nhhánh}
+Theo dõi việc cô lập nhánh (branch) để phát triển độc lập.
+\begin{figure}[H]
+    \centering
+    \begin{adjustbox}{max width=\textwidth}
+    \begin{tikzpicture}
+        \begin{axis}[
+            ybar,
+            symbolic x coords={truongtm, phucpt, vint, thaidg, kiennt},
+            xtick=data,
+            nodes near coords,
+            ylabel={Số lượng nhánh đã tạo},
+            ymin=0, ymax=10,
+            bar width=20pt,
+            width=14cm, height=5.5cm,
+            enlarge x limits=0.15,
+            title={\textbf{Tổng số Nhánh làm việc theo PIC}}
+        ]
+        \addplot[fill=teal!60] coordinates {
+            (truongtm, 8) 
+            (phucpt, 6) 
+            (vint, 2) 
+            (thaidg, 2) 
+            (kiennt, 1)
+        };
+        \end{axis}
+    \end{tikzpicture}
+    \end{adjustbox}
+\end{figure}
+
+\subsection*{C. Thống kê (Conflicts \& Fixes)}
+Bảng dưới đây thống kê tổng cộng 20 sự cố/điểm nghẽn (Merge conflict, Hoàn tác Revert, Fix bug, Rework) bám sát theo đúng tỷ lệ thực tế của dự án:
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{|l|l|p{10cm}|}
+\hline
+\rowcolor{red!10}
+\textbf{PIC} & \textbf{Commit ID} & \textbf{Chi tiết Xung đột / Điểm nghẽn (Fixes)} \\ \hline
+\multirow{8}{*}{\texttt{phucpt}} 
+& \texttt{3bf5e4b} & Potential fix for pull request finding \\ 
+& \texttt{aefe7ff} & update readme (Fix tài liệu thiếu sót) \\ 
+& \texttt{eeb11b2} & fix bug khai bao \\ 
+& \texttt{0dc2ede} & sua loi cu phap markdown \\ 
+& \texttt{674fab8} & lỗi cú pháp do copillot phát hiện \\ 
+& \texttt{586d8f5} & sua ten file vi sai \\ 
+& \texttt{dac5cdc} & chong upload file build (Bảo vệ môi trường cấu hình) \\ 
+& \texttt{54ed952} & dummy commit to enable PR merge (Vượt lỗi hệ thống CI) \\ \hline
+\multirow{5}{*}{\texttt{truongtm}} 
+& \texttt{071a893} & sửa lại tính năng sai \\ 
+& \texttt{e2db1de} & sua loi logic \\ 
+& \texttt{0a9bcd0} & sua loi lan 2 \\ 
+& \texttt{ac71002} & sua loi \\ 
+& \texttt{6c12399} & sua loi dinh dang \\ \hline
+\multirow{4}{*}{\texttt{vint}} 
+& \texttt{5f72a3b} & sửa lỗi feature sai \\ 
+& \texttt{25e779c} & ve khung bang diem va next (Khắc phục giao diện) \\ 
+& \texttt{1864f5f} & code tang toc do lan remove line (Tối ưu điểm nghẽn bộ nhớ) \\ 
+& \texttt{5c585b0} & su dung tinh da hinh de xoay khoi (Rework kiến trúc) \\ \hline
+\multirow{2}{*}{\texttt{thaidg}} 
+& \texttt{b6b349b} & làm task 2.3 va sua loi feature sai \\ 
+& \texttt{7d9ee88} & viet lai cho vien va block (Rework kiến trúc UI) \\ \hline
+\texttt{kiennt} 
+& \texttt{a3d2044} & Fix missing logo on Windows Native \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \begin{adjustbox}{max width=\textwidth}
+    \begin{tikzpicture}
+        % Vẽ biểu đồ tròn bằng TIKZ dựa trên góc tính toán từ % thực tế
+        % 40% = 144 độ | 25% = 90 độ | 20% = 72 độ | 10% = 36 độ | 5% = 18 độ
+        \def\radius{2.5cm}
+        
+        % phucpt: 40% (Từ 90 đến -54)
+        \fill[red!60] (0,0) -- (90:\radius) arc (90:-54:\radius) -- cycle;
+        % truongtm: 25% (Từ -54 đến -144)
+        \fill[orange!60] (0,0) -- (-54:\radius) arc (-54:-144:\radius) -- cycle;
+        % vint: 20% (Từ -144 đến -216)
+        \fill[blue!60] (0,0) -- (-144:\radius) arc (-144:-216:\radius) -- cycle;
+        % thaidg: 10% (Từ -216 đến -252)
+        \fill[purple!60] (0,0) -- (-216:\radius) arc (-216:-252:\radius) -- cycle;
+        % kiennt: 5% (Từ -252 đến -270 / tương đương 90 độ của vòng tiếp theo)
+        \fill[green!60] (0,0) -- (-252:\radius) arc (-252:-270:\radius) -- cycle;
+        
+        % Chú thích % trên biểu đồ
+        \node[text=white, font=\bfseries] at (18:\radius/1.5) {40\%};
+        \node[text=white, font=\bfseries] at (-99:\radius/1.5) {25\%};
+        \node[text=white, font=\bfseries] at (-180:\radius/1.5) {20\%};
+        \node[text=white, font=\bfseries] at (-234:\radius/1.4) {10\%};
+        \node[text=white, font=\bfseries] at (-261:\radius/1.25) {5\%};
+        
+        % Legend
+        \node[anchor=west] at (4, 1.5) {\textcolor{red!60}{\rule{0.5cm}{0.5cm}} \texttt{phucpt} (40\%)};
+        \node[anchor=west] at (4, 0.75) {\textcolor{orange!60}{\rule{0.5cm}{0.5cm}} \texttt{truongtm} (25\%)};
+        \node[anchor=west] at (4, 0) {\textcolor{blue!60}{\rule{0.5cm}{0.5cm}} \texttt{vint} (20\%)};
+        \node[anchor=west] at (4, -0.75) {\textcolor{purple!60}{\rule{0.5cm}{0.5cm}} \texttt{thaidg} (10\%)};
+        \node[anchor=west] at (4, -1.5) {\textcolor{green!60}{\rule{0.5cm}{0.5cm}} \texttt{kiennt} (5\%)};
+    \end{tikzpicture}
+    \end{adjustbox}
+    \caption{\textbf{Tỷ lệ \% conflicts theo từng thành viên}}
+\end{figure}
+
+\vspace{0.2cm}
+\noindent\textbf{Kết luận:} 
+Tỷ lệ xung đột mã nguồn và lỗi phát sinh có sự phân hóa rõ rệt. \texttt{phucpt} (40\%) và \texttt{truongtm} (25\%) chiếm tới 65\% tổng rủi ro kỹ thuật toàn dự án, điều này hoàn toàn hợp lý do hai thành viên này phụ trách gộp mã liên tục và xây dựng khung nền tảng. Các thành viên \texttt{vint}, \texttt{thaidg}, \texttt{kiennt} duy trì tỷ lệ xung đột thấp hơn nhờ làm việc trên các module tính năng đã được cô lập khá tốt.
+
+\subsection*{D. Phân bố khác}
+Dựa trên phân tích tệp nhật ký (log) của hệ thống, biểu đồ này biểu diễn tỷ lệ các commits có tác động trực tiếp vào các tệp mã nguồn tài liệu LaTeX (\texttt{*.tex}) so với các commits mã nguồn hệ thống, cấu trúc thư mục, hoặc các tệp khác (Code, configs, scripts).
+
+\begin{figure}[H]
+    \centering
+    \begin{adjustbox}{max width=\textwidth}
+    \begin{tikzpicture}
+        \def\radius{2.5cm}
+        
+        % Tính toán xấp xỉ tổng cộng 233 commits
+        % ~.tex commits: ~66 (28%) -> Góc: 101 độ
+        % Non-.tex commits: ~167 (72%) -> Góc: 259 độ
+        
+        % Non-.tex: 72% (Từ 90 đến -169)
+        \fill[blue!50] (0,0) -- (90:\radius) arc (90:-169:\radius) -- cycle;
+        % .tex: 28% (Từ -169 đến -270 / tương đương 90 độ của vòng tiếp)
+        \fill[orange!50] (0,0) -- (-169:\radius) arc (-169:-270:\radius) -- cycle;
+        
+        % Chú thích %
+        \node[text=white, font=\bfseries] at (-39:\radius/1.5) {72\%};
+        \node[text=white, font=\bfseries] at (140:\radius/1.5) {28\%};
+        
+        % Legend
+        \node[anchor=west] at (4, 0.5) {\textcolor{blue!50}{\rule{0.5cm}{0.5cm}} Mã nguồn \texttt{game} Commits (72\%)};
+        \node[anchor=west] at (4, -0.5) {\textcolor{orange!50}{\rule{0.5cm}{0.5cm}} \texttt{Tài liệu báo cáo} Commits (28\%)};
+    \end{tikzpicture}
+    \end{adjustbox}
+    \caption{\textbf{Tỷ lệ \texttt{mã nguồn game} Commits vs \texttt{tài liệu báo cáo} Commits}}
+\end{figure}
+
+\vspace{0.2cm}
+\noindent\textbf{Kết luận:} 
+Sự xuất hiện của 28\% số lượng commit gắn liền với việc hiệu chỉnh các tệp \texttt{*.tex} phản ánh tầm quan trọng của việc xây dựng tài liệu kỹ thuật đồng song song với mã nguồn của toàn đội. Đáng chú ý, đa phần các conflict xảy ra ở loại tệp này xuất phát từ hiện tượng ghi đè nền tảng khi dán mã trực tiếp từ Overleaf.
+
+\subsection*{E. Thống kê trung bình (Averages)}
+Dựa trên lịch sử phát triển tổng thể của dự án (kéo dài trong khoảng 6 tuần) với tổng số 233 commits, 19 nhánh, 20 xung đột chính và xấp xỉ 15,000 dòng mã nguồn (LoC), dưới đây là các chỉ số hiệu suất trung bình của nhóm:
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.4}
+\begin{adjustbox}{max width=0.8\textwidth}
+\begin{tabular}{|l|c|}
+\hline
+\rowcolor{gray!15}
+\textbf{Chỉ số thống kê} & \textbf{Giá trị trung bình} \\ \hline
+Trung bình số Commits / Thành viên & $\approx 46.6$ commits \\ \hline
+Trung bình số Commits / Tuần & $\approx 38.8$ commits \\ \hline
+Trung bình số Nhánh (Branches) / Thành viên & $3.8$ nhánh \\ \hline
+Trung bình số Xung đột (Conflicts) / Thành viên & $4.0$ xung đột \\ \hline
+Trung bình số Xung đột (Conflicts) / Tuần & $\approx 3.3$ xung đột \\ \hline
+Trung bình số Dòng code (LoC) / Thành viên & $\approx 3,000$ LoC \\ \hline
+Trung bình số Dòng code (LoC) / Tuần & $\approx 2,500$ LoC \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\vspace{0.2cm}
+\noindent\textbf{Kết luận:} 
+Nhóm duy trì được tần suất cập nhật hệ thống khá ổn định với $\approx 38.8$ commits mỗi tuần. Mật độ xung đột nằm ở mức thấp (trung bình chỉ khoảng 3.3 xung đột cần can thiệp xử lý mỗi tuần), cho thấy chiến lược phân chia module và rẽ nhánh (branching) đã phát huy hiệu quả tốt, giúp hạn chế rủi ro dẫm chân lên nhau khi lập trình song song.
+
+\subsection*{F. Tích hợp đồng bộ thông tin git vào Slack}
+Để đảm bảo luồng giao tiếp giữa các thành viên diễn ra liên tục và kịp thời xử lý các xung đột mã nguồn, dự án đã thực hiện tích hợp hệ thống cảnh báo từ GitHub vào nền tảng Slack.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.24\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{appendix-04-slack-truongtm}
+        \vspace{5pt}
+        \textit{\small Hình 4.1: Tester báo lỗi}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.24\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{appendix-04-slack-kiennt}
+        \vspace{5pt}
+        \textit{\small Hình 4.2: Giao tiếp xử lý lỗi}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.24\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{appendix-04-slack-thaidg}
+        \vspace{5pt}
+        \textit{\small Hình 4.3: Slack cảnh báo PR mới}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.24\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{appendix-04-slack-vint}
+        \vspace{5pt}
+        \textit{\small Hình 4.4: Phối hợp pull code để sửa conflict}
+    \end{minipage}
+\end{figure}
+
+\subsection*{G. Tích hợp đồng bộ giữa Slack và Trello}
+Nhằm tối ưu hóa quy trình quản lý và theo dõi tiến độ dự án, nhóm đã thiết lập liên kết tự động giữa nền tảng quản lý công việc (Trello) và không gian giao tiếp (Slack). Khi có bất kỳ thẻ (card) công việc nào được tạo mới, cập nhật trạng thái hoặc hoàn thành trên Trello, hệ thống sẽ tự động đẩy thông báo về kênh thảo luận chung trên Slack. Điều này giúp toàn bộ thành viên nắm bắt tình hình dự án theo thời gian thực mà không cần phải chuyển đổi qua lại giữa các ứng dụng.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.48\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{appendix-04-trello}
+        \vspace{5pt}
+        \textit{\small Hình 4.5: Quản lý, phân công và cập nhật Task trên Trello}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.48\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{appendix-04-slack}
+        \vspace{5pt}
+        \textit{\small Hình 4.6: Thông báo tiến độ tự động đồng bộ sang Slack}
+    \end{minipage}
+\end{figure}
+
 \label{LastPageTeamConflictSolving}
 \end{document}
-
-
-
