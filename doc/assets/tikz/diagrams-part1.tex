@@ -1,0 +1,65 @@
+% !TEX TS-program = lualatex
+\documentclass[tikz, border=2mm, multi=forest]{standalone}
+
+% Hỗ trợ Font Tiếng Việt cho LuaLaTeX
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+}{
+  \setmainfont{Liberation Serif}
+}
+% Xử lý font cho các đoạn code \texttt
+\IfFontExistsTF{Courier New}{
+  \setmonofont{Courier New}[Scale=MatchLowercase]
+}{}
+
+\usepackage{forest}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc, trees}
+
+\begin{document}
+% Thêm 2 dòng này để tắt nén PDF, chống lỗi khi nhúng vào file chính
+% =======================================================
+% === SƠ ĐỒ TỪ 01-PREFACE (Trang 1) ===
+% =======================================================
+\begin{tikzpicture}[
+    box/.style={
+        rectangle, draw=black!80, thick, text width=8cm, align=left, rounded corners=3mm, inner sep=10pt, font=\small
+    },
+    arrow/.style={
+        -{Stealth[scale=1.5]}, line width=1.5pt, draw=gray!80
+    },
+    label/.style={
+        font=\footnotesize\bfseries, align=center, text=black!70
+    }
+]
+
+\node[box, fill=blue!5] (story) at (0, 5) {
+    \textbf{\large 1. MỞ KHOÁ TUYẾN TRUYỆN}\\
+    \textit{(Phân hệ cốt truyện)}\\[1ex]
+    $\bullet$ \textbf{Đầu vào:} Điểm và thời gian của vòng chơi trước.\\
+    $\bullet$ \textbf{Tác động:} Phân tích di sản để bẻ nhánh cốt truyện. Tạo lựa chọn mới với độ khó tương ứng.\\
+    $\bullet$ \textbf{Đầu ra:} Bộ thử thách ẩn để mở nhánh mới.
+};
+
+\node[box, fill=purple!5] (console) at (5, -3) {
+    \textbf{\large 2. THỬ THÁCH TUYẾN TRUYỆN}\\
+    \textit{(Phân hệ bảng điều khiển)}\\[1ex]
+    $\bullet$ \textbf{Đầu vào:} Bộ thử thách và thông số từ phân hệ cốt truyện.\\
+    $\bullet$ \textbf{Tác động:} Cập nhật giao diện. Hiển thị chủ đề tương ứng và mục tiêu.\\
+    $\bullet$ \textbf{Đầu ra:} Bộ thông số cấu hình truyền thẳng vào phân hệ lõi trò chơi.
+};
+
+\node[box, fill=green!5] (core) at (-5, -3) {
+    \textbf{\large 3. VƯỢT QUA THỬ THÁCH}\\
+    \textit{(Phân hệ lõi trò chơi)}\\[1ex]
+    $\bullet$ \textbf{Đầu vào:} Cấu hình độ khó, tốc độ rơi, điều kiện mở khóa.\\
+    $\bullet$ \textbf{Tác động:} Xử lý logic giải đố. Người chơi vượt thử thách để lấy quyền năng, đẩy cao thành tích.\\
+    $\bullet$ \textbf{Đầu ra:} Kết quả thực chiến lưu lại làm dữ liệu đầu vào.
+};
+
+\draw[arrow] (story.south east) to[bend left=20] node[label, right=2mm] {Chuyển giao\\Thử thách \& Cấu hình} (console.north);
+\draw[arrow] (console.west) to[bend left=15] node[label, below=2mm] {Kích hoạt\\lối chơi cốt lõi} (core.east);
+\draw[arrow, draw=red!70!black] (core.north) to[bend left=20] node[label, left=2mm, text=red!70!black] {\textbf{TÁI KHỞI ĐỘNG}\\Trả kết quả thực chiến\\để định đoạt tương lai} (story.south west);
+\end{tikzpicture}
+
+\end{document}

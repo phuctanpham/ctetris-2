@@ -12,6 +12,7 @@
   \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
 }
 \usepackage{docmute}
+\usepackage{multirow}
 
 \hypersetup{pdftitle={Ước tính Công sức và Tiến độ Dự án}}
 
@@ -31,27 +32,7 @@ Tài liệu này hợp nhất Phương pháp Ước tính Công sức (Phân rã
 
 \begin{center}
 \begin{adjustbox}{max width=\linewidth}
-\begin{tikzpicture}[
-  tier/.style={rectangle,rounded corners=4pt,draw=gray!80,fill=gray!10,
-               minimum width=11cm,minimum height=0.75cm,align=center,font=\small},
-  label/.style={font=\footnotesize\itshape,text=gray},
-  arrow/.style={-{Stealth[length=5pt]},thick,gray}
-]
-  \node[tier,fill=red!10,draw=red!80](t3) at (0,0)
-    {\textbf{Tầng 3 — Phiên bản Phân hệ}\\
-     \footnotesize Tập hợp nhiều Thành phần Lớn + Các tác vụ sửa lỗi độc lập};
-  \node[tier,fill=orange!10,draw=orange!80,below=0.4cm of t3](t2)
-    {\textbf{Tầng 2 — Thành phần Lớn}\\
-     \footnotesize Nhóm nhiều Tính năng Nhỏ + Công sức Tích hợp};
-  \node[tier,fill=green!10,draw=green!80,below=0.4cm of t2](t1)
-    {\textbf{Tầng 1 — Hàm / Tính năng Nhỏ}\\
-     \footnotesize Thiết kế (0.25) + Lập trình (0.5) + Tự kiểm thử (0.25) = \textbf{1 NC}};
-  \draw[arrow](t3.south)--(t2.north);
-  \draw[arrow](t2.south)--(t1.north);
-  \node[label,right=0.3cm of t3]{Tầng Phân hệ};
-  \node[label,right=0.3cm of t2]{Tầng Thành phần};
-  \node[label,right=0.3cm of t1]{Tầng Tính năng};
-\end{tikzpicture}
+    \includegraphics[page=1]{assets/tikz/diagrams-part6.pdf}
 \end{adjustbox}
 \end{center}
 
@@ -100,55 +81,7 @@ Thay vì liệt kê từng hàm đơn lẻ, bảng dưới đây tóm tắt tổ
 \subsubsection{Biểu đồ Tích lũy Công sức theo Phiên bản}
 \begin{center}
 \begin{adjustbox}{max width=\linewidth}
-\begin{tikzpicture}[every node/.style={font=\scriptsize}]
-\def\totalW{9.0}
-\def\barH{0.65}
-\def\scale{0.07563} % 9cm / 119
-% Legend
-\node[fill=green!50,draw=green!80,minimum width=1cm,minimum height=0.4cm] at (-4.5,1.8) {};
-\node[right] at (-3.9,1.8) {Phiên bản 1};
-\node[fill=orange!60,draw=orange!80,minimum width=1cm,minimum height=0.4cm] at (-2.0,1.8) {};
-\node[right] at (-1.4,1.8) {Phiên bản 2};
-\node[fill=red!50,draw=red!80,minimum width=1cm,minimum height=0.4cm] at (0.5,1.8) {};
-\node[right] at (1.1,1.8) {Phiên bản 3};
-
-% gameStory bar
-\def\ygs{0.9}
-\fill[green!50,draw=green!80] (0,\ygs) rectangle (35*\scale,\ygs+\barH);
-\fill[orange!60,draw=orange!80] (35*\scale,\ygs) rectangle (83*\scale,\ygs+\barH);
-\fill[red!50,draw=red!80] (83*\scale,\ygs) rectangle (96.5*\scale,\ygs+\barH);
-\node[left] at (-0.1,\ygs+\barH/2) {\textit{Phân hệ Cốt truyện}};
-\node at (17.5*\scale,\ygs+\barH/2) {35};
-\node at (59*\scale,\ygs+\barH/2) {48};
-\node at (89.75*\scale,\ygs+\barH/2) {13.5};
-
-% gameConsole bar
-\def\ygc{0}
-\fill[green!50,draw=green!80] (0,\ygc) rectangle (46*\scale,\ygc+\barH);
-\fill[orange!60,draw=orange!80] (46*\scale,\ygc) rectangle (98*\scale,\ygc+\barH);
-\fill[red!50,draw=red!80] (98*\scale,\ygc) rectangle (119*\scale,\ygc+\barH);
-\node[left] at (-0.1,\ygc+\barH/2) {\textit{Phân hệ BĐK}};
-\node at (23*\scale,\ygc+\barH/2) {46};
-\node at (72*\scale,\ygc+\barH/2) {52};
-\node at (108.5*\scale,\ygc+\barH/2) {21};
-
-% gameCore bar
-\def\ygr{-0.9}
-\fill[green!50,draw=green!80] (0,\ygr) rectangle (37.5*\scale,\ygr+\barH);
-\fill[orange!60,draw=orange!80] (37.5*\scale,\ygr) rectangle (81.5*\scale,\ygr+\barH);
-\fill[red!50,draw=red!80] (81.5*\scale,\ygr) rectangle (86*\scale,\ygr+\barH);
-\node[left] at (-0.1,\ygr+\barH/2) {\textit{Phân hệ Lõi}};
-\node at (18.75*\scale,\ygr+\barH/2) {37.5};
-\node at (59.5*\scale,\ygr+\barH/2) {44};
-\node at (83.75*\scale,\ygr+\barH/2) {4.5};
-
-% x-axis
-\foreach \x in {0,30,60,90,119}{
-  \draw (\x*\scale,-1.15)--(\x*\scale,-1.25);
-  \node[below] at (\x*\scale,-1.25) {\x\,NC};
-}
-\draw[->] (0,-1.2)--(\totalW+0.3,-1.2) node[right] {Ngày công};
-\end{tikzpicture}
+    \includegraphics[page=2]{assets/tikz/diagrams-part6.pdf}
 \end{adjustbox}
 \end{center}
 
@@ -157,88 +90,17 @@ Thay vì liệt kê từng hàm đơn lẻ, bảng dưới đây tóm tắt tổ
 % ======================================================================
 \subsection{Lịch trình \& Sơ đồ Gantt (14 Tuần)}
 
-Dự án được phát triển song song 3 phiên bản qua 14 tuần ($\approx$3.5 tháng). 
+Dự án được phát triển song song 3 phiên bản qua 14 tuần ($\approx$3.5 tháng).
 
 \begin{center}
 \begin{adjustbox}{max width=\linewidth}
-\begin{tikzpicture}[every node/.style={font=\footnotesize}, x=1cm, y=1cm]
-  \foreach \col/\lbl/\x in {
-    gray/Khởi tạo/0,
-    blue/Thiết kế/2.2,
-    orange/Lập trình/4.2,
-    yellow/Kiểm thử/6.4,
-    purple/Tích hợp/8.2,
-    red/Sửa lỗi/10.0,
-    green/Phát hành/11.5}{
-    \fill[\col!70,draw=\col,rounded corners=1pt] (\x,0) rectangle (\x+0.5,0.28);
-    \node[right] at (\x+0.55,0.14) {\lbl};
-  }
-\end{tikzpicture}
+    \includegraphics[page=3]{assets/tikz/diagrams-part6.pdf}
 \end{adjustbox}
 \end{center}
 
 \begin{center}
 \begin{adjustbox}{max width=\linewidth}
-\begin{tikzpicture}[x=1cm, y=1cm, font=\scriptsize]
-  \def\W{9.0}  
-  \def\T{14}   
-
-  \foreach \w in {1,3,5,7,9,11,13}{
-    \draw[gray!20, thin] ({(\w-1)/\T*\W}, -0.1) -- ({(\w-1)/\T*\W}, 9.8);
-  }
-  \foreach \w in {1,3,5,7,9,11,13,14}{
-    \node[font=\tiny, gray] at ({(\w-0.5)/\T*\W}, -0.25) {Tuần \w};
-  }
-
-  \begin{scope}[xshift=3.4cm]
-  \foreach \w in {1,3,5,7,9,11,13}{
-    \draw[gray!15, thin] ({(\w-1)/\T*\W}, -0.1) -- ({(\w-1)/\T*\W}, 9.8);
-  }
-  \foreach \w in {1,3,5,7,9,11,13,14}{
-    \node[font=\tiny, gray] at ({(\w-0.5)/\T*\W}, -0.28) {Tuần \w};
-  }
-  \draw[gray!40] (0,-0.1) -- (\W,-0.1);
-
-  % Cốt truyện
-  \node[font=\small\bfseries, green!60!black, anchor=east] at (-0.15, 9.3) {Phân hệ Cốt truyện};
-  \fill[green!15, rounded corners=2pt] (0,8.75) rectangle ({\W*4/14}, 9.55);
-  \node[font=\tiny\bfseries, green!80!black, anchor=west] at (0.05, 9.15) {PB 1 (Tuần 1-4)};
-  
-  \fill[orange!15, rounded corners=2pt] ({\W*5/14},8.75) rectangle ({\W*10/14}, 9.55);
-  \node[font=\tiny\bfseries, orange!80!black, anchor=west] at ({0.05+\W*5/14}, 9.15) {PB 2 (Tuần 5-10)};
-  
-  \fill[red!15, rounded corners=2pt] ({\W*11/14},8.75) rectangle ({\W*12/14}, 9.55);
-  \node[font=\tiny\bfseries, red!80!black, anchor=west] at ({0.05+\W*11/14}, 9.15) {PB 3 (Tuần 11-12)};
-
-  \draw[gray!30, dashed] (0, 6.1) -- (\W, 6.1);
-
-  % Bảng điều khiển
-  \node[font=\small\bfseries, green!80!black, anchor=east] at (-0.15, 5.6) {Phân hệ BĐK};
-  \fill[green!15, rounded corners=2pt] (0,5.1) rectangle ({\W*5/14}, 5.9);
-  \node[font=\tiny\bfseries, green!80!black, anchor=west] at (0.05, 5.5) {PB 1 (Tuần 1-5)};
-  
-  \fill[orange!15, rounded corners=2pt] ({\W*6/14},5.1) rectangle ({\W*11/14}, 5.9);
-  \node[font=\tiny\bfseries, orange!80!black, anchor=west] at ({0.05+\W*6/14}, 5.5) {PB 2 (Tuần 6-11)};
-
-  \fill[red!15, rounded corners=2pt] ({\W*12/14},5.1) rectangle ({\W}, 5.9);
-  \node[font=\tiny\bfseries, red!80!black, anchor=west] at ({0.05+\W*12/14}, 5.5) {PB 3 (Tuần 12-14)};
-
-  \draw[gray!30, dashed] (0, 2.4) -- (\W, 2.4);
-
-  % Lõi trò chơi
-  \node[font=\small\bfseries, green!60!black, anchor=east] at (-0.15, 2.0) {Phân hệ Lõi};
-  \fill[green!15, rounded corners=2pt] (0,1.45) rectangle ({\W*4/14}, 2.25);
-  \node[font=\tiny\bfseries, green!80!black, anchor=west] at (0.05, 1.85) {PB 1 (Tuần 1-4)};
-  
-  \fill[orange!15, rounded corners=2pt] ({\W*5/14},1.45) rectangle ({\W*11/14}, 2.25);
-  \node[font=\tiny\bfseries, orange!80!black, anchor=west] at ({0.05+\W*5/14}, 1.85) {PB 2 (Tuần 5-11)};
-  
-  \fill[red!15, rounded corners=2pt] ({\W*12/14},1.45) rectangle ({\W*13/14}, 2.25);
-  \node[font=\tiny\bfseries, red!80!black, anchor=west] at ({0.05+\W*12/14}, 1.85) {PB 3 (Tuần 12-13)};
-
-  \draw[gray!50] (0,-1.3) rectangle (\W, 9.65);
-  \end{scope} 
-\end{tikzpicture}
+    \includegraphics[page=4]{assets/tikz/diagrams-part6.pdf}
 \end{adjustbox}
 \end{center}
 

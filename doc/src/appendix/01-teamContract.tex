@@ -1,0 +1,181 @@
+% !TEX TS-program = lualatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{\input{../libs/body.tex}}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{\input{../libs/header.tex}}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{\input{../libs/footer.tex}}
+\usepackage{docmute}
+\hypersetup{pdftitle={Hop dong lam viec nhom - ctetris}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{01-teamContract.tex}{LastPageTeamContract}
+\small
+\singlespacing
+
+\begin{center}
+    {\LARGE \textbf{HỢP ĐỒNG LÀM VIỆC NHÓM}} \\[10pt]
+    {\large Dự án: ctetris}
+\end{center}
+
+\vspace{5pt} 
+\hrule
+\vspace{5pt} 
+
+\section{Thông Tin Chung} 
+\begin{itemize}[label=--, itemsep=2pt]
+    \item \textbf{Tên nhóm:} uit-ss004-f21-geny 
+    \item \textbf{Tên file báo cáo:} 25730134\_25730160\_25730157\_25730144\_25730118.pdf 
+    \item \textbf{Mục tiêu dự án:} Hoàn thành dự án đúng hạn với chất lượng tốt nhất.
+    \item \textbf{Kênh liên lạc chính (Slack):} \href{https://ss004f21.slack.com/archives/C0ANP80FNSZ}{Link Slack}
+    \item \textbf{Soạn thảo tài liệu (Overleaf):} \href{https://www.overleaf.com/read/swpzbgqzpyqc#0fdcbb}{Link Overleaf}
+    \item \textbf{Quản lý tiến độ (Trello):} \href{https://trello.com/b/jzxLVWjG/ctetris}{Link Trello}
+    \item \textbf{Quản lý mã nguồn (Github):} \href{https://github.com/phuctanpham/ctetris}{Link Github}
+    \item \textbf{Quản lý tài liệu (Google Drive):} \href{https://drive.google.com/drive/folders/1ymKk4BAUBcXxKVpawqgOrsJHpHAze8I5}{Link Google Drive}
+    \item \textbf{Video Meeting (Google Meet):} \href{https://meet.google.com/owo-iige-rum}{Link Google Meet}
+\end{itemize}
+
+\section{Quy Tắc Làm Việc}
+\begin{enumerate}[itemsep=0pt, parsep=0pt]
+    \item \textbf{phucpt:} Phản hồi slack và cập nhật trello thường xuyên để mọi người nắm bắt tiến độ lẫn nhau.
+    \item \textbf{vint:} Tuân thủ deadline đã cam kết. Nếu gặp sự cố phải thông báo ngay cho các thành viên khác hỗ trợ.
+    \item \textbf{truongtm:} Trong giai đoạn cao điểm, các thành viên phải duy trì trạng thái "Online" trên Slack trong khung giờ quy định. Không tự ý thay đổi cấu trúc tệp .tex mà không có sự đồng ý của người quản lý trực tiếp.
+    \item \textbf{thaidg:} Mỗi thành viên phải chịu trách nhiệm với phần việc của mình và không làm ảnh hưởng tiến độ chung của nhóm.
+    \item \textbf{kiennt:} Làm việc trong Trello, không tự ý can thiệp nhánh Git của người khác, và mọi thay đổi mã nguồn đều bắt buộc phải thông qua Pull Request để review.
+\end{enumerate}
+
+\section{Giải Quyết Xung Đột}
+\begin{enumerate}[itemsep=0pt, parsep=0pt]
+    \item \textbf{phucpt:} Tài liệu nào do ai quản lý, người đó đưa ra quyết định cuối cùng.
+    \item \textbf{vint:} Quyết định theo hình thức bỏ phiếu số đông.
+    \item \textbf{truongtm:} Có quyền yêu cầu rà soát lại bảng phân công hoặc họp nhanh qua Google Meet nếu quá tải hoặc bất đồng quan điểm.
+    \item \textbf{thaidg:} Mọi mâu thuẫn sẽ được thảo luận công khai và quyết định theo đa số, các thành viên có trách nhiệm tôn trọng và thực hiện.
+    \item \textbf{kiennt:} Nếu hai bên không thể tự thống nhất bằng logic, quyết định cuối cùng sẽ do Trưởng nhóm phán quyết dựa trên biểu quyết hoặc tài liệu thiết kế gốc.
+\end{enumerate}
+
+\section{Các mốc thời gian quan trọng}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+    node distance=0.35cm,
+    block/.style={rectangle, draw, fill=blue!10, text width=2.25cm, text centered, rounded corners, minimum height=1cm, font=\scriptsize},
+    line/.style={draw, -{Stealth[scale=1.2]}, line width=1pt, color=black}
+]
+    \node [block] (m1) {\textbf{Phân tích / Phân công} \\ (Ngày 12/04/2026)};
+    \node [block, right=of m1] (m2) {\textbf{Rà soát / Hiệu chỉnh} \\ (Ngày 15/04/2026)};
+    \node [block, right=of m2] (m3) {\textbf{Phát triển / Tích hợp} \\ (Ngày 19/04/2026)};
+    \node [block, right=of m3] (m4) {\textbf{Kiểm thử / Hoàn thiện} \\ (Ngày 22/04/2026)};
+    \node [block, right=of m4] (m5) {\textbf{Tổng hợp / Deadline} \\ (Ngày 26/04/2026)};
+
+    \path [line] (m1) -- (m2);
+    \path [line] (m2) -- (m3);
+    \path [line] (m3) -- (m4);
+    \path [line] (m4) -- (m5);
+    \end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\section{Vai Trò và Trách Nhiệm}
+\noindent
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{0.95} 
+\begin{tabularx}{\textwidth}{|m{3.5cm}|m{2.5cm}|>{\arraybackslash}X|} 
+\hline
+\rowcolor{gray!15}
+\textbf{Thành viên} & \textbf{Vai trò} & \textbf{Trách nhiệm cụ thể} \\ \hline
+
+% Hàng 1
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{1pt}, after=\vspace{1pt}]
+    \item Phạm Tấn Phúc
+    \item phucpt
+    \item 25730134
+\end{itemize} & Chuyên viên quản lý dự án & 
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{1pt}, after=\vspace{1pt}]
+    \item Điều phối, quản lý tiến độ.
+    \item Thiết lập môi trường làm việc chung.
+    \item Tổng hợp và chuẩn hoá báo cáo và mã nguồn
+    \item Quản lý: tất các file có đuôi tex và file main.cpp
+\end{itemize} \\ \hline
+
+% Hàng 2
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{1pt}, after=\vspace{1pt}]
+    \item Ngô Triều Vĩ
+    \item vint
+    \item 25730160
+\end{itemize} & Lập trình viên & 
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{1pt}, after=\vspace{1pt}]
+    \item Viết báo cáo: hướng dẫn sử dụng cho các tính năng chính
+    \item Viết báo cáo: tài liệu kỹ thuật cho các tính năng chính
+    \item Viết mã nguồn: các tính năng chính
+\end{itemize} \\ \hline
+
+% Hàng 3
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{1pt}, after=\vspace{1pt}]
+    \item Tạ Minh Trường
+    \item truongtm
+    \item 25730157
+\end{itemize} & Chuyên viên kiểm thử chất lượng phần mềm & 
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{1pt}, after=\vspace{1pt}]
+    \item Soạn nhật ký biên bản họp.
+    \item Kiểm thử phần mềm toàn bộ tính năng
+    \item Đối soát kiểm tra toàn bộ hướng dẫn sử dụng
+\end{itemize} \\ \hline
+
+% Hàng 4
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{4pt}, after=\vspace{4pt}]
+    \item Đàm Gia Thái
+    \item thaidg
+    \item 25730144
+\end{itemize} & Lập trình viên & 
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{4pt}, after=\vspace{4pt}]
+    \item Viết báo cáo: hướng dẫn sử dụng cho các tính năng cấu hình
+    \item Viết báo cáo: tài liệu kỹ thuật cho các tính cấu hình
+    \item Viết mã nguồn: các tính năng cấu hình
+\end{itemize} \\ \hline
+
+% Hàng 5
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{4pt}, after=\vspace{4pt}]
+    \item Nguyễn Trung Kiên
+    \item kiennt
+    \item 25730118
+\end{itemize} & Lập trình viên & 
+\begin{itemize}[leftmargin=*, nosep, before=\vspace{4pt}, after=\vspace{4pt}]
+    \item Viết báo cáo: hướng dẫn sử dụng cho các tính năng cốt truyện
+    \item Viết báo cáo: tài liệu kỹ thuật cho các tính năng cốt truyện
+    \item Viết mã nguồn: các tính năng cốt truyện
+\end{itemize} \\ \hline
+
+\end{tabularx}
+\end{table}
+
+\section{Chế Tài}
+Vi phạm lần 1 nhắc nhở. Lần 2 báo cáo giảng viên hoặc trừ điểm đánh giá nội bộ theo thỏa thuận chung.
+
+\section{Chữ Ký Xác Nhận}
+\vspace{4pt}
+\noindent
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.0}
+\begin{tabularx}{\textwidth}{>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}X}
+\textbf{Phạm Tấn Phúc} & \textbf{Ngô Triều Vĩ} & \textbf{Tạ Minh Trường} & \textbf{Đàm Gia Thái} & \textbf{Nguyễn Trung Kiên} \\
+% Check if signature exists, otherwise insert a blank space of the same height
+\IfFileExists{assets/signature_phucpt.png}{\includegraphics[height=1.1cm, keepaspectratio]{assets/signature_phucpt.png}}{\rule{0pt}{1.1cm}} & 
+\IfFileExists{assets/signature_vint.png}{\includegraphics[height=1.1cm, keepaspectratio]{assets/signature_vint.png}}{\rule{0pt}{1.1cm}} & 
+\IfFileExists{assets/signature_truongtm.png}{\includegraphics[height=1.1cm, keepaspectratio]{assets/signature_truongtm.png}}{\rule{0pt}{1.1cm}} & 
+\IfFileExists{assets/signature_thaidg.png}{\includegraphics[height=1.1cm, keepaspectratio]{assets/signature_thaidg.png}}{\rule{0pt}{1.1cm}} & 
+\IfFileExists{assets/signature_kiennt.png}{\includegraphics[height=1.1cm, keepaspectratio]{assets/signature_kiennt.png}}{\rule{0pt}{1.1cm}} \\
+\rule{2.2cm}{0.5pt} & \rule{2.2cm}{0.5pt} & \rule{2.2cm}{0.5pt} & \rule{2.2cm}{0.5pt} & \rule{2.2cm}{0.5pt}
+\end{tabularx}
+\end{table}
+
+% --- FORCE THE PAGE NUMBER TO REGISTER ---
+\par\vspace{1pt}
+\phantomsection
+\label{LastPageTeamContract}
+\mbox{} 
+% -----------------------------------------
+
+\end{document}

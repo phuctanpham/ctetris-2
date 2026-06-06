@@ -1,0 +1,660 @@
+% !TEX TS-program = lualatex
+\documentclass[tikz, border=2mm, multi=forest]{standalone}
+
+% Hỗ trợ Font Tiếng Việt cho LuaLaTeX
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+}{
+  \setmainfont{Liberation Serif}
+}
+% Xử lý font cho các đoạn code \texttt
+\IfFontExistsTF{Courier New}{
+  \setmonofont{Courier New}[Scale=MatchLowercase]
+}{}
+
+\usepackage{forest}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc, trees}
+
+\begin{document}
+% =======================================================
+% === CÁC SƠ ĐỒ TỪ 02-gameRequirements.tex (Trang 2 đến 25) ===
+% =======================================================
+
+% Sơ đồ 2: Ngữ cảnh Cốt truyện
+\begin{tikzpicture}[
+    entity/.style={rectangle, draw=black, fill=blue!10, thick, minimum width=2.8cm, minimum height=1.2cm, align=center, font=\small},
+    system/.style={circle, draw=orange, fill=orange!10, thick, minimum size=2.8cm, align=center, font=\small},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+\node[system] (gamestory) {\textbf{Phân hệ}\\ \textbf{Cốt truyện}};
+\node[entity, left=3cm of gamestory] (player) {Người chơi};
+\node[entity, right=3cm of gamestory] (os) {API Đám mây /\\ Hệ điều hành};
+\node[entity, below=1.5cm of gamestory] (gameconsole) {Phân hệ\\ Bảng điều khiển};
+\draw[arrow] ($(player.east)+(0,0.3)$) -- node[above, font=\scriptsize, align=center] {Khởi chạy \&\\ Tương tác} ($(gamestory.west)+(0,0.3)$);
+\draw[arrow] ($(gamestory.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Hiển thị Giao diện} ($(player.east)-(0,0.3)$);
+\draw[arrow] ($(gamestory.east)+(0,0.3)$) -- node[above, font=\scriptsize] {Yêu cầu Dữ liệu} ($(os.west)+(0,0.3)$);
+\draw[arrow] ($(os.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Cung cấp Tệp} ($(gamestory.east)-(0,0.3)$);
+\draw[arrow] (gamestory) -- node[right, font=\scriptsize] {Tín hiệu kết thúc} (gameconsole);
+\end{tikzpicture}
+
+% Sơ đồ 3: Khởi tạo PB1
+\begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, start/.style={circle, draw, fill=green!20, minimum size=0.6cm}, end/.style={circle, draw, fill=red!20, double, minimum size=0.6cm}, process/.style={rectangle, draw, fill=orange!10, minimum width=2cm}, decision/.style={diamond, draw, fill=blue!5, aspect=2}]
+    \node (s) [start] {Bắt đầu};
+\node (p1) [process, below=0.6cm of s] {Khởi tạo Đồng hồ};
+    \node (p2) [process, below=0.6cm of p1] {Cập nhật Giao diện};
+\node (d1) [decision, below=0.6cm of p2] {T $\geq$ 8s?};
+    \node (e) [end, right=1.5cm of d1] {Kết thúc};
+\draw [->] (s) -- (p1); \draw [->] (p1) -- (p2); \draw [->] (p2) -- (d1);
+\draw [->] (d1) -- node[above] {Có} (e); 
+    \draw [->] (d1.west) -- ++(-0.5,0) |- (p2.west);
+\end{tikzpicture}
+
+% Sơ đồ 4: Use case PB1
+\begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10, minimum size=0.5cm}, usecase/.style={ellipse, draw, fill=white, minimum width=2cm}]
+    \draw (0,0) rectangle (4,-2.5);
+\node at (2,-0.3) {\textbf{Hệ thống Phiên bản 1}};
+    \node (p) [actor] at (-1.5, -1.25) {Người chơi};
+\node (u1) [usecase] at (2,-1) {Xem Đoạn Mở Đầu};
+    \node (u2) [usecase] at (2,-1.8) {Theo dõi Tiến độ};
+\draw [->] (p) -- (u1); \draw [->] (p) -- (u2);
+\end{tikzpicture}
+
+% Sơ đồ 5: State PB2
+\begin{tikzpicture}[
+    node distance=2.0cm,
+    state/.style={circle, draw=blue!60, fill=blue!5, thick, minimum size=1.8cm, align=center, font=\scriptsize},
+    sync/.style={rectangle, draw=orange!70, fill=orange!5, thick, rounded corners, minimum width=2.2cm, minimum height=0.6cm, align=center, font=\scriptsize},
+    arrow/.style={-{Stealth[scale=1.1]}, thick},
+    darrow/.style={-{Stealth[scale=1.1]}, thick, dashed, gray}
+]
+    \node[sync] (sidle)   at (0, 3.5)    {CHỜ ĐỒNG BỘ};
+\node[sync] (sfetch)  at (2.8, 3.5)  {ĐANG TẢI};
+    \node[sync] (supd)    at (5.6, 3.5)  {CẬP NHẬT CSDL};
+\node[sync] (sdone)   at (8.4, 3.5)  {HOÀN TẤT};
+    \node[sync, draw=red!60, fill=red!5] (soff) at (5.6, 2.4) {NGOẠI TUYẾN};
+\draw[arrow] (sidle)  -- node[above,font=\tiny]{Bắt đầu} (sfetch);
+    \draw[arrow] (sfetch) -- node[above,font=\tiny]{Tải thành công} (supd);
+\draw[arrow] (supd)   -- node[above,font=\tiny]{Xong} (sdone);
+    \draw[arrow] (sfetch.south) -- node[right,font=\tiny]{Lỗi/Hết giờ} (soff.north west);
+\draw[arrow] (supd.south)   -- node[right,font=\tiny]{Lỗi tải} (soff.north);
+
+    \node[state] (logo)  at (2.0, 0)   {GIAI ĐOẠN\\ BIỂU TRƯNG};
+\node[state] (diag)  at (5.6, 0)   {HỆ THỐNG\\ HỘI THOẠI};
+\node[state, draw=green!60, fill=green!5] (done)  at (8.8, 0)   {KẾT THÚC};
+
+    \draw[arrow] (sdone.south) -- ++(0,-0.8) -|
+node[below,font=\tiny,pos=0.25]{Đã đồng bộ} (logo.north);
+    \draw[arrow] (soff.south)  -- ++(0,-0.3) -| node[below,font=\tiny,pos=0.1]{Ngoại tuyến} (logo.north west);
+\draw[arrow] (logo.east) -- node[above,font=\tiny,align=center]{8s / Bỏ qua\\$\rightarrow$ Kiểm tra điều kiện} (diag.west);
+    \draw[arrow] (diag.east) -- node[above,font=\tiny]{Xong / Bỏ qua} (done.west);
+\draw[darrow] (logo.east) to[bend right=20] node[below,font=\tiny]{Không có truyện mới} (done.south);
+
+    \node[font=\scriptsize, draw=blue!30, fill=white, rounded corners, inner sep=3pt] (ext) at (5.6, -2.0) {Vào trực tiếp từ Trình đơn};
+\draw[arrow, blue!60] (ext.north) -- (diag.south);
+
+    \node[draw=orange!40, dashed, rounded corners, fill=orange!3, fit=(sidle)(sfetch)(supd)(sdone)(soff), label=left:{\small\textbf{Giai đoạn 1}}] {};
+\node[draw=blue!40, dashed, rounded corners, fill=blue!3, fit=(logo)(diag)(done), label=left:{\small\textbf{Giai đoạn 2}}] {};
+\end{tikzpicture}
+
+% Sơ đồ 6: Đồng bộ dữ liệu
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    box/.style={rectangle, draw=black, thick, fill=white, inner sep=5pt, align=left, minimum width=3.0cm},
+    arrow/.style={-{Stealth[scale=1.1]}, thick},
+    darrow/.style={-{Stealth[scale=1.1]}, thick, dashed}
+]
+    \node[box, fill=yellow!10] (gist) at (0, 0) {
+        \textbf{Máy chủ Đám mây}\\
+        \rule{2.6cm}{0.4pt}\\
+        \texttt{KhaiBao.json}\\
+        \quad \texttt{Chuong01: \{Mã băm\}}\\
+        \quad \texttt{Chuong02: \{Mã băm\}}\\
+        \texttt{DuLieu\_Chuong01.json}\\
+        \texttt{DuLieu\_Chuong02.json}
+    };
+\node[box, fill=orange!10, right=2.2cm of gist] (sync) {
+        \textbf{Ham\_DongBo()}\\
+        \rule{2.6cm}{0.4pt}\\
+        1. Lấy Tệp Khai báo\\
+        2. So sánh Mã băm\\
+        3. Tải Chương bị đổi\\
+        4. Áp dụng dữ liệu JSON\\
+        5. Lưu Mã băm mới\\
+        6. Cập nhật Tệp tin ảo
+    };
+    \node[box, fill=blue!10, right=2.2cm of sync] (db) {
+        \textbf{CSDL Cục bộ}\\
+        \rule{2.6cm}{0.4pt}\\
+        \texttt{Bang\_DuLieuChung}\\
+        \texttt{Bang\_HoiThoai}\\
+        \texttt{Bang\_LuaChon}\\
+        \texttt{Bang\_SieuDuLieu}\\
+        \quad (Mã băm)
+    };
+\draw[arrow] (gist.east) -- node[above]{Giao thức HTTP} (sync.west);
+    \draw[arrow] (sync.east) -- node[above,align=center]{CHÈN HOẶC\\CẬP NHẬT} (db.west);
+\draw[darrow, blue!50] (db.north) to[bend right=35] node[above, font=\tiny]{Kiểm tra Mã băm cục bộ} (sync.north east);
+\end{tikzpicture}
+
+% Sơ đồ 7: Điều kiện sau Đồng bộ
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    proc/.style={rectangle, draw=black, fill=orange!10, thick, minimum width=4.2cm, minimum height=0.55cm, align=center},
+    dec/.style={diamond, draw=black, fill=green!10, thick, aspect=2.5, align=center},
+    term/.style={rectangle, rounded corners, draw=black, fill=red!10, thick, minimum width=3.0cm, minimum height=0.55cm, align=center},
+    arrow/.style={-{Stealth[scale=1.1]}, thick}
+]
+    \node[proc]  (q) {Truy vấn: \texttt{Truyen\_Cua\_NguoiDung} Đã Chọn=1};
+\node[dec,   below=0.5cm of q]  (d1) {Đã chọn\\truyện?};
+\node[proc,  below=0.5cm of d1] (fs) {Lấy truyện đầu tiên trong CSDL};
+\node[dec,   below=0.5cm of fs] (d2) {Đạt điều kiện\\truyện kế?};
+\node[term,  right=1.8cm of d2] (unlock) {Hiện Cửa sổ thông báo\\Hỏi Chơi Truyện Mới?};
+\node[term,  below=0.5cm of d2] (replay) {Chơi lại truyện hiện tại};
+\node[term,  right=1.8cm of d1] (skip)   {Về Bảng điều khiển};
+    
+    \draw[arrow] (q) -- (d1);
+\draw[arrow] (d1) -- node[left]{Không} (fs);
+    \draw[arrow] (d1) -- node[above,align=center]{Không có\\dữ liệu} (skip);
+    \draw[arrow] (fs) -- (d2);
+\draw[arrow] (d2) -- node[above]{Có} (unlock);
+    \draw[arrow] (d2) -- node[left]{Không} (replay);
+\end{tikzpicture}
+
+% Sơ đồ 8: Use case PB2 (Story)
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    actor/.style={circle, draw, fill=gray!10, minimum size=0.6cm},
+    usecase/.style={ellipse, draw, fill=white, minimum width=2.8cm, align=center}
+]
+    \draw (0,0) rectangle (7.5,-5.2);
+\node at (3.75,-0.3) {\textbf{Hệ thống Phiên bản 2}};
+    \node (p)   [actor] at (-1.6, -2.5)  {Người chơi};
+\node (net) [actor, draw=blue!60] at (9.1, -2.5) {Máy chủ};
+    
+    \node (u1) [usecase] at (3.75,-0.9) {Xem hoặc Bỏ qua Mở đầu};
+\node (u2) [usecase] at (3.75,-1.8) {Đọc Hội thoại};
+    \node (u3) [usecase] at (3.75,-2.7) {Chọn Nhánh};
+\node (u4) [usecase] at (3.75,-3.6) {Xem Thông báo Mở khóa};
+    \node (u5) [usecase, draw=blue!60] at (3.75,-4.6) {Đồng bộ Dữ liệu};
+\draw [->] (p) -- (u1); \draw [->] (p) -- (u2);
+    \draw [->] (p) -- (u3); \draw [->] (p) -- (u4);
+\draw [->, blue!60] (net) -- (u5);
+    \draw [->, dashed] (u5.east) to[bend right=50] (u2.east);
+\end{tikzpicture}
+
+% Sơ đồ 9: Cây tính năng PB2
+\begin{tikzpicture}[
+    grow=right,
+    level 1/.style={sibling distance=3.8cm, level distance=4.5cm},
+    level 2/.style={sibling distance=1.3cm, level distance=4.0cm},
+    edge from parent fork right,
+    every node/.style={rectangle, draw=black, rounded corners, fill=gray!10, thick, align=center, font=\scriptsize, text width=2.2cm},
+    root/.style={fill=orange!20, font=\small\bfseries, text width=2.0cm}
+]
+\node[root] {Cập nhật\\PB 2}
+    child { node[fill=blue!10] {Tầng Đồng bộ}
+        child { node {So sánh\\Mã băm} }
+        child { node {Áp dụng\\Dữ liệu JSON} }
+        child { node {Theo dõi\\Mã băm} }
+    }
+    child { node[fill=yellow!15] {Hệ thống\\Hội thoại}
+        child { node {Cỗ máy trạng thái\\Hội thoại} }
+        child { node {Rẽ nhánh\\lựa chọn} }
+        child { node {Âm thanh\\theo ngữ cảnh} }
+    }
+    child { node[fill=green!10] {Logic sau\\Đồng bộ}
+        child { node {Kiểm tra\\Điều kiện} }
+        child { node {Thông báo\\Mở khóa} }
+        child { node {Lựa chọn\\Cốt truyện} }
+    }
+    child { node[fill=red!10] {Giao diện}
+        child { node {Nút Bỏ qua} }
+        child { node {Thanh trạng thái\\Đồng bộ} }
+    };
+\end{tikzpicture}
+
+% Sơ đồ 10: Tích hợp API PB3
+\begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, start/.style={circle, draw, fill=green!20}, end/.style={circle, draw, fill=red!20, double}, process/.style={rectangle, draw, fill=orange!10}, decision/.style={diamond, draw, fill=blue!5, aspect=2}]
+    \node (s) [start] {Mở Ứng dụng};
+\node (d1) [decision, below=0.6cm of s] {Trực tuyến?};
+    \node (p1) [process, below=0.6cm of d1] {Tải Hình ảnh/Âm thanh};
+\node (p2) [process, below=0.6cm of p1] {Chạy Hệ thống Hội thoại};
+\node (e) [end, right=1.5cm of d1] {Chạy Chế độ Ngoại tuyến};
+    \draw [->] (s) -- (d1);
+\draw [->] (d1) -- node[left] {Có} (p1); \draw [->] (d1) -- node[above] {Không} (e);
+    \draw [->] (p1) -- (p2);
+\draw [->] (p2.east) -| (e.south);
+\end{tikzpicture}
+
+% Sơ đồ 11: Use case API
+\begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10}, usecase/.style={ellipse, draw, fill=white, minimum width=2.5cm}]
+    \draw (0,0) rectangle (5,-3);
+\node at (2.5,-0.3) {\textbf{Hệ thống Phiên bản 3}};
+    \node (sys) [actor] at (6.5, -1.5) {API Đám mây};
+\node (u1) [usecase] at (2.5,-1) {Kiểm tra đường truyền};
+    \node (u2) [usecase] at (2.5,-2) {Tải Đa phương tiện};
+\draw [->] (sys) -- (u2);
+\end{tikzpicture}
+
+% Sơ đồ 12: Cây tính năng Console
+\begin{tikzpicture}[
+    grow=right,
+    level 1/.style={sibling distance=3.2cm, level distance=4.5cm},
+    level 2/.style={sibling distance=1.0cm, level distance=4.0cm},
+    edge from parent fork right,
+    every node/.style={rectangle, draw=black, rounded corners, fill=gray!10, thick, align=center, font=\scriptsize, text width=2.4cm},
+    root/.style={fill=orange!20, font=\small\bfseries, text width=2.2cm}
+]
+\node[root] {Phân hệ \\ Bảng điều khiển}
+    child { node[fill=blue!10] {Quản lý Phiên}
+        child { node {Màn hình Tải lại} }
+        child { node {Chuyển đổi Phân hệ} }
+    }
+    child { node[fill=green!10] {Điều hướng}
+        child { node {Chuột \& Con lăn} }
+        child { node {Phím tắt} }
+        child { node {Hệ thống Tập trung} }
+    }
+    child { node[fill=yellow!10] {Cửa sổ Nổi}
+        child { node {Thanh cuộn tương tác} }
+        child { node {Bảng xếp hạng} }
+        child { node {Hướng dẫn chơi} }
+    }
+    child { node[fill=red!10] {Cấu hình}
+        child { node {Âm lượng \& Màu sắc} }
+        child { node {Lưu \& Tải cài đặt} }
+    };
+\end{tikzpicture}
+
+% Sơ đồ 13: Console State V2
+\begin{tikzpicture}[
+    node distance=2.8cm,
+    state/.style={circle, draw=blue!60, fill=blue!5, thick, minimum size=1.9cm, align=center, font=\scriptsize},
+    guard/.style={diamond, draw=red!70, fill=red!5, thick, minimum width=2.2cm, minimum height=1.1cm, align=center, font=\scriptsize, aspect=2},
+    initstate/.style={rectangle, rounded corners, draw=orange!60, fill=orange!5, thick, minimum width=2.2cm, minimum height=0.8cm, align=center, font=\scriptsize},
+    arrow/.style={-{Stealth[scale=1.1]}, thick},
+    dashed arrow/.style={-{Stealth[scale=1.1]}, thick, dashed}
+]
+    \node[guard]  (dbg)     {Bảo vệ\\CSDL};
+\node[state,  right=2.8cm of dbg]  (main)    {TRÌNH ĐƠN\\CHÍNH};
+\node[initstate, above=1.5cm of dbg] (init) {Khởi tạo Cốt truyện};
+
+    \node[state,  above left=1.8cm and 1.8cm of main] (guide)  {HƯỚNG DẪN};
+\node[state,  above right=1.8cm and 1.8cm of main] (board) {XẾP HẠNG};
+\node[state,  below left=1.8cm and 1.8cm of main] (set)   {CÀI ĐẶT};
+\node[state,  below right=1.8cm and 1.8cm of main] (stor) {CỐT TRUYỆN};
+    \node[state,  right=2.8cm of main] (reload) {TẢI LẠI\\(Trình duyệt)};
+\draw[dashed arrow] (dbg) -- node[above,font=\scriptsize]{CSDL Ổn} (main);
+    \draw[dashed arrow] (dbg) -- node[left,font=\scriptsize]{Mất DL $\rightarrow$ Quay về} (init);
+\draw[arrow] (main) to[bend right=20] node[above right,font=\scriptsize]{Hướng Dẫn} (guide);
+    \draw[arrow] (guide) to[bend right=20] node[below left,font=\scriptsize]{Đóng} (main);
+\draw[arrow] (main) to[bend right=20] node[above left,font=\scriptsize]{Xếp Hạng} (board);
+    \draw[arrow] (board) to[bend right=20] node[below right,font=\scriptsize]{Đóng} (main);
+\draw[arrow] (main) to[bend right=20] node[below right,font=\scriptsize]{Cài Đặt} (set);
+    \draw[arrow] (set) to[bend right=20] node[above left,font=\scriptsize,align=center]{Đóng\\\& Lưu} (main);
+\draw[arrow] (main) to[bend right=20] node[below left,font=\scriptsize]{Cốt Truyện} (stor);
+    \draw[arrow] (stor) to[bend right=20] node[above right,font=\scriptsize]{Đóng} (main);
+
+    \draw[arrow] (main) -- node[above,font=\scriptsize,align=center]{Thoát} (reload);
+\end{tikzpicture}
+
+% Sơ đồ 14: Kiến trúc CSDL Console
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    tbl/.style={rectangle, draw=black, fill=white, thick, text width=4.0cm, align=left, inner sep=4pt},
+    grp/.style={rectangle, draw=gray, dashed, rounded corners, fill=gray!5, inner sep=6pt},
+    arrow/.style={-{Stealth[scale=1.0]}, thick}
+]
+\node[tbl] (rec) at (0,0) {
+    \textbf{Bang\_LichSu} (Nhóm 1)\\
+    \rule{\linewidth}{0.4pt}\\
+    \texttt{ID} Khóa chính Tự tăng\\
+    \texttt{MaNguoiDung} Chuỗi\\
+    \texttt{TGBatDau / TGKetThuc} Số\\
+    \texttt{MaTruyen / MaChuong} Số\\
+    \texttt{TongDiem / TongGiay}\\
+    \texttt{TocDoTB} Số thực
+};
+\node[tbl, below=0.3cm of rec] (stor) {
+    \textbf{Bang\_TienDo} (Nhóm 1)\\
+    \rule{\linewidth}{0.4pt}\\
+    Khóa(\texttt{NguoiDung, Truyen, Chuong})\\
+    \texttt{DaKichHoat / DaChon}\\
+    \texttt{SoLanThu / DiemCaoNhat}\\
+    \texttt{TocDoCaoNhat}
+};
+\node[tbl, below=0.3cm of stor] (sett) {
+    \textbf{Bang\_CaiDat} (Nhóm 1)\\
+    \rule{\linewidth}{0.4pt}\\
+    \texttt{Khoa} Chuỗi Khóa chính\\
+    \texttt{GiaTri} Chuỗi
+};
+\node[tbl, right=0.6cm of rec] (sd) {
+    \textbf{Bang\_DuLieuChung} (Nhóm 2)\\
+    \rule{\linewidth}{0.4pt}\\
+    Khóa(\texttt{MaTruyen, MaChuong})\\
+    \texttt{TenTruyen / TenChuong}\\
+    \texttt{NguongDiem/TocDo/SoLan}\\
+    \texttt{DieuKienMoKhoa} Chuỗi\\
+    \texttt{DiemMoKeTiep / TocDo}\\
+    \texttt{MaTranBanCo / XMLHoiThoai}
+};
+\node[tbl, below=0.3cm of sd] (sdlg) {
+    \textbf{Bang\_HoiThoai} (Nhóm 2)\\
+    \rule{\linewidth}{0.4pt}\\
+    Duy nhất(\texttt{Truyen, Chuong, Nut})\\
+    \texttt{NguoiNoi / NoiDung / Anh}\\
+    \texttt{MaNutKe / CoLuaChon}
+};
+\node[tbl, below=0.3cm of sdlg] (smet) {
+    \textbf{Bang\_SieuDuLieu} (Nhóm 2)\\
+    \rule{\linewidth}{0.4pt}\\
+    \texttt{MaChuong} Khóa chính\\
+    \texttt{MaBamSHA / NgayCapNhat}\\
+    \texttt{LienKetAnh}
+};
+\node[tbl, right=0.6cm of sd] (sync) {
+    \textbf{Bang\_DongBo} (Nhóm 3)\\
+    \rule{\linewidth}{0.4pt}\\
+    \textit{Đồng bộ đám mây}\\
+    \texttt{TenNguoiDung / TongDiem}\\
+    \texttt{TongGiay / TocDoTB}\\
+    \texttt{TGBatDau / Truyen / Chuong}
+};
+\begin{scope}[on background layer]
+    \node[grp, fit=(rec)(stor)(sett), label=above:{\scriptsize\bfseries Nhóm 1 — Đọc/Ghi theo Người dùng}] {};
+\node[grp, fit=(sd)(sdlg)(smet), label=above:{\scriptsize\bfseries Nhóm 2 — Dữ liệu dùng chung (Chỉ đọc)}] {};
+\node[grp, fit=(sync), label=above:{\scriptsize\bfseries Nhóm 3 — Đám mây Cloudflare}] {};
+\end{scope}
+
+\draw[arrow, blue!60] (stor.east) -- ++(0.3,0) |- node[pos=0.25, right, font=\tiny]{Kết nối} (sd.west);
+\draw[arrow, green!50!black] (rec.west) -- ++(-0.6, 0) |- node[pos=0.75, above, font=\scriptsize]{Khởi tạo Bảng xếp hạng} ($(sett.south) + (0, -1.0)$) -| (sync.south);
+\end{tikzpicture}
+
+% Sơ đồ 15: Hợp đồng cấu hình
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    cfg/.style={rectangle, draw=black, fill=blue!5, thick, minimum width=4.0cm, align=left, inner sep=5pt},
+    core/.style={rectangle, draw=black, fill=blue!5, thick, align=center, inner sep=5pt},
+    db/.style={rectangle, rounded corners, draw=black, fill=blue!5, thick, align=center, inner sep=5pt},
+    arrow/.style={-{Stealth[scale=1.1]}, thick},
+    dashed arrow/.style={-{Stealth[scale=1.1]}, thick, dashed, draw=purple}
+]
+    \node[cfg] (cfg) at (0,0) {
+        \begin{tabular}{@{}l@{}}
+            \multicolumn{1}{c}{\textbf{CauHinhCaiDat}} \\
+            \hline 
+            \rule{0pt}{10pt}\texttt{public:} \\
+            \texttt{\hspace{4pt}float amLuong} \\
+            \texttt{\hspace{4pt}bool mauDuocBat[7]} \\
+            \texttt{\hspace{4pt}int maTruyen / maChuong} \\
+            \texttt{\hspace{4pt}int diemKhoiKe} \\
+            \texttt{\hspace{4pt}float tocDoKhoiKe} \\
+            \texttt{\hspace{4pt}string maTranBanCo}
+        \end{tabular}
+    };
+\node[core, label={[font=\scriptsize]above:ChayPhanHeLoi(Tham chiếu Cấu Hình)}] (core) at (6.5, 0.5) {
+        \texttt{Tham chiếu CauHinhCaiDat\&}
+    };
+\node[db] (db) at (0, -3.5) {
+        \begin{tabular}{@{}l@{}}
+            \texttt{LuuCaiDatCSDL()} \\
+            \texttt{TaiCaiDatCSDL()}
+        \end{tabular}
+    };
+\draw[arrow] (core.west) -- (cfg.east |- core.west);
+    \draw[dashed arrow] (cfg.south) -- (db.north);
+\end{tikzpicture}
+
+% Sơ đồ 16: Luồng Khởi động Console
+\begin{tikzpicture}[
+    node distance=0.7cm,
+    every node/.style={font=\scriptsize},
+    proc/.style={rectangle, draw=black, fill=orange!10, thick, minimum width=3.6cm, minimum height=0.55cm, align=center},
+    dec/.style={diamond, draw=black, fill=green!10, thick, aspect=2.2, align=center},
+    term/.style={rectangle, rounded corners, draw=black, fill=red!10, thick, minimum width=3.0cm, minimum height=0.55cm, align=center},
+    arrow/.style={-{Stealth[scale=1.1]}, thick}
+]
+    \node[term]  (s)   {Vào Phân hệ Bảng điều khiển};
+\node[dec,   below=0.5cm of s]   (chk)  {CSDL\\Tồn tại?};
+\node[proc,  below=0.5cm of chk] (idbfs){WASM: Gắn kết tệp tin ảo};
+\node[proc,  below=0.5cm of idbfs](open) {Mở CSDL \& Tạo bảng};
+\node[proc,  below=0.5cm of open] (seed) {Tạo hạt giống dữ liệu chung};
+\node[dec,   below=0.5cm of seed] (hasD) {Có dữ liệu\\chung?};
+\node[proc,  below=0.5cm of hasD] (load) {Tải Cài đặt \& Áp dụng Âm lượng};
+\node[proc,  below=0.5cm of load] (unl)  {Kiểm tra \& Mở khóa Truyện};
+\node[proc,  below=0.5cm of unl]  (brd)  {Tải Bảng xếp hạng \& Sắp xếp};
+\node[term,  below=0.5cm of brd]  (loop) {Vòng lặp sự kiện chính};
+\node[term,  right=3.2cm of chk]  (ret3) {Trả về 3 (Lỗi CSDL)};
+\node[term,  right=3.2cm of hasD] (ret3b){Trả về 3 (Thiếu dữ liệu)};
+
+    \draw[arrow] (s) -- (chk);
+    \draw[arrow] (chk) -- node[left]{Có} (idbfs);
+\draw[arrow] (chk) -- node[above]{Không} (ret3);
+    \draw[arrow] (idbfs) -- (open); \draw[arrow] (open) -- (seed); \draw[arrow] (seed) -- (hasD);
+\draw[arrow] (hasD) -- node[left]{Có} (load);
+    \draw[arrow] (hasD) -- node[above]{Không} (ret3b);
+    \draw[arrow] (load) -- (unl); \draw[arrow] (unl) -- (brd);
+\draw[arrow] (brd) -- (loop);
+\end{tikzpicture}
+
+% Sơ đồ 17: Cây tính năng Console V2
+\begin{tikzpicture}[
+    grow=right,
+    level 1/.style={sibling distance=4.0cm, level distance=4.5cm},
+    level 2/.style={sibling distance=1.4cm, level distance=4.0cm},
+    edge from parent fork right,
+    every node/.style={rectangle, draw=black, rounded corners, fill=gray!10, thick, align=center, font=\scriptsize, text width=1.8cm},
+    root/.style={fill=orange!20, font=\small\bfseries, text width=2.2cm}
+]
+\node[root] {Cập nhật\\PB 2}
+    child { node[fill=blue!10] {Lưu trữ}
+        child { node {3 Nhóm SQLite} }
+        child { node {Tệp ảo Web} }
+        child { node {Đồng bộ Đám mây} }
+    }
+    child { node[fill=yellow!15] {Cửa sổ Cài đặt}
+        child { node {Thanh Âm lượng} }
+        child { node {Bộ chọn 7 Màu} }
+        child { node {Lưu/Đọc Cài đặt} }
+    }
+    child { node[fill=green!10] {Cửa sổ Truyện}
+        child { node {3 Trạng thái dòng} }
+        child { node {Điều hướng Chương} }
+        child { node {Mở khóa Liên hoàn} }
+    }
+    child { node[fill=red!10] {Liên Phân hệ}
+        child { node {Hợp đồng Cấu hình} }
+        child { node {Bộ máy Sắp xếp} }
+    };
+\end{tikzpicture}
+
+% Sơ đồ 18: Ngữ cảnh Core
+\begin{tikzpicture}[
+    entity/.style={rectangle, draw=black, fill=blue!10, thick, minimum width=2.8cm, minimum height=1.2cm, align=center, font=\small},
+    system/.style={circle, draw=orange, fill=orange!10, thick, minimum size=2.8cm, align=center, font=\small},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+\node[system] (gamecore) {\textbf{Phân hệ}\\ \textbf{Lõi trò chơi}};
+\node[entity, left=3.5cm of gamecore] (player) {Người chơi};
+\node[entity, right=3.5cm of gamecore] (database) {Máy chủ đám mây\\ (API Đám mây)};
+\node[entity, above=1.5cm of gamecore] (gameconsole) {Phân hệ\\ Bảng điều khiển};
+
+\draw[arrow] ($(player.east)+(0,0.3)$) -- node[above, font=\scriptsize, align=center] {Thao tác (Phím/Vuốt)} ($(gamecore.west)+(0,0.3)$);
+\draw[arrow] ($(gamecore.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Hiển thị Lưới/Giao diện} ($(player.east)-(0,0.3)$);
+\draw[arrow] ($(gamecore.east)+(0,0.3)$) -- node[above, font=\scriptsize] {Gửi Điểm \& Tên} ($(database.west)+(0,0.3)$);
+\draw[arrow] ($(database.west)-(0,0.3)$) -- node[below, font=\scriptsize] {Trạng thái lưu} ($(gamecore.east)-(0,0.3)$);
+\draw[arrow] ($(gameconsole.south)+(-0.3,0)$) -- node[left, font=\scriptsize] {Khởi tạo Trò chơi} ($(gamecore.north)+(-0.3,0)$);
+\draw[arrow] ($(gamecore.north)+(0.3,0)$) -- node[right, font=\scriptsize] {Trở về (Thoát/Menu)} ($(gameconsole.south)+(0.3,0)$);
+\end{tikzpicture}
+
+% Sơ đồ 19: Use case Core
+\begin{tikzpicture}[node distance=1cm, every node/.style={font=\scriptsize}, actor/.style={circle, draw, fill=gray!10, minimum size=0.5cm}, usecase/.style={ellipse, draw, fill=white, minimum width=2cm}]
+    \draw (0,0) rectangle (5,-4);
+\node at (2.5,-0.3) {\textbf{Hệ thống Lõi trò chơi}};
+    \node (p) [actor] at (-1.5, -2) {Người chơi};
+\node (u1) [usecase] at (2.5,-1) {Di chuyển/Xoay khối};
+    \node (u2) [usecase] at (2.5,-1.8) {Rơi nhanh};
+\node (u3) [usecase] at (2.5,-2.6) {Tạm dừng};
+    \node (u4) [usecase] at (2.5,-3.4) {Xem khối kế tiếp};
+\draw [->] (p) -- (u1); \draw [->] (p) -- (u2); 
+    \draw [->] (p) -- (u3); \draw [->] (p) -- (u4);
+\end{tikzpicture}
+
+% Sơ đồ 20: Hoạt động Core
+\begin{tikzpicture}[
+    node distance=1.2cm, 
+    every node/.style={font=\scriptsize},
+    startstop/.style={rectangle, rounded corners, draw=black, fill=red!10, thick, minimum width=2cm, minimum height=0.6cm, align=center},
+    process/.style={rectangle, draw=black, fill=orange!10, thick, minimum width=2.5cm, minimum height=0.6cm, align=center},
+    decision/.style={diamond, draw=black, fill=green!10, thick, aspect=2, align=center},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+    \node (start) [startstop] {Bắt đầu Ván};
+\node (spawn) [process, below=0.6cm of start] {Sinh khối ngẫu nhiên};
+\node (input) [process, below=0.6cm of spawn] {Nhận thao tác điều khiển};
+\node (move) [process, below=0.6cm of input] {Cập nhật vị trí/Xoay};
+    \node (col) [decision, below=0.6cm of move] {Va chạm?};
+\node (lock) [process, right=1.5cm of col] {Khóa khối \& Xóa dòng};
+    \node (over) [decision, above=0.8cm of lock] {Đầy bảng?};
+\node (end) [startstop, right=1.2cm of over] {Trò chơi Kết thúc};
+
+    \draw [arrow] (start) -- (spawn);
+    \draw [arrow] (spawn) -- (input);
+\draw [arrow] (input) -- (move);
+    \draw [arrow] (move) -- (col);
+    \draw [arrow] (col) -- node[above] {Có} (lock);
+\draw [arrow] (col.west) -- node[above] {Không} ++(-1,0) |- (input.west);
+    \draw [arrow] (lock) -- (over);
+\draw [arrow] (over) -- node[above] {Có} (end);
+    \draw [arrow] (over.north) |- node[above, near start] {Không} (spawn.east);
+\end{tikzpicture}
+
+% Sơ đồ 21: State Cơ bản Core
+\begin{tikzpicture}[
+    node distance=3cm and 2cm,
+    state/.style={circle, draw=blue, fill=blue!5, thick, minimum size=2.2cm, align=center, font=\scriptsize},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+    \node[state] (init) {KHỞI TẠO};
+\node[state, right=of init] (playing) {ĐANG CHƠI};
+    \node[state, below=1.5cm of playing] (paused) {TẠM DỪNG};
+    \node[state, right=of playing] (gameover) {KẾT THÚC};
+\draw[arrow] (init) -- node[above, font=\scriptsize] {Xong khởi tạo} (playing);
+    \draw[arrow] (playing.250) -- node[left, font=\scriptsize] {Nhấn Tạm Dừng} (paused.110);
+\draw[arrow] (paused.70) -- node[right, font=\scriptsize] {Tiếp tục} (playing.290);
+    \draw[arrow] (playing) -- node[above, font=\scriptsize] {Khối chạm đỉnh} (gameover);
+\draw[arrow] (gameover.north) -- ++(0,1.2) -| node[near start, above, font=\scriptsize] {Chơi lại} (init.north);
+    \draw[arrow] (paused.east) -| node[near start, below, font=\scriptsize] {Thoát} (gameover.south);
+\end{tikzpicture}
+
+% Sơ đồ 22: Cây tính năng Core (forest)
+\begin{forest}
+  for tree={
+    draw=black, thick, rounded corners, fill=gray!10, align=center, font=\scriptsize,
+    edge={thick}, l sep=1.2cm, s sep=2mm,
+    edge path={
+      \noexpand\path[\forestoption{edge}] (!u.south) -- +(0,-6mm) -| (.north)\forestoption{edge label};
+    },
+  }
+  [Phân hệ Lõi trò chơi, fill=orange!20, font=\small\bfseries, minimum height=0.8cm
+    [Xử lý Khối, fill=blue!10
+      [Sinh khối\\ngẫu nhiên]
+      [Phát hiện\\va chạm]
+    ]
+    [Điều khiển, fill=green!10
+      [Bàn phím]
+      [Chuột (UI)]
+      [Cảm ứng\\(Vuốt)]
+    ]
+    [Luật chơi, fill=yellow!10
+      [Xóa dòng]
+      [Tính điểm\\\& Combo]
+    ]
+    [Trạng thái\\\& Giao diện, fill=red!10
+      [Đồng hồ\\đếm ngược]
+      [Cửa sổ\\Tạm dừng]
+    ]
+  ]
+\end{forest}
+
+% Sơ đồ 23: State Mở rộng Core V2
+\begin{tikzpicture}[
+    node distance=2.6cm,
+    state/.style={circle, draw=blue!60, fill=blue!5, thick, minimum size=2.1cm, align=center, font=\scriptsize},
+    persist/.style={rectangle, draw=green!60, fill=green!5, thick, rounded corners, minimum width=2.6cm, minimum height=0.7cm, align=center, font=\scriptsize},
+    arrow/.style={-{Stealth[scale=1.1]}, thick},
+    darrow/.style={-{Stealth[scale=1.1]}, thick, dashed, gray}
+]
+    \node[state] (init)      {KHỞI TẠO};
+\node[state, right=of init]  (play)    {ĐANG CHƠI};
+\node[state, below=2cm of play]  (flash)   {CHỚP\\ XÓA DÒNG};
+\node[state, above right=1cm and 2.5cm of play] (pause)   {TẠM DỪNG};
+\node[state, below right=1cm and 2.5cm of play] (over)    {KẾT THÚC};
+\node[state, right=3.5cm of over] (wasm)   {TẢI LẠI TRANG};
+    \node[persist, below=0.6cm of flash] (db) {\texttt{ThemLichSu()}};
+\node[persist, below=0.8cm of over]  (db2) {\texttt{CapNhatTienDo()}};
+
+    \draw[arrow] (init) -- node[above,font=\scriptsize]{Vào} (play);
+    \draw[arrow] (play.south) -- node[left,font=\scriptsize]{Hàng đầy} (flash.north);
+\draw[arrow] (flash.west) to[bend left=40] node[left,font=\scriptsize,align=center]{Xong 6 nhịp} (play.west);
+    \draw[arrow] (play.45) to[bend left=20] node[above,font=\scriptsize,sloped,pos=0.5,yshift=2pt]{Nút Dừng} (pause.225);
+\draw[arrow] (pause.250) to[bend left=20] node[below,font=\scriptsize,sloped,pos=0.5,yshift=-2pt]{Tiếp tục} (play.20);
+    \draw[arrow] (play.south east) to[bend right=15] node[below left,font=\scriptsize,sloped]{Chạm nóc} (over.north west);
+\draw[arrow] (over) -- node[above,font=\scriptsize]{Thoát} (wasm); 
+    \draw[arrow] (over.west) -- ++(-0.8, 0) -- ++(0, -5.5) -| node[near start, above, font=\scriptsize]{Chơi lại} (init.south);
+\draw[arrow] (over.north east) -- ++(0.4,0.4) node[above right,font=\scriptsize,draw=blue!30,fill=white,rounded corners,inner sep=2pt] {Về Trình đơn};
+
+    \draw[darrow] (flash.south) -- (db.north);
+    \draw[darrow] (over.south) -- (db2.north);
+\draw[darrow] (db2.south) -- ++(0,-0.4) node[below,font=\tiny]{\texttt{KiemTraMoKhoa()}};
+\end{tikzpicture}
+
+% Sơ đồ 24: Logic mở khóa Khối Kế tiếp
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    cond/.style={diamond, draw=black, fill=green!10, thick, aspect=3.5, align=center},
+    slot/.style={rectangle, draw=black, fill=blue!10, thick, minimum width=1.8cm, minimum height=0.6cm, align=center},
+    arrow/.style={-{Stealth[scale=1.1]}, thick}
+]
+    \node[slot] (n1) at (0,0)    {KHỐI KẾ-1\\(Luôn hiện)};
+\node[cond] (c2) at (5.0,0)  {Điểm $\geq$ Ngưỡng};
+    \node[slot] (n2) at (11.5, 1.0)   {KHỐI KẾ-2\\(Đã mở)};
+\node[slot, draw=gray, fill=gray!10] (n2h) at (11.5, -1.0) {KHỐI KẾ-2\\(Đang ẩn)};
+\node[cond] (c3) at (5.0,-3.2) {KẾ-2 Đã Mở\\VÀ\\Điểm $\geq$ Ngưỡng $\times$ 2};
+    \node[slot] (n3) at (11.5,-2.2) {KHỐI KẾ-3\\(Đã mở)};
+\node[slot, draw=gray, fill=gray!10] (n3h) at (11.5,-4.2) {KHỐI KẾ-3\\(Đang ẩn)};
+
+    \draw[arrow] (n1.east) -- (c2.west);
+    \draw[arrow] (c2.east) -- node[above=2pt, sloped] {Đạt} (n2.west);
+\draw[arrow] (c2.east) -- node[below=2pt, sloped] {Chưa} (n2h.west);
+    \draw[arrow] (c2.south) -- (c3.north);
+    
+    \draw[arrow] (c3.east) -- node[above=2pt, sloped] {Đạt} (n3.west);
+\draw[arrow] (c3.east) -- node[below=2pt, sloped] {Chưa} (n3h.west);
+\end{tikzpicture}
+
+% Sơ đồ 25: Ma trận Bàn cờ Cốt truyện
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+    \foreach \r in {0,1,2,3} {
+        \foreach \c in {0,...,9} {
+            \draw[gray!50] (\c*0.4, \r*0.4) rectangle (\c*0.4+0.4, \r*0.4+0.4);
+        }
+    }
+    \foreach \c/\clr in {2/red!60, 5/blue!60, 8/green!60} {
+        \fill[\clr] (\c*0.4+0.05, 0.05) rectangle (\c*0.4+0.35, 0.35);
+    }
+    \foreach \c/\clr in {0/orange!70, 3/purple!60, 6/yellow!70, 9/red!60} {
+        \fill[\clr] (\c*0.4+0.05, 0.45) rectangle (\c*0.4+0.35, 0.75);
+    }
+    \node[right] at (4.2, 0.2) {\texttt{"0,0,2,0,0,1,0,0,3,0"} $\leftarrow$ Hàng áp chót};
+\node[right] at (4.2, 0.6) {\texttt{"4,0,0,5,0,0,6,0,0,2"} $\leftarrow$ Hàng dưới cùng};
+    \node[right] at (4.2, 1.2) {Các hàng nối bằng dấu \texttt{";"}};
+\node[right] at (4.2, 0.95) {Chuỗi rỗng $\rightarrow$ Bảng trống};
+
+    \draw[->] (4.1, 0.2) -- (3.8, 0.2);
+\draw[->] (4.1, 0.6) -- (3.8, 0.6);
+\end{tikzpicture}
+
+\end{document}

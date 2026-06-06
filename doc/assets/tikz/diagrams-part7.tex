@@ -1,0 +1,261 @@
+% !TEX TS-program = lualatex
+\documentclass[tikz, border=2mm]{standalone}
+
+% Hỗ trợ Font Tiếng Việt cho LuaLaTeX
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+}{
+  \setmainfont{Liberation Serif}
+}
+\IfFontExistsTF{Courier New}{
+  \setmonofont{Courier New}[Scale=MatchLowercase]
+}{}
+
+\usepackage{xcolor}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+
+% Định nghĩa lại các màu hệ thống
+\colorlet{tBlue}{blue}
+\colorlet{tOrange}{orange}
+\colorlet{tGreen}{green!60!black}
+\colorlet{tPurple}{purple}
+
+% Định nghĩa lại các phong cách (style) hộp công nghệ
+\tikzset{
+  techBox/.style={rectangle, draw=#1!80, fill=#1!10, rounded corners=4pt, thick, align=center, font=\small, inner sep=6pt},
+  techBoxSm/.style={rectangle, draw=#1!80, fill=#1!10, rounded corners=4pt, thick, align=center, font=\scriptsize, inner sep=4pt},
+  sdsArrow/.style={-{Stealth[length=5pt]}, thick, draw=#1},
+  vTag/.style={rectangle, draw=#1!80, fill=#1!10, rounded corners=2pt, font=\tiny, inner sep=2pt}
+}
+
+\begin{document}
+
+% Sơ đồ 1: Tổng quan Kiến trúc
+\begin{tikzpicture}[node distance=0.4cm,
+  comp/.style={techBoxSm=tBlue, text width=2.4cm},
+  arrow/.style={sdsArrow=tBlue!80}
+]
+  \node[techBox=tBlue, text width=12cm]
+    (entry) at (0,0)
+    {Thư viện SDL3 --- Cửa sổ · Bộ vẽ đồ họa · Vòng lặp sự kiện · Luồng âm thanh};
+  \node[comp] (svg)  at (-4.5,-1.8) {Bộ chuyển đổi\\Ảnh Vector\\Thành điểm ảnh};
+  \node[comp] (draw) at (-1.5,-1.8) {Vẽ đồ họa\\bằng thuật toán\\(Không ảnh tĩnh)};
+  \node[comp] (dbg)  at (1.5,-1.8)  {Vẽ chữ\\(Phông chữ\\tích hợp)};
+  \node[comp] (aud)  at (4.5,-1.8)  {Luồng âm thanh\\\& Điều chỉnh\\âm lượng};
+  \node[techBox=tOrange, text width=12cm]
+    (wasm) at (0,-3.4)
+    {Nền tảng WebAssembly --- Trình biên dịch · Hàm dị bộ · Tệp ảo (IDBFS) · Trang nền};
+  \foreach \c in {svg,draw,dbg,aud}{
+    \draw[arrow](entry)--(\c.north);
+    \draw[arrow](\c.south)--(wasm.north -| \c);
+  }
+\end{tikzpicture}
+
+% Sơ đồ 2: Quy trình xuất Khung hình
+\begin{tikzpicture}[
+  b/.style={techBoxSm=tBlue, text width=2.2cm},
+  a/.style={sdsArrow=tBlue!80}
+]
+  \node[b](p1){Bắt Sự kiện\\(Lớp đầu vào)};
+  \node[b,right=0.5cm of p1](p2){Cập nhật\\Trạng thái};
+  \node[b,right=0.5cm of p2](p3){Xóa\\Màn hình};
+  \node[b,right=0.5cm of p3](p4){Vẽ Hình nền\\(Chất liệu SVG)};
+  \node[b,right=0.5cm of p4](p5){Vẽ Phân hệ\\(Bảng/Giao diện)};
+  \node[b,right=0.5cm of p5](p6){Xuất hình\\(60 FPS)};
+  \foreach \x/\y in {p1/p2,p2/p3,p3/p4,p4/p5,p5/p6} {\draw[a](\x)--(\y);}
+\end{tikzpicture}
+
+% Sơ đồ 3: Kiến trúc Tổng thể Backend
+\begin{tikzpicture}[
+  box/.style={techBoxSm=tGreen, text width=2.6cm},
+  cloud/.style={techBoxSm=tOrange, text width=2.6cm},
+  arrow/.style={sdsArrow=tGreen!80},
+  darrow/.style={sdsArrow=tOrange!80,dashed}
+]
+  \node[techBox=tGreen, text width=12cm]
+    (core) at (0,0)
+    {Động cơ trò chơi C++17 --- Cốt truyện · Bảng điều khiển · Lõi trò chơi};
+  \node[box](gs)  at (-4.5,-1.8) {Đồng bộ Truyện\\\& Vòng lặp\\Hội thoại};
+  \node[box](gc)  at (-1.5,-1.8) {Trung tâm ĐK\\+ Cài đặt\\+ Chọn Truyện};
+  \node[box](gr)  at (1.5,-1.8)  {Vòng lặp Vật lý\\+ Ghi Lưu trữ};
+  \node[box](http) at (4.5,-1.8) {Lớp Mạng HTTP\\(Máy tính \& Web)};
+
+  \node[cloud](gist)   at (-4.5,-4.8) {Dịch vụ Gist\\(Khai báo \&\\Nội dung truyện)};
+  \node[cloud](d1)     at (0.0,-4.8)  {Đám mây D1\\(Cơ sở dữ liệu\\Xếp hạng)};
+  \node[cloud](cfwork) at (4.5,-4.8)  {Máy chủ Trung gian\\(Xử lý Yêu cầu)};
+  \foreach \c in {gs,gc,gr,http}{\draw[arrow](core)--(\c.north);}
+  
+  \draw[darrow](gs.south)--(gist.north) node[midway,right,font=\tiny]{Mã băm SHA};
+  \draw[darrow](http.south)--(cfwork.north) node[midway,right,font=\tiny]{Gửi thành tích};
+  \draw[darrow](cfwork.west)--(d1.east) node[midway,above,font=\tiny]{Ghi dữ liệu};
+  \node[font=\tiny,vTag=orange] at (-4.5,-5.6){Bản 2};
+  \node[font=\tiny,vTag=red]   at (0.0,-5.6){Bản 3};
+  \node[font=\tiny,vTag=red]   at (4.5,-5.6){Bản 3};
+\end{tikzpicture}
+
+% Sơ đồ 4: Luồng đồng bộ nội dung
+\begin{tikzpicture}[
+  proc/.style={techBoxSm=tGreen, text width=3.0cm, minimum height=0.7cm},
+  dec/.style={diamond, draw=tOrange!80, fill=tOrange!8, aspect=2.4, align=center, font=\scriptsize, inner sep=1pt},
+  arr/.style={sdsArrow=tGreen!80}
+]
+  \node[proc](p0){Tải Khai báo\\từ Máy chủ};
+  \node[proc,right=0.6cm of p0](p1){Đọc Phiên bản\\Mới nhất};
+  \node[dec,right=0.6cm of p1](d0){Mã băm\\Khớp?};
+  \node[proc,right=0.6cm of d0](p2){Bỏ qua\\Chương};
+  \node[proc,below=0.8cm of d0](p3){Tải Dữ liệu\\Chương (JSON)};
+  \node[proc,left=0.6cm of p3](p4){\texttt{ApDungDuLieu()}\\+ CẬP NHẬT DB};
+  \node[proc,left=0.6cm of p4](p5){\texttt{LuuMaBam()}\\+ Đồng bộ Tệp Ảo};
+
+  \draw[arr](p0)--(p1); \draw[arr](p1)--(d0);
+  \draw[arr](d0)--node[above,font=\tiny]{Có}(p2);
+  \draw[arr](d0)--node[right,font=\tiny]{Không}(p3);
+  \draw[arr](p3)--(p4); \draw[arr](p4)--(p5);
+  \draw[sdsArrow=gray!80,dashed](p2.south) |- ([yshift=-0.5cm]p5.south) -- (p5.south);
+\end{tikzpicture}
+
+% Sơ đồ 5: Kiến trúc Lưu trữ
+\begin{tikzpicture}[
+  grp/.style={rectangle, draw=#1!60, fill=#1!8, rounded corners=4pt, thick, align=center, font=\scriptsize, inner sep=6pt},
+  tbl/.style={rectangle, draw=#1!50, fill=#1!5, rounded corners=2pt, align=left, font=\scriptsize, inner sep=4pt, text width=3.0cm},
+  arrow/.style={sdsArrow=gray!80, dashed}
+]
+  \node[grp=blue, minimum width=3.6cm, minimum height=8.0cm] (g1box) at (-4.5,0) {};
+  \node[font=\scriptsize\bfseries\color{blue}, align=center] at ([yshift=-0.85cm]g1box.south) {Nhóm 1 — Đọc/Ghi\\Người dùng};
+  
+  \node[tbl=blue] (rec) at (-4.5, 2.5) {\textbf{Bảng\_LichSu}\\ID, NguoiDung\\TGBatDau, TGKetThuc\\DiemSo, ThoiGian\\TocDo, LanChoi};
+  \node[tbl=blue] (sto) at (-4.5, 0.1) {\textbf{Bảng\_TienDo}\\NguoiDung, Truyen\\KichHoat, DaChon\\DiemCao, TocDoCao};
+  \node[tbl=blue] (set) at (-4.5, -2.4) {\textbf{Bảng\_CaiDat}\\Khoa\_ID (Chính)\\GiaTri};
+  \node[grp=purple, minimum width=3.6cm, minimum height=8.0cm] (g2box) at (0,0) {};
+  \node[font=\scriptsize\bfseries\color{purple}, align=center] at (0, -4.85) {Nhóm 2 — Dữ liệu Dùng chung};
+  \node[tbl=purple] (sd) at (0, 2.8) {\textbf{Bảng\_DuLieu}\\Truyen, Chuong\\Ten, NguongDiem\\NguongTocDo, MaTran};
+  \node[tbl=purple] (sdlg) at (0, 1.0) {\textbf{Bảng\_HoiThoai}\\Truyen, Chuong, Nut\\NhanVat, LoiThoai\\Anh, NutKeTiep};
+  \node[tbl=purple] (scho) at (0, -0.8) {\textbf{Bảng\_LuaChon}\\Nut, ChiSo\\Nhan, NutKeTiep};
+  \node[tbl=purple] (smet) at (0, -2.6) {\textbf{Bảng\_SieuDuLieu}\\Chuong\_ID\\MaBam, NgayCapNhat};
+  \node[grp=orange, minimum width=3.4cm, minimum height=4.0cm] (g3box) at (4.5, 2.0) {};
+  \node[font=\scriptsize\bfseries\color{orange}, align=center] at (4.5, -4.85) {Nhóm 3 — Đám mây};
+  \node[tbl=orange] (sync) at (4.5, 2.5) {\textbf{Bảng\_XepHang}\\TenNguoiDung, Diem\\ThoiGian, TocDo\\Truyen, Chuong};
+
+  \node[grp=orange, minimum width=3.4cm, minimum height=1.2cm] (idbfs) at (4.5, -2.6) {\textbf{Hệ thống tệp ảo}\\(Chỉ trên Web)\\Đồng bộ sau mỗi lần ghi};
+  \draw[arrow] (rec.north) -- ++(0,1.8) coordinate (top) -| (sync.north);
+  \path (top) -- (top -| sync.north) node[midway, above, font=\tiny] {Khởi tạo Bảng xếp hạng};
+  \draw[arrow](g2box.east |- g3box.west)--(g3box.west) node[midway,above,font=\tiny,align=center]{Đồng bộ D1};
+  \draw[sdsArrow=orange!80,dashed](g1box.south)--++(0,-0.5)-|(idbfs.south);
+\end{tikzpicture}
+
+% Sơ đồ 6: Hệ thống Đóng gói Đa nền tảng
+\begin{tikzpicture}[
+  b/.style={techBoxSm=tOrange, text width=2.6cm},
+  outBox/.style={techBoxSm=tGreen, text width=2.4cm},
+  arr/.style={sdsArrow=tOrange!80}
+]
+  \node[techBox=tBlue, text width=6.5cm] (src) at (0,4.0) {Mã nguồn C++ \& Cấu hình CMake};
+  \node[b](bs)  at (-3.5, 1.5) {Tập lệnh Tự động\\(Linux/Windows)};
+  \node[b](cmake) at (0, 1.5) {Hệ thống\\Xây dựng (CMake)};
+  \node[b](emsdk) at (3.5, 1.5) {Bộ công cụ Web\\(Emscripten)};
+
+  \node[outBox](nat) at (-4.5, -1.5) {Tệp chạy\\Máy tính\\(.exe/.app)};
+  \node[outBox](wasm) at (-1.5, -1.5) {Tệp Web\\(.html + .js + .wasm)};
+  \node[outBox](sa)  at (1.5, -1.5)  {Các Tệp\\Kiểm thử\\Độc lập};
+  \node[outBox](ci)  at (4.5, -1.5)  {Kết quả tự động\\(Máy chủ Tích hợp)};
+
+  \draw[arr](src)--(bs); \draw[arr](src)--(cmake); \draw[arr](src)--(emsdk);
+  \draw[arr](bs)--(nat); \draw[arr](cmake)--(nat); \draw[arr](cmake)--(sa);
+  \draw[arr, rounded corners=12pt] (emsdk.east) -- ++(2.8,0) |- ([yshift=-0.8cm]wasm.south) -- (wasm.south);
+  \draw[arr](cmake)--(wasm); \draw[arr](cmake)--(ci);
+\end{tikzpicture}
+
+% Sơ đồ 7: Chuỗi Phụ thuộc (Dependencies)
+\begin{tikzpicture}[
+  pkg/.style={techBoxSm=tOrange, text width=2.4cm},
+  from/.style={techBoxSm=tBlue, text width=2.4cm},
+  arr/.style={sdsArrow=gray!80},
+]
+  \node[from](sdl3){Thư viện SDL3\\(Tự biên dịch)};
+  \node[pkg,right=0.5cm of sdl3](nano){Xử lý ảnh Vector\\(Tệp tiêu đề đơn)};
+  \node[pkg,right=0.5cm of nano](sq){Cơ sở dữ liệu\\SQLite3};
+  \node[pkg,right=0.5cm of sq](json){Phân tích JSON\\(Tệp tiêu đề đơn)};
+  \node[pkg,right=0.5cm of json](curl){Mạng HTTP\\(Hệ thống / Web)};
+  \node[techBox=tBlue, text width=13.5cm, below=0.8cm of sq]
+    (app) {Tệp chạy Máy tính / Gói Tệp chạy Web};
+  \foreach \x in {sdl3,nano,sq,json,curl} {\draw[arr](\x)--(app.north -| \x);}
+\end{tikzpicture}
+
+% Sơ đồ 8: Luồng 1 - Phát hành Web
+\begin{tikzpicture}[
+  job/.style={techBoxSm=tOrange, text width=2.6cm, minimum height=1.0cm},
+  trig/.style={techBoxSm=tBlue, text width=2.4cm},
+  outBox/.style={techBoxSm=tGreen, text width=2.4cm},
+  cSide/.style={rectangle, draw=gray!50, fill=gray!6, rounded corners=2pt, font=\tiny, align=center, inner sep=3pt, text width=2.2cm},
+  arr/.style={sdsArrow=tOrange!80}, darr/.style={sdsArrow=gray!80, dashed}
+]
+  \node[trig](trig) at (-5.5,0) {Đẩy mã lên\\Nhánh chính};
+  \node[job](cfg) at (-2.6,0) {\textbf{Tác vụ 0}\\Xác định Môi trường};
+  \node[job](bld) at (0.8,0) {\textbf{Tác vụ 1}\\Biên dịch Web \& Đẩy tệp lên};
+  \node[job](dep) at (4.2,0) {\textbf{Tác vụ 2}\\Phát hành Trang};
+  \node[outBox](url) at (4.2,-1.8) {Liên kết Trò chơi Trực tuyến};
+  \node[cSide](cache) at (0.8,-1.8) {Bộ nhớ đệm:\\Tải Thư viện \& Công cụ};
+  \node[cSide](art) at (0.8,1.6) {Báo cáo:\\Nhật ký biên dịch};
+
+  \draw[arr](trig)--(cfg);
+  \draw[arr](cfg)--(bld) node[above,font=\tiny,midway]{HĐH}; \draw[arr](bld)--(dep); \draw[arr](dep)--(url);
+  \draw[darr](cache)--(bld); \draw[darr](bld)--(art);
+\end{tikzpicture}
+
+% Sơ đồ 9: Luồng 2 - Đồng bộ Truyện lên Gist
+\begin{tikzpicture}[
+  cStep/.style={techBoxSm=tGreen, text width=2.8cm, minimum height=0.95cm},
+  trig/.style={techBoxSm=tBlue, text width=2.4cm},
+  cSide/.style={rectangle, draw=gray!50, fill=gray!6, rounded corners=2pt, font=\tiny, align=center, inner sep=3pt, text width=2.8cm},
+  arr/.style={sdsArrow=tGreen!80}, darr/.style={sdsArrow=gray!80, dashed}
+]
+  \node[trig](trig) at (-5.2,0) {Đẩy mã Truyện\\hoặc Thủ công};
+  \node[cStep](s0) at (-2.0,0) {\textbf{Bước 0}\\Xác thực Khóa API};
+  \node[cStep](s1) at (1.2,0) {\textbf{Bước 1}\\Đồng bộ Chương};
+  \node[cStep](s2) at (4.4,0) {\textbf{Bước 2}\\Tái tạo tệp Khai báo};
+  \node[cStep](s3) at (7.6,0) {\textbf{Bước 3}\\In Liên kết tải truyện};
+  \node[cSide](ver) at (7.6,-1.8) {Cập nhật Liên kết vào Cấu hình ứng dụng};
+  \node[cSide](sha) at (-2.0,-1.8) {Chặn lỗi từ đầu nếu Khóa không đủ quyền};
+  
+  \draw[arr](trig)--(s0); \draw[arr](s0)--(s1); \draw[arr](s1)--(s2); \draw[arr](s2)--(s3);
+  \draw[darr](s3)--(ver); \draw[darr](s0)--(sha);
+\end{tikzpicture}
+
+% Sơ đồ 10: Luồng 3 - Kiểm tra Biên dịch
+\begin{tikzpicture}[
+  cStep/.style={techBoxSm=tPurple, text width=2.4cm, minimum height=0.95cm},
+  os/.style={rectangle, draw=tPurple, fill=tPurple!8, rounded corners=3pt, font=\scriptsize\bfseries, align=center, inner sep=5pt, minimum width=2.0cm, minimum height=0.7cm},
+  trig/.style={techBoxSm=tBlue, text width=2.4cm},
+  arr/.style={sdsArrow=tPurple!80}, darr/.style={sdsArrow=gray!80, dashed}
+]
+  \node[trig](trig) at (0,0) {Đẩy mã lên\\Nhánh Phụ};
+  \node[os](win)  at (3.0, 1.2) {Windows};
+  \node[os](ubu)  at (3.0, 0.0) {Ubuntu};
+  \node[os](mac)  at (3.0,-1.2) {macOS};
+  \node[cStep](setup) at (5.8,0) {\textbf{Bước 1}\\Cài Thư viện};
+  \node[cStep](nat)   at (8.6,0) {\textbf{Bước 2}\\Biên dịch Máy tính};
+  \node[cStep](wasm)  at (11.4,0) {\textbf{Bước 3}\\Biên dịch Web};
+  \node[rectangle, draw=gray!50, fill=gray!6, rounded corners=2pt, font=\tiny, align=center, inner sep=3pt, text width=2.2cm, right=0.5cm of wasm] (res) {Báo cáo \&\\Lưu Nhật ký lỗi};
+
+  \foreach \os in {win,ubu,mac}{ \draw[arr](trig)--(\os); \draw[arr](\os)--(setup); }
+  \draw[arr](setup)--(nat); \draw[arr](nat)--(wasm); \draw[darr](wasm)--(res);
+\end{tikzpicture}
+
+% Sơ đồ 11: Luồng 4 - Triển khai Cloudflare
+\begin{tikzpicture}[
+  cStep/.style={techBoxSm=tOrange, text width=2.4cm, minimum height=0.95cm},
+  trig/.style={techBoxSm=tBlue, text width=2.4cm},
+  cSide/.style={rectangle, draw=gray!50, fill=gray!6, rounded corners=2pt, font=\tiny, align=center, inner sep=3pt, text width=2.4cm},
+  arr/.style={sdsArrow=tOrange!80}, darr/.style={sdsArrow=gray!80, dashed}
+]
+  \node[trig](trig) at (0,0) {Đẩy mã Mạng\\(API)};
+  \node[cStep](s0) at (3.2,0) {\textbf{Bước 0}\\Xác thực Khóa};
+  \node[cStep](s1) at (6.4,0) {\textbf{Bước 1}\\Đẩy mã Máy chủ};
+  \node[cStep](s2) at (9.6,0) {\textbf{Bước 2}\\Kiểm tra Sức khỏe};
+  \node[cSide](apiInfo) at (9.6,-1.8) {Gọi API xem hoạt động chưa, xuất thông báo};
+
+  \draw[arr](trig)--(s0); \draw[arr](s0)--(s1); \draw[arr](s1)--(s2); \draw[darr](s2)--(apiInfo);
+\end{tikzpicture}
+
+\end{document}

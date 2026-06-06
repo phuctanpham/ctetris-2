@@ -1,0 +1,249 @@
+% !TEX TS-program = lualatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass{article}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\graphicspath{{doc/assets/}{../doc/assets/}{assets/}{../assets/}{../}}
+
+\usepackage[
+  paperwidth=338mm, paperheight=190mm,
+  top=0mm, bottom=0mm, left=0mm, right=0mm
+]{geometry}
+
+% -- ROBUST FONT FIX FOR LUALATEX & OVERLEAF --
+\usepackage{fontspec}
+\IfFontExistsTF{Roboto}{
+  \setsansfont{Roboto}
+}{
+  \IfFontExistsTF{Arial}{
+    \setsansfont{Arial}[
+      ItalicFont={Arial},
+      ItalicFeatures={FakeSlant=0.25},
+      BoldFont={Arial Bold},
+      BoldItalicFont={Arial Bold},
+      BoldItalicFeatures={FakeSlant=0.25}
+    ]
+  }{
+    \IfFontExistsTF{Noto Sans}{
+      \setsansfont{Noto Sans}
+    }{
+      \IfFontExistsTF{Liberation Sans}{
+        \setsansfont{Liberation Sans}
+      }{
+        \IfFontExistsTF{TeX Gyre Heros}{
+          \setsansfont{TeX Gyre Heros}
+        }{
+          % Fallback mặc định
+        }
+      }
+    }
+  }
+}
+\renewcommand{\familydefault}{\sfdefault}
+% ---------------------------------------------
+
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{fontawesome5}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{calc, matrix, arrows.meta, shapes.geometric}
+\usepackage[hidelinks]{hyperref}
+\pagestyle{empty}
+\parindent=0pt
+
+\newcommand{\TOCitem}[1]{{\color{sap}\vrule width 2pt height 8pt depth 0pt}\ #1}
+
+%── Bảng màu chuẩn hóa thanh lịch (Pure Blue/Yellow)
+\definecolor{sap}{HTML}{0000FF}           % Primary: Xanh lam thuần
+\definecolor{cyel}{HTML}{FFFF00}         % Secondary: Vàng thuần
+\definecolor{cslate}{HTML}{64748B}
+\definecolor{cneg}{HTML}{D32F2F}
+\definecolor{cpos}{HTML}{2E7D32}
+\definecolor{cgry}{HTML}{757575}
+\definecolor{clightgray}{HTML}{F8F9FA}
+
+% Màu nền khối Insight Box
+\definecolor{cgr}{HTML}{2E7D32}
+\definecolor{cbl}{HTML}{1565C0}
+\definecolor{cbk}{HTML}{424242}
+\colorlet{bggr}{cgr!8}
+\colorlet{bgbl}{cbl!8}
+\colorlet{bgbk}{cbk!8}
+
+%── Định hình cấu trúc pgfplots hóa biểu đồ
+\pgfplotsset{
+  empty legend/.style={draw=none, fill=none},
+  dashmod/.style={dashed, line width=2.5pt, mark=none},
+  solproj/.style={solid,  line width=2.5pt, mark=none},
+  hlchart/.style={
+    clip=false,
+    scale only axis=true,
+    xmin=0.5, xmax=7.5, ymin=0, ymax=5.9,
+    xtick={1,2,3,4,5,6,7},
+    xticklabels={W1,W2,W3,{W4$^\star$},W5,W6,W7},
+    x tick label style={font=\fontsize{15}{18}\selectfont, text=cgry!80!black},
+    y tick label style={font=\fontsize{15}{18}\selectfont, text=cgry!80!black},
+    ylabel={},
+    xlabel={},
+    grid=both,
+    minor ytick={0,0.5,...,5.5},
+    minor grid style={gray!8,  line width=0.15pt},
+    major grid style={gray!18, line width=0.30pt},
+    axis line style={gray!35,  line width=0.40pt},
+    tick style={gray!35, line width=0.40pt},
+    legend style={
+      at={(0.5, -0.12)},
+      anchor=north,
+      font=\fontsize{14}{17}\selectfont,
+      draw=none, fill=none,
+      legend columns=4,
+      column sep=4ex,
+      row sep=1ex
+    },
+    legend cell align=left,
+  }
+}
+
+%── Hệ thống các Macros tạo khối giao diện nhanh
+\newcommand{\Card}[7]{%
+  \begin{scope}[shift={(#1mm,#2mm)}]
+    \fill[clightgray,rounded corners=4pt] (0,0) rectangle (50mm,32mm);
+    \node[anchor=north west, font=\fontsize{11}{13}\selectfont\color{cslate}, text width=42mm] at (4mm, 28mm) {\MakeUppercase{#3}};
+    \node[anchor=north west, font=\fontsize{28}{32}\selectfont\bfseries\color{sap}] at (4mm, 23mm) {#4};
+    \node[anchor=north west, font=\fontsize{12}{14}\selectfont\color{#7}] at (4mm, 9mm) {#6 \textcolor{cslate!75}{(D.Án: #5)}};
+  \end{scope}
+}
+
+\newcommand{\Insight}[9]{%
+  \begin{scope}[shift={(#1mm,#2mm)}]
+    \fill[#3,rounded corners=4pt] (0,0) rectangle (98mm,50mm);
+    \node[anchor=north west, font=\fontsize{22}{26}\selectfont\color{#4}] at (4mm, 46mm) {#5};
+    \node[anchor=north west, text width=92mm, align=left] at (4mm, 37mm) {
+        \fontsize{10.5}{13.5}\selectfont\color{#4!35!black}
+        \textbullet\ \ #6 \par \textbullet\ \ #7 \par \textbullet\ \ #8 \par \vspace{3.5pt}
+        \textcolor{#4}{\faHandPointRight}\ \ \textbf{#9}
+    };
+  \end{scope}
+}
+
+\newcommand{\TitleLine}[1]{%
+  \draw[cyel, line width=6pt] (17mm, -10mm) -- (17mm, -25mm);
+  \node[anchor=west, font=\fontsize{35}{40}\selectfont\bfseries, text=sap] at (21mm, -17.5mm) {#1};
+}
+
+\newcommand{\ContentBox}[4]{%
+  \begin{scope}[shift={(#1mm,#2mm)}]
+    \fill[clightgray, rounded corners=4pt] (0,0) rectangle (95mm,42mm);
+    \node[anchor=north west, font=\fontsize{16}{20}\selectfont\bfseries\color{sap}, text width=85mm] at (5mm, 37mm) {#3};
+    \node[anchor=north west, font=\fontsize{12}{16}\selectfont\color{cbk}, text width=85mm] at (5mm, 22mm) {#4};
+  \end{scope}
+}
+
+\newcommand{\vtwomark}{%
+  \addplot[black!22,solid,line width=1.5pt,mark=none,forget plot] coordinates{(3.5,0)(3.5,5.9)};
+  \node[font=\fontsize{15}{18}\selectfont,text=black!38,anchor=south west] at (axis cs:3.55,5.4) {V2$\to$};
+}
+
+\begin{document}
+
+% ===================================================================
+% SLIDE 7: Phân hệ tuyến truyện - Tổng quát (Kế thừa dữ liệu sơ đồ từ PDF Trang 4)
+% ===================================================================
+\begin{tikzpicture}[remember picture, overlay]
+  \coordinate (NW) at (current page.north west);
+  \begin{scope}[shift={(NW)}]
+    \TitleLine{Phân hệ tuyến truyện - Tổng quát}
+
+    \ContentBox{17}{-65}{Hệ thống Tiểu thuyết Trực quan}{Quản lý hội thoại rẽ nhánh và bối cảnh thông qua bộ máy trạng thái.}
+    \ContentBox{17}{-108}{Đồng bộ Dữ liệu Mã băm (SHA)}{Kiểm tra và tải nội dung chương mới từ Gist API thời gian thực.}
+    \ContentBox{17}{-151}{Xử lý Đồ họa Vector (SVG)}{Phân tích và chuyển đổi SVG sang kết cấu đồ họa tối ưu 60 FPS.}
+
+    % Khối sơ đồ Usecase tuyến truyện tái lập trung thực theo sơ đồ trang 4 PDF gốc
+    \begin{scope}[shift={(165mm, -55mm)}, scale=1.35, every node/.append style={transform shape}]
+        \draw[cslate, thick, rounded corners=4pt] (0,0) rectangle (7.5,-5.5);
+        \node[anchor=north, font=\fontsize{12}{14}\selectfont\bfseries\color{sap}] at (3.75, -0.2) {Sơ đồ usecase (Tuyến truyện)};
+        
+        \node[circle, draw=cslate, fill=clightgray, minimum size=0.8cm] (p) at (-1.6, -2.7) {};
+        \node[below=2pt, font=\fontsize{11}{13}\selectfont\color{cbk}] at (p.south) {Người chơi};
+        
+        \node[circle, draw=sap, fill=clightgray, minimum size=0.8cm] (net) at (9.1, -2.7) {};
+        \node[below=2pt, font=\fontsize{11}{13}\selectfont\color{cbk}] at (net.south) {Máy chủ};
+        
+        \begin{scope}[every node/.style={ellipse, draw=cslate, fill=white, minimum width=3.5cm, inner sep=2pt, font=\fontsize{9}{11}\selectfont\color{cbk}}]
+            \node (u1) at (3.75,-1.1) {Xem/Bỏ qua intro};
+            \node (u2) at (3.75,-2.0) {Đọc hội thoại};
+            \node (u3) at (3.75,-2.9) {Lựa chọn nhánh};
+            \node (u4) at (3.75,-3.8) {Nhận thông báo};
+            \node (u5) [draw=sap, font=\fontsize{9}{11}\selectfont\bfseries\color{sap}] at (3.75,-4.7) {Đồng bộ Gist API};
+        \end{scope}
+
+        \foreach \i in {1,2,3,4} \draw[->, thick, draw=cslate] (p) -- (u\i.west);
+        \draw[->, thick, draw=sap] (net) -- (u5.east);
+        \draw[->, thick, dashed, draw=sap] (u5.north) to[bend right=30] (u2.east);
+    \end{scope}
+
+    \node[anchor=north west, text width=290mm, font=\fontsize{13}{17}\selectfont\color{cbk}] at (17mm, -156mm) {
+        \textbf{Đặc điểm cốt lõi:} Kết hợp hiển thị đồ họa Vector (SVG/TTF) và logic hội thoại rẽ nhánh.
+        Dữ liệu cốt truyện được đồng bộ mã băm (SHA) theo thời gian thực từ Gist API, cho phép cập nhật nội dung chương mới mà không cần biên dịch lại mã nguồn hệ thống.
+    };
+  \end{scope}
+\end{tikzpicture}
+\newpage
+
+% ===================================================================
+% SLIDE 8: Phân hệ tuyến truyện - V1 vs V2
+% ===================================================================
+\begin{tikzpicture}[remember picture, overlay]
+  \coordinate (NW) at (current page.north west);
+  \begin{scope}[shift={(NW)}]
+    \TitleLine{Phân hệ tuyến truyện - V1 vs V2}
+    \node[anchor=north west, label={[sap]below:V1}] at (17mm, -35mm) {
+      \includegraphics[width=95mm, height=135mm, keepaspectratio]{08-gameStoryGuide-screenshot.png}
+    };
+    \draw[red, dashed, line width=2.5pt] (122mm, -35mm) -- (122mm, -170mm);
+    \node[anchor=north west, label={[sap]below:V2 - Loading}] at (132mm, -35mm) {
+      \includegraphics[width=95mm, height=135mm, keepaspectratio]{08-gameStoryGuide-screenshot-v2.png}
+    };
+    \node[anchor=north west, label={[sap]below:V2 - Dialogue}] at (232mm, -35mm) {
+      \includegraphics[width=95mm, height=135mm, keepaspectratio]{08-gameStoryGuide-screenshot-v2-dialogue.png}
+    };
+  \end{scope}
+\end{tikzpicture}
+\newpage
+
+% ===================================================================
+% SLIDE 9: Phân hệ tuyến truyện - Thống kê (Áp dụng khung lưới trục từ PDF Trang 5)
+% ===================================================================
+\begin{tikzpicture}[remember picture, overlay]
+  \coordinate (NW) at (current page.north west);
+  \begin{scope}[shift={(NW)}]
+      \TitleLine{Phân hệ tuyến truyện - Thống kê}
+      \Card{17}{-58}{Tổng Tin Nhắn}{69.4}{206.3}{$\downarrow$\,17.5\,\%}{cpos}
+      \Card{71}{-58}{Tin Nhắn (Người)}{58.3}{172.8}{$\downarrow$\,19.9\,\%}{cpos}
+      \Card{17}{-94}{Task Hoàn Thành}{16.9}{61.7}{$\downarrow$\,5.3\,\%}{cpos}
+      \Card{71}{-94}{Lỗi Phát Sinh}{15.0}{47.9}{$\uparrow$\,13.2\,\%}{cneg}
+      \Card{17}{-130}{Tổng Commits}{50.5}{163.5}{$\downarrow$\,12.6\,\%}{cpos}
+      \Card{71}{-130}{Xung Đột}{15.8}{47.4}{$\uparrow$\,3.6\,\%}{cneg}
+      
+      % Hệ thống biểu đồ lưới nẹp trục số liệu hoàn chỉnh cho phân hệ gameStory
+      \begin{axis}[at={(127mm,-106mm)},anchor=south west, width=194mm,height=80mm,hlchart]
+        \vtwomark
+        \addlegendimage{empty legend}\addlegendentry{\textbf{Phân hệ}}
+        \addplot[cgr,dashmod] coordinates{(1,.88)(2,.88)(3,.88)(4,.79)(5,.79)(6,.79)(7,.62)}; \addlegendentry{human/bot}
+        \addplot[cbl,dashmod] coordinates{(1,.42)(2,.42)(3,.42)(4,3.37)(5,1.86)(6,1.86)(7,1.33)}; \addlegendentry{issue/task}
+        \addplot[cbk,dashmod] coordinates{(1,.24)(2,.24)(3,.24)(4,.61)(5,.27)(6,.27)(7,.49)}; \addlegendentry{conflict/commit}
+        \addlegendimage{empty legend}\addlegendentry{\textbf{Dự án}}
+        \addplot[cgr,solproj] coordinates{(1,.88)(2,.88)(3,.88)(4,.78)(5,.78)(6,.78)(7,.62)}; \addlegendentry{human/bot}
+        \addplot[cbl,solproj] coordinates{(1,.32)(2,.32)(3,.32)(4,3.60)(5,2.10)(6,2.10)(7,1.49)}; \addlegendentry{issue/task}
+        \addplot[cbk,solproj] coordinates{(1,.20)(2,.20)(3,.20)(4,.66)(5,.29)(6,.29)(7,.49)}; \addlegendentry{conflict/commit}
+      \end{axis}
+      
+      \Insight{17}{-184}{bggr}{cgr}{\faSlack}{Sp1 (W1-2): Bắt đầu ở 0.88 – AI hỗ trợ SVG.}{Sp2 (W3-4): Duy trì 0.79 – cốt truyện phức tạp.}{Sp3 (W5-7): Đạt 0.62 sau khi API ổn định.}{Thuần túy hướng nội thích làm hơn nói chuyện vì phần lớn tin nhắn báo commit mới từ bot ở phân hệ này.}
+      \Insight{120}{-184}{bgbl}{cbl}{\faTrello}{Sp1 (W1-2): Tỷ lệ lỗi cao ngay từ đầu (0.42).}{Sp2 (W3-4): Đỉnh 3.37 – hệ thống hội thoại.}{Sp3 (W5-7): Giảm tốt về 1.33 sau refactor.}{Phân hệ này ứng dụng các thư viện đa phương tiện (SFML, SDL) từ sớm và khó nhất nên lỗi xuất hiện sớm.}
+      \Insight{223}{-184}{bgbk}{cbk}{\faGithub}{Sp1 (W1-2): Git ratio cao hơn chuẩn (0.24).}{Sp2 (W3-4): Lên 0.61 khi tích hợp Gist API.}{Sp3 (W5-7): Ổn định 0.49 sau khi SHA sync vận hành.}{Tương tự phân hệ khác, tỷ lệ xung đột tăng vào thời điểm tích hợp, khả năng cao lỗi từ khâu thiết kế phần mềm.}
+  \end{scope}
+\end{tikzpicture}
+\newpage
+
+\end{document}

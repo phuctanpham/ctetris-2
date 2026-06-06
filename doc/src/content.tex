@@ -83,41 +83,37 @@
       \fi\fi\fi
     }%
     \InputContentFile{#1}%
+    \clearpage % ĐẨY TRANG RA TRƯỚC KHI ĐÓNG SCOPE (Sửa lỗi ID)
   }%
 }
 
 % --- NỘI DUNG CHÍNH ---
 
 % Preface
-\InputContentFile{01-Preface.tex}
+\InputContentFile{01-Preface.tex} \clearpage
 
 % A/ TÀI LIỆU ĐẶC TẢ YÊU CẦU (SRS)
-\ContentGroup{A}{đặc tả yêu cầu (SRS)}
-\InputGroupedContentFile{02-gameRequirements.tex} \clearpage
+\InputGroupedContentFile{02-gameRequirements.tex}
 
 % B/ TÀI LIỆU ĐẶC TẢ KỸ THUẬT (SDS)
-\ContentGroup{B}{đặc tả kỹ thuật (SDS)}
-\InputGroupedContentFile{03-gameEngineering.tex} \clearpage
+\InputGroupedContentFile{03-gameEngineering.tex}
 
 % C/ HƯỚNG DẪN CÀI ĐẶT VÀ SỬ DỤNG
-\ContentGroup{C}{Hướng dẫn sử dụng}
-\InputGroupedContentFile{04-gameGuide.tex} \clearpage
+\InputGroupedContentFile{04-gameGuide.tex}
 
 % D/ KIỂM THỬ VÀ KIỂM SOÁT CHẤT LƯỢNG
-\ContentGroup{D}{Kiểm thử và kiểm soát chất lượng}
-\InputGroupedContentFile{05-gameTest.tex} \clearpage
+\InputGroupedContentFile{05-gameTest.tex}
 
 % E/ QUẢN LÝ DỰ ÁN
-\ContentGroup{E}{Quản lý}
-\InputGroupedContentFile{06-gameMilestones.tex} \clearpage
+\InputGroupedContentFile{06-gameMilestones.tex}
 
 % F/ QUY HOẠCH TÀI NGUYÊN VÀ ĐỊNH HƯỚNG NHÂN LỰC
-\ContentGroup{F}{Quy hoạch}
-\InputGroupedContentFile{07-gameTechnologies.tex} \clearpage
+\InputGroupedContentFile{07-gameTechnologies.tex}
+
+% G/ QUY HOẠCH TÀI NGUYÊN VÀ ĐỊNH HƯỚNG NHÂN LỰC
 \InputGroupedContentFile{08-gameSkills.tex}
 
-% G/ CÁC NỘI DUNG KHÁC
-\ContentGroup{G}{Tài liệu tham khảo}
-\InputGroupedContentFile{00-References.tex} \clearpage
+% H/ CÁC NỘI DUNG KHÁC
+\InputGroupedContentFile{00-References.tex}
 
 \end{document}
