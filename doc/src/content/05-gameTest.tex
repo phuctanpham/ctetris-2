@@ -1,0 +1,154 @@
+% !TEX TS-program = lualatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
+\usepackage{docmute}
+\hypersetup{pdftitle={Chiến lược \& Danh sách Kịch bản Kiểm thử}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{05-gameTest}{LastPageTesting}
+\onehalfspacing
+
+\section{Chiến lược và Danh sách Kiểm thử}
+
+Tài liệu này hợp nhất Chiến lược Kiểm thử và Danh sách Kịch bản Kiểm thử cho dự án trò chơi xếp hình.
+
+% ── CHIẾN LƯỢC ──────────────────────────────────────────────────────
+\subsection{Tổng quan Chiến lược Kiểm thử}
+
+Chiến lược áp dụng cho ba phân hệ: Lõi trò chơi (lối chơi), Bảng điều khiển (giao diện, vòng lặp trò chơi), và Cốt truyện (nội dung, hội thoại).
+
+\textbf{Mục tiêu Kiểm thử:}
+\begin{enumerate}[nosep]
+  \item Bảo đảm luật chơi chính xác (khối rơi, xoay, va chạm, xóa dòng).
+  \item Phản hồi thời gian thực không độ trễ.
+  \item Giảm thiểu lỗi tích hợp giữa các lập trình viên.
+  \item Duy trì sự nhất quán của giao diện và trạng thái.
+  \item Phát hiện sớm lỗi hồi quy khi thêm tính năng mới.
+  \item Hiệu năng ổn định trên nhiều cấu hình thiết bị.
+\end{enumerate}
+
+\textbf{Phạm vi Kiểm thử:}
+\begin{itemize}[nosep]
+  \item \textbf{Phân hệ Lõi trò chơi (Ưu tiên Cao):} Xử lý 7 loại khối, cơ chế xoay khối chuẩn, phát hiện va chạm, tính điểm, quản lý vòng đời ván chơi, độ khó tăng dần.
+  \item \textbf{Phân hệ Bảng điều khiển (Ưu tiên Trung bình):} Bắt phím, hiển thị lưới chơi/điểm, đảm bảo khung hình 60 FPS, quản lý trạng thái trình đơn, tương thích thiết bị đầu cuối.
+  \item \textbf{Phân hệ Cốt truyện (Ưu tiên Thấp):} Kích hoạt sự kiện cốt truyện, hiển thị văn bản không làm giật trò chơi, dễ mở rộng nội dung.
+  \item \textbf{Tích hợp:} Sự đồng bộ giữa Lõi và Bảng điều khiển, giữa Lõi và Cốt truyện, luồng hoạt động từ đầu đến cuối, và kiểm tra sức chịu tải dài hạn.
+\end{itemize}
+
+\subsubsection{Mô hình Phân lớp}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|l|p{6cm}|c|c|}
+\hline
+\rowcolor{gray!35}
+\textbf{Tầng} & \textbf{Đối tượng} & \textbf{Công cụ} & \textbf{Tự động} \\ \hline
+Đơn vị (Unit) & Từng hàm độc lập của các phân hệ & Khung kiểm thử chuẩn & 100\% \\ \hline
+Tích hợp & Sự giao tiếp giữa Lõi $\leftrightarrow$ Giao diện $\leftrightarrow$ Truyện & Dữ liệu giả lập & 70\% \\ \hline
+Hệ thống & Toàn bộ hệ thống, tính tương thích & Thủ công/Kịch bản & 40\% \\ \hline
+Hồi quy & Chạy sau mỗi thay đổi mã nguồn & Hệ thống CI/CD & 100\% \\ \hline
+Hiệu năng & Tốc độ khung hình, độ trễ, bộ nhớ & Công cụ đo lường & Một phần \\ \hline
+Sử dụng & Cảm giác điều khiển, độ khó & Chơi thử thực tế & 0\% \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Đánh giá Rủi ro}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|p{5.5cm}|c|c|l|}
+\hline
+\rowcolor{gray!35}
+\textbf{Rủi ro} & \textbf{Phân hệ} & \textbf{Mức độ} & \textbf{Kiểu} \\ \hline
+Sai logic va chạm, xếp khối, hoặc tính điểm & Lõi & Cao & Đơn vị \\ \hline
+Sai điều kiện kết thúc hoặc chơi lại & Lõi & Cao & Hệ thống \\ \hline
+Trạng thái hiển thị khác với logic bên dưới & Lõi $\leftrightarrow$ Giao diện & Cao & Tích hợp \\ \hline
+Giao diện và Điểm số không đồng bộ & Giao diện & Trung bình & Tích hợp \\ \hline
+Sự kiện truyện kích hoạt sai lúc & Truyện & Trung bình & Tích hợp \\ \hline
+Giật hình khi chơi tốc độ cao & Giao diện & Trung bình & Hiệu năng \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+% ── DANH SÁCH ──────────────────────────────────────────────────────
+\subsection{Danh sách Kịch bản Kiểm thử}
+
+\subsubsection{Yêu cầu Môi trường \& Tích hợp}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|p{4.5cm}|p{8.5cm}|}
+\hline
+\rowcolor{gray!35}
+\textbf{Tiêu chí} & \textbf{Mô tả} \\ \hline
+Môi trường biên dịch & Ngôn ngữ C++ chuẩn 17, hệ thống xây dựng CMake bản 3.15+. Hỗ trợ Đa hệ điều hành. \\ \hline
+Kiểm tra Lưới hiển thị & Tất cả các ô và khối phải vuông tỷ lệ 1:1, viền sắc nét, không biến dạng hình chữ nhật kể cả khi thay đổi kích thước cửa sổ. \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Kiểm thử Phân hệ Cốt truyện}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|p{2.2cm}|p{10.8cm}|}
+\hline
+\rowcolor{gray!35}
+\textbf{Mã} & \textbf{Nội dung Kiểm thử} \\ \hline
+PB1: BỐ CỤC & Khởi chạy ứng dụng. Cửa sổ hiển thị đúng tỷ lệ dọc 9:16, không bị kéo dãn. \\ \hline
+PB1: BIỂU TRƯNG & Biểu trưng và thông tin phát triển hiện lên giữa màn hình với hiệu ứng hiện dần mượt mà, kèm âm thanh xuất hiện. \\ \hline
+PB1: THANH TẢI & Thanh tải dữ liệu xuất hiện, tăng từ 0 đến 100\% đúng bằng thời gian biểu trưng hiện, và tự động chuyển màn hình khi hoàn tất. \\ \hline
+PB2: HỘI THOẠI & Vào chế độ đọc truyện. Nhân vật, lời thoại, nhạc nền hoạt động trơn tru. \\ \hline
+PB2: BỎ QUA & Đang ở cảnh truyện hoặc khởi động, nhấn Phím Bỏ qua. Chuyển ngay lập tức vào trình đơn chính, ngắt nhạc đúng lúc, không lỗi ứng dụng. \\ \hline
+PB3: ĐÁM MÂY & Tải tài nguyên hình ảnh/âm thanh từ máy chủ đám mây. Lưu tệp cục bộ thành công. Thanh tải dữ liệu tăng theo tiến trình tải tệp thực tế (chứ không theo thời gian). Xử lý tốt khi mất mạng. \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Kiểm thử Phân hệ Bảng điều khiển (Giao diện \& Cài đặt)}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|p{2.2cm}|p{10.8cm}|}
+\hline
+\rowcolor{gray!35}
+\textbf{Mã} & \textbf{Nội dung Kiểm thử} \\ \hline
+PB1 HƯỚNG DẪN & Nhấn mở cửa sổ Hướng dẫn. Nội dung rõ ràng, đóng mở bình thường, không rò rỉ bộ nhớ khi mở đóng liên tục. \\ \hline
+PB1 XẾP HẠNG & Nhấn mở cửa sổ Xếp hạng. Các cột điểm/thời gian/tên phân biệt rõ, đóng mở bình thường, tự cuộn nếu dài. \\ \hline
+PB1: NHẠC NỀN & Nhạc nền phát liên tục, không bị cắt khi mở đóng cửa sổ nhỏ, dừng đúng lúc khi thoát. \\ \hline
+PB2: CÀI ĐẶT & Mở Cài đặt, đổi âm lượng và màu khối. Nếu đóng mà không Lưu thì cài đặt cũ giữ nguyên. Thay đổi âm lượng phải nhận tác dụng ngay. Màu khối mới xuất hiện ở ván chơi kế. \\ \hline
+PB2: NÚT CHƠI & Bấm nút Chơi. Xử lý chính xác việc nạp nhạc nền trò chơi, đóng giao diện trình đơn và gọi Phân hệ Lõi. Nhấn liên tục không làm treo máy. \\ \hline
+PB3: ĐÁM MÂY & Mở Xếp hạng, hệ thống gọi Máy chủ Đám mây. Bảng xếp hạng nạp thông tin điểm số trên mạng. Xử lý khi mất mạng an toàn (không sập). \\ \hline
+PB3: SẮP XẾP & Nhấn sắp xếp Điểm (Tăng/Giảm), Thời gian (Mới/Cũ). Kiểm tra thuật toán sắp xếp hiển thị thứ tự đúng. Đóng mở cửa sổ giữ nguyên tùy chọn sắp xếp. \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Kiểm thử Phân hệ Lõi (Lối chơi Vật lý)}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|p{2cm}|p{11cm}|}
+\hline
+\rowcolor{gray!35}
+\textbf{Mã} & \textbf{Nội dung Kiểm thử} \\ \hline
+LÕI: KHỐI & Hệ thống sinh 7 loại khối ngẫu nhiên (L, I, T, Z-trái, Z-phải, O) đủ các ô, đúng hình dạng, và màu sắc theo cài đặt (Không lặp lại liên tục 1 khối). \\ \hline
+LÕI: VẬT LÝ & Thả khối rơi tự do, tốc độ đều. Điều khiển trái/phải, xoay. Va chạm đáy hoặc khối khác sẽ dừng ngay lập tức, không xếp chồng lên nhau. Thử xoay khối khi đang sát mép tường. \\ \hline
+LÕI: XÓA DÒNG & Gồm nhiều kịch bản: (A) Xóa 1 hàng, các hàng trên dịch xuống 1 bậc. (B) Xóa 2-4 hàng cùng lúc. (C) Hàng đầy ở giáp biên trên cùng. (D) Xóa hàng không được ghi đè lên các ô viền bức tường. Các ô trống phải là ký tự rỗng chuẩn.\\ \hline
+LÕI: ĐIỂM SỐ & Ghi điểm đúng chuẩn (Ví dụ: Xóa 4 dòng cùng lúc nhận điểm cao hơn nhiều so với xóa 1 dòng). Tốc độ rơi của khối tăng dần khi chạm các mốc điểm cao hơn, nhưng không bao giờ vượt qua giới hạn không thể chơi. Nếu không xóa được dòng nào thì tốc độ giữ nguyên. \\ \hline
+LÕI: NHÌN TRƯỚC & Luôn luôn hiển thị đúng 3 khối sắp rơi tiếp theo theo đúng trật tự. \\ \hline
+LÕI: ĐIỀU KHIỂN & Bấm phím Dừng thì khối phải ngừng rơi và nhạc tắt. Nhấn Nút Bỏ cuộc thì thoát ra ngoài, trò chơi không được chạy ngầm. \\ \hline
+LÕI: KẾT THÚC & Chơi cố tình để thua. Cho phép nhập tên, báo cáo điểm và gọi API Đám mây lưu trữ thành công. API trả về mã thành công. \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\label{LastPageTesting}
+\end{document}

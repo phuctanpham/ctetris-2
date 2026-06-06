@@ -1,0 +1,474 @@
+% !TEX TS-program = lualatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
+\usepackage{docmute}
+
+\hypersetup{pdftitle={Hướng dẫn sử dụng - Tổng hợp hệ thống}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{04-gameGuide}{LastPageUserGuide}
+\onehalfspacing
+
+\section{Hướng dẫn Sử dụng: Tổng hợp Hệ thống}
+
+Tài liệu này hướng dẫn cách tương tác với ba phân hệ cốt lõi của trò chơi: \textbf{Phân hệ Cốt truyện}, \textbf{Phân hệ Bảng điều khiển}, và \textbf{Phân hệ Lõi trò chơi}.
+
+% ======================================================================
+% PHẦN 1: PHÂN HỆ CỐT TRUYỆN
+% ======================================================================
+\subsection{Phân hệ Cốt truyện (Màn hình Mở đầu \& Dẫn dắt)}
+
+Đây là đoạn mở đầu ngắn 8 giây, đóng vai trò chào mừng và tải dữ liệu trước khi chuyển đến màn hình điều khiển chính.
+
+\subsubsection{Giao diện Phiên bản 1 (Tự động hoàn toàn)}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{adjustbox}{max width=\linewidth}
+    \includegraphics[width=0.3\textwidth]{08-gameStoryGuide-screenshot}
+    \end{adjustbox}
+    \\[10pt]
+    \textit{\small Hình 8.1: Màn hình phân hệ Cốt truyện - Phiên bản 1}
+\end{figure}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|c|p{8cm}|}
+    \hline
+    \textbf{Thời điểm} & \textbf{Bạn sẽ thấy gì trên màn hình} \\
+    \hline
+    0 giây & Màn hình đen, các thành phần bắt đầu xuất hiện rất mờ. \\
+    \hline
+    2 giây & Biểu trưng và thông tin đã rõ khoảng 25\%, thanh tải dữ liệu lấp 1/4. \\
+    \hline
+    4 giây & Biểu trưng và thông tin hiện rõ 50\%, thanh tải đến giữa. \\
+    \hline
+    6 giây & Toàn bộ màn hình hiển thị rõ 75\%, thanh tải gần đầy. \\
+    \hline
+    8 giây & Mọi thành phần đạt độ rõ tối đa, thanh tải lấp đầy hoàn toàn. \\
+    \hline
+    > 8 giây & Tự động chuyển sang Phân hệ Bảng điều khiển (Trình đơn chính). \\
+    \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Giao diện Phiên bản 2 (Cốt truyện Tương tác)}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{adjustbox}{max width=\linewidth}
+    \includegraphics[width=0.3\textwidth]{08-gameStoryGuide-screenshot-v2}
+    \end{adjustbox}
+    \\[10pt]
+    \textit{\small Hình 8.2: Màn hình phân hệ Cốt truyện - Phiên bản 2}
+\end{figure}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners=3pt, minimum width=5.2cm, minimum height=0.9cm, align=center, font=\small},
+    label/.style={font=\footnotesize\itshape, text=gray}
+]
+    \draw[thick, rounded corners=6pt] (-0.2,-0.3) rectangle (5.4,7.5);
+    \node[label] at (2.6, 7.15) {Màn hình 9:16 (dọc)};
+    \node[box, fill=blue!8, minimum height=2.6cm] (logo) at (2.6,5.5)
+        {\begin{tabular}{c}
+            \textbf{Biểu trưng}\\
+            \footnotesize Lưới 3$\times$3 ô màu\\
+            \footnotesize + chữ C T E T R I S
+         \end{tabular}};
+    \node[box, fill=green!12, minimum height=0.6cm] (bar) at (2.6,3.9)
+        {\textbf{Thanh tải dữ liệu} \ {\footnotesize (Xanh lá, 180$\times$12 px)}};
+    \node[label] at (2.6, 3.2) {$\longleftarrow$ khoảng trống nền tối $\longrightarrow$};
+    \node[box, fill=gray!10, minimum height=0.7cm] (credit) at (2.6,2.0)
+        {\textbf{Dòng ghi công} \ {\footnotesize (Đơn vị phát triển)}};
+    \draw[->, gray, dashed] (5.0,5.5) -- (5.8,5.5) node[right, label] {hiện dần};
+    \draw[->, gray, dashed] (5.0,3.9) -- (5.8,3.9) node[right, label] {điền dần};
+    \draw[->, gray, dashed] (5.0,2.0) -- (5.8,2.0) node[right, label] {hiện dần};
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\textbf{Hai chế độ vận hành:}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+    node distance=0.6cm and 1.4cm,
+    block/.style={draw, rounded corners=4pt, minimum width=4.2cm, minimum height=1.5cm, align=center, font=\small},
+    cond/.style={draw, diamond, aspect=2.5, align=center, font=\small, fill=yellow!20},
+    arr/.style={->, >=Stealth, thick}
+]
+    \node[cond] (q) {Lần đầu mở ứng dụng?};
+    \node[block, fill=blue!8,  below left=of q]  (A)
+        {\textbf{Mở đầu + Đồng bộ}\\[3pt]
+         \footnotesize Biểu trưng 8 giây\\
+         \footnotesize + kiểm tra nội dung mới};
+    \node[block, fill=orange!10, below right=of q] (B)
+        {\textbf{Chỉ Hội thoại}\\[3pt]
+         \footnotesize Bỏ qua biểu trưng\\
+         \footnotesize Chạy hội thoại cốt truyện};
+    \node[draw, rounded corners=3pt, below=1.8cm of q, minimum width=3cm, fill=green!10, font=\small] (C)
+        {Phân hệ Bảng điều khiển};
+    \draw[arr] (q) -- node[above left,  font=\footnotesize]{Có} (A);
+    \draw[arr] (q) -- node[above right, font=\footnotesize]{Không (chọn truyện)} (B);
+    \draw[arr] (A) -- (C); \draw[arr] (B) -- (C);
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Hệ thống Hội thoại}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{adjustbox}{max width=\linewidth}
+    \includegraphics[width=0.3\textwidth]{assets/08-gameStoryGuide-screenshot-v2-dialogue}
+    \end{adjustbox}
+    \\[10pt]
+    \textit{\small Hình 8.3: Màn hình phân hệ Cốt truyện Phiên bản 2 - Hội thoại}
+\end{figure}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners=3pt, minimum width=5.4cm, align=center, font=\small}
+]
+    \draw[thick, rounded corners=6pt] (-0.2,-0.2) rectangle (5.6,7.6);
+    \node[box, fill=gray!15, minimum height=3.4cm] (img) at (2.7,5.5)
+        {\textit{Ảnh bối cảnh}\\{\footnotesize (Hiển thị hình ảnh từ máy chủ)}};
+    \node[box, fill=blue!10, minimum height=0.5cm] (spk) at (2.7,3.5)
+        {\footnotesize\textbf{Tên nhân vật}};
+    \node[box, fill=white, minimum height=1.4cm] (txt) at (2.7,2.5)
+        {\footnotesize Dòng thoại hiển thị ở đây.\\
+         \footnotesize Bấm Xác Nhận để tiếp tục.};
+    \node[box, fill=green!8, minimum height=0.5cm, minimum width=2.4cm, dashed] at (1.5,1.1)
+        {\footnotesize Lựa chọn A};
+    \node[box, fill=orange!8, minimum height=0.5cm, minimum width=2.4cm, dashed] at (3.9,1.1)
+        {\footnotesize Lựa chọn B};
+    \node[font=\footnotesize\itshape, text=gray] at (2.7, 0.45)
+        {(chỉ xuất hiện khi đoạn thoại có rẽ nhánh)};
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Kiểm tra điều kiện sau 8 giây}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+    node distance=0.5cm and 1.2cm,
+    block/.style={draw, rounded corners=4pt, minimum width=3.6cm, minimum height=1.1cm, align=center, font=\small},
+    cond/.style={draw, diamond, aspect=2.2, align=center, font=\small, fill=yellow!20},
+    arr/.style={->, >=Stealth, thick}
+]
+    \node[cond] (c1) at (0,0) {Truyện mới\\mở khoá?};
+    \node[block, fill=orange!10] (popup) at (-3,-2.5)
+        {\textbf{Hộp thoại Đồng Ý / Từ Chối}\\ \footnotesize ``Chơi truyện mới?''};
+    \node[block, fill=blue!8] (console) at (3,-2.5)
+        {\textbf{Phân hệ Bảng điều khiển}\\ \footnotesize (Trình đơn chính)};
+    \node[block, fill=green!10] (story) at (-5,-4.8)
+        {\textbf{Chạy truyện mới}\\ \footnotesize (Chỉ hội thoại)};
+    \node[block, fill=gray!10] (replay) at (-1,-4.8)
+        {\textbf{Chơi lại truyện cũ}\\ \footnotesize (Chỉ hội thoại)};
+    \draw[arr] (c1) -- node[above left,  font=\footnotesize]{Có} (popup);
+    \draw[arr] (c1) -- node[above right, font=\footnotesize]{Không} (console);
+    \draw[arr] (popup) -- node[left, font=\footnotesize]{Đồng ý} (story);
+    \draw[arr] (popup) -- node[right, font=\footnotesize]{Từ chối}  (replay);
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+% ======================================================================
+% PHẦN 2: PHÂN HỆ BẢNG ĐIỀU KHIỂN
+% ======================================================================
+\subsection{Phân hệ Bảng điều khiển (Trung tâm Điều phối)}
+
+Từ màn hình này bạn có thể bắt đầu ván đấu, xem kết quả, chọn câu chuyện, chỉnh cài đặt, và thoát ra.
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+    mod/.style={draw, rounded corners=5pt, minimum width=3cm, minimum height=0.9cm, align=center, font=\small},
+    arr/.style={->, >=Stealth, thick}, node distance=0.3cm and 1.5cm
+]
+    \node[mod, fill=gray!12]  (gs) {Phân hệ Cốt truyện\\{\footnotesize (mở đầu)}};
+    \node[mod, fill=blue!10, right=1.5cm of gs] (gc) {\textbf{Bảng điều khiển}\\{\footnotesize (trung tâm)}};
+    \node[mod, fill=green!10, right=1.5cm of gc] (co) {Lõi trò chơi\\{\footnotesize (ván đấu)}};
+
+    \draw[arr] (gs) -- node[above,font=\footnotesize]{Hoàn tất} (gc);
+    \draw[arr] (gc) -- node[above,font=\footnotesize]{Bấm CHƠI} (co);
+    \draw[arr] (co.south) to[bend left=30] node[below,font=\footnotesize]{Thoát ván} (gc.south);
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Giao diện Phiên bản 1}
+\begin{figure}[htbp]
+    \centering
+    \begin{adjustbox}{max width=\linewidth}
+    \includegraphics[width=0.3\textwidth]{09-gameConsoleGuide-screenshot}
+    \end{adjustbox}
+    \\[10pt]
+    \textit{\small Hình 9.1: Màn hình phân hệ Bảng điều khiển - Phiên bản 1}
+\end{figure}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|l|l|p{6cm}|}
+    \hline
+    \textbf{Phím} & \textbf{Hành động} \\
+    \hline
+    \texttt{TAB} \,/\, \texttt{S} \,/\, \texttt{A} & Tiến tới nút kế tiếp. \\
+    \hline
+    \texttt{Shift+TAB} \,/\, \texttt{W} \,/\, \texttt{D} & Lùi về nút trước đó. \\
+    \hline
+    \texttt{ENTER} \,/\, \texttt{SPACE} & Chọn nút. \\
+    \hline
+    \texttt{ESC} & Nhảy về nút THOÁT. \\
+    \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Giao diện Phiên bản 2 (Thêm Cài đặt \& Cốt truyện)}
+\begin{figure}[htbp]
+    \centering
+    \begin{adjustbox}{max width=\linewidth}
+    \includegraphics[width=0.3\textwidth]{09-gameConsoleGuide-screenshot-v2}
+    \end{adjustbox}
+    \\[10pt]
+    \textit{\small Hình 9.2: Màn hình phân hệ Bảng điều khiển - Phiên bản 2}
+\end{figure}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+    zone/.style={draw, rounded corners=3pt, minimum width=5.4cm, align=center, font=\small},
+    btn/.style={draw, rounded corners=2pt, minimum width=4.8cm, minimum height=0.52cm, align=center, font=\footnotesize}
+]
+    \draw[thick, rounded corners=6pt] (-0.2,-0.3) rectangle (5.6,8.2);
+    \node[zone, fill=gray!15, minimum height=0.8cm] at (2.7,7.55) {\textbf{C TETRIS -- GAME CONSOLE}};
+    \foreach \lbl/\col/\y in {
+        HƯỚNG DẪN/blue!20/6.1,
+        BẢNG XẾP HẠNG/green!25/5.45,
+        CHƠI/red!20/4.8,
+        CỐT TRUYỆN/orange!22/4.15,
+        CÀI ĐẶT/violet!18/3.5,
+        THOÁT/gray!22/2.85
+    }{
+        \node[btn, fill=\col] at (2.7,\y) {\textbf{\lbl}};
+    }
+    \node[zone, fill=gray!8, minimum height=1.0cm] at (2.7,1.2) {{\footnotesize TAB / ENTER / ESC -- gợi ý phím tắt}};
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Các Cửa sổ Chức năng}
+\begin{figure}[htbp]
+    \centering
+    \begin{minipage}[t]{0.24\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{09-gameConsoleGuide-screenshot-v2-board}
+        \vspace{5pt}
+        \textit{\small Hình 9.3: Cửa sổ Xếp hạng}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.24\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{09-gameConsoleGuide-screenshot-v2-stories}
+        \vspace{5pt}
+        \textit{\small Hình 9.4: Cửa sổ Cốt truyện}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.24\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{09-gameConsoleGuide-screenshot-v2-setting}
+        \vspace{5pt}
+        \textit{\small Hình 9.5: Cửa sổ Cài đặt}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.24\textwidth}
+        \vspace{0pt}
+        \centering
+        \includegraphics[width=\linewidth]{09-gameConsoleGuide-screenshot-v2-reload}
+        \vspace{5pt}
+        \textit{\small Hình 9.6: Cửa sổ Tải lại (Trình duyệt)}
+    \end{minipage}
+\end{figure}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|l|p{8cm}|}
+    \hline
+    \textbf{Tính năng} & \textbf{Mô tả} \\
+    \hline
+    \textbf{Xếp hạng} & 4 chế độ sắp xếp: Điểm giảm/tăng dần, Thời gian mới/cũ nhất. \\
+    \hline
+    \textbf{Cốt truyện} & 3 trạng thái truyện: Đã khóa (mờ), Đã mở (chọn được), Đang chọn (chấm đậm). \\
+    \hline
+    \textbf{Cài đặt} & Chỉnh âm lượng (bằng phím Trái/Phải) và Bật/Tắt 7 màu khối. \\
+    \hline
+    \textbf{Tải lại} & Bấm F5 hoặc nút trên màn hình để khởi động lại trên nền Web. \\
+    \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+% ======================================================================
+% PHẦN 3: PHÂN HỆ LÕI TRÒ CHƠI
+% ======================================================================
+\subsection{Phân hệ Lõi trò chơi (Game Engine)}
+
+Đây là nơi bạn tận hưởng trải nghiệm xếp hình cốt lõi.
+
+\subsubsection{Giao diện Phiên bản 1}
+\begin{figure}[htbp]
+    \centering
+    \begin{adjustbox}{max width=\linewidth}
+    \includegraphics[width=0.3\textwidth]{10-gameCoreGuide-screenshot}
+    \end{adjustbox}
+    \\[10pt]
+    \textit{\small Hình 10.1: Màn hình phân hệ Lõi trò chơi - Phiên bản 1}
+\end{figure}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[font=\small]
+    \draw[thick, rounded corners=4pt] (0,0) rectangle (8.4,5.2);
+    \draw[fill=gray!8] (0,0) rectangle (5.8,5.2);
+    \node[align=center] at (2.9,2.6)
+        {\textbf{Bảng chơi}\\240$\times$480 px\\
+         \footnotesize 10 cột $\times$ 20 hàng\\
+         \footnotesize khối Tetromino rơi ở đây};
+    \draw[fill=blue!6] (5.8,0) rectangle (8.4,5.2);
+    \node[align=center, font=\footnotesize] at (7.1,4.7) {\textbf{Thanh Bên}};
+    \foreach \lbl/\y in {
+        {0 THOÁT}/3.95,
+        {1 TẠM DỪNG}/3.55,
+        {2 ĐIỂM SỐ}/3.15,
+        {3 ĐỒNG HỒ}/2.75,
+        {4 KẾT TIẾP-1}/2.35,
+        {5 KẾT TIẾP-2}/1.95,
+        {6 KẾT TIẾP-3}/1.55,
+        {7 LẬT CÙNG}/1.15,
+        {8 LẬT NGƯỢC}/0.75,
+        {9 TRÁI}/0.35
+    }{
+        \draw (5.85,\y-0.18) rectangle (8.35,\y+0.18);
+        \node[font=\tiny] at (7.1,\y) {\lbl};
+    }
+    \node[font=\tiny] at (7.1,-0.05) {10 PHẢI / 11 TỐC ĐỘ};
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Giao diện Phiên bản 2}
+\begin{figure}[htbp]
+    \centering
+    \begin{adjustbox}{max width=\linewidth}
+    \includegraphics[width=0.3\textwidth]{10-gameCoreGuide-screenshot-v2}
+    \end{adjustbox}
+    \\[10pt]
+    \textit{\small Hình 10.2: Màn hình phân hệ Lõi trò chơi - Phiên bản 2}
+\end{figure}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+    sbox/.style={draw, rounded corners=3pt, minimum width=2.8cm, minimum height=0.8cm, align=center, font=\footnotesize, fill=white},
+    arr/.style={->, >=Stealth, thick},
+    node distance=0.3cm
+]
+    \node[sbox, fill=gray!12] (a) {Hàng đầy\\phát hiện};
+    \node[sbox, fill=yellow!20, right=0.5cm of a] (b) {Chớp\\trắng/tối\\$\times$3};
+    \node[sbox, fill=green!15,  right=0.5cm of b] (c) {Xoá thật\\+ cộng điểm};
+    \node[sbox, fill=blue!10,   right=0.5cm of c] (d) {Khối phía\\trên rơi xuống};
+
+    \draw[arr] (a) -- (b); \draw[arr] (b) -- (c);
+    \draw[arr] (c) -- (d);
+    \node[font=\tiny\itshape, below=0.15cm of b] {6 nhịp $\times$ 80 ms $\approx$ 480 ms};
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[font=\small,
+    slot/.style={draw, rounded corners=3pt, minimum width=3.8cm, minimum height=1.1cm, align=center}
+]
+    \node[slot, fill=green!12] (n1) at (0,0)
+        {\textbf{KẾ TIẾP-1} (ô 4)\\{\footnotesize Luôn hiện}};
+    \node[slot, fill=orange!12] (n2) at (6,0)
+        {\textbf{KẾ TIẾP-2} (ô 5)\\
+         {\footnotesize Mở khi: Truyện yêu cầu}\\
+         {\footnotesize \textbf{và} \texttt{Điểm $\geq$ Ngưỡng}}};
+    \node[slot, fill=red!10] (n3) at (12,0)
+        {\textbf{KẾ TIẾP-3} (ô 6)\\
+         {\footnotesize Mở khi: KẾ TIẾP-2 đã mở}\\
+         {\footnotesize \textbf{và} \texttt{Điểm $\geq$ Ngưỡng$\times$2}}};
+    \draw[->, >=Stealth, dashed] (n1.east) -- (n2.west) node[midway, above, font=\footnotesize\itshape]{đạt ngưỡng};
+    \draw[->, >=Stealth, dashed] (n2.east) -- (n3.west) node[midway, above, font=\footnotesize\itshape]{đạt ngưỡng};
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[font=\small]
+    \draw[fill=gray!4] (0,2.2) rectangle (3.2,5.5);
+    \node[text=gray, font=\footnotesize\itshape] at (1.6,3.85) {(trống)};
+    \draw[fill=blue!15]   (0,1.5) rectangle (0.8,2.2);
+    \draw[fill=red!15]    (0.8,1.5) rectangle (1.6,2.2);
+    \draw[fill=green!15]  (1.6,1.5) rectangle (2.4,2.2);
+    \draw[fill=yellow!20] (2.4,1.5) rectangle (3.2,2.2);
+    \draw[fill=green!15]  (0,0.7) rectangle (0.8,1.5);
+    \draw[fill=blue!15]   (0.8,0.7) rectangle (1.6,1.5);
+    \draw[fill=gray!25]   (1.6,0.7) rectangle (2.4,1.5);
+    \draw[fill=red!15]    (2.4,0.7) rectangle (3.2,1.5);
+    \draw[thick] (0,0.7) rectangle (3.2,5.5);
+    \draw[<-, thick] (3.35, 1.45) -- (4.2, 1.45) node[right, font=\footnotesize] {Hàng điền sẵn từ Truyện};
+    \draw[<-, gray]  (3.35, 3.85) -- (4.2, 3.85) node[right, font=\footnotesize\itshape] {Phần trống bình thường};
+\end{tikzpicture}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Trạng thái Kết thúc}
+\begin{figure}[htbp]
+    \centering
+    \begin{adjustbox}{max width=\linewidth}
+    \includegraphics[width=0.3\textwidth]{10-gameCoreGuide-screenshot-V2-poweroff}
+    \end{adjustbox}
+    \\[10pt]
+    \textit{\small Hình 10.3: Màn hình phân hệ Lõi trò chơi - Phiên bản 2 - Hộp thoại Tắt máy}
+\end{figure}
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|l|p{8cm}|}
+    \hline
+    \textbf{Nút lệnh} & \textbf{Hành động} \\
+    \hline
+    \textbf{Khởi động lại} & Chơi ván mới ngay lập tức (Lưu CSDL). \\
+    \hline
+    \textbf{Bảng điều khiển} & Về Trình đơn chính (Lưu CSDL). \\
+    \hline
+    \textbf{Thoát} & Thoát game hoặc Tải lại trang (Lưu CSDL). \\
+    \hline
+    \textbf{Hủy} & Hủy Thoát (Chỉ dùng được nếu đang Tạm dừng). \\
+    \hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\label{LastPageUserGuide}
+\end{document}

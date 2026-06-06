@@ -1,0 +1,174 @@
+% !TEX TS-program = lualatex
+% !TEX encoding = UTF-8 Unicode
+\documentclass[12pt,a4paper]{article}
+
+\IfFileExists{src/libs/body.tex}{\input{src/libs/body.tex}}{%
+  \IfFileExists{../libs/body.tex}{\input{../libs/body.tex}}{\input{libs/body.tex}}%
+}
+\IfFileExists{src/libs/header.tex}{\input{src/libs/header.tex}}{%
+  \IfFileExists{../libs/header.tex}{\input{../libs/header.tex}}{\input{libs/header.tex}}%
+}
+\IfFileExists{src/libs/footer.tex}{\input{src/libs/footer.tex}}{%
+  \IfFileExists{../libs/footer.tex}{\input{../libs/footer.tex}}{\input{libs/footer.tex}}%
+}
+\usepackage{docmute}
+\usepackage{adjustbox}
+\usepackage[table]{xcolor}
+\usepackage{enumitem}
+
+\hypersetup{pdftitle={Công cụ, Môi trường và Danh sách Kỹ năng}}
+
+\begin{document}
+\providecommand{\StandaloneSectionSetup}[2]{\ApplyStandardFooter{#1}{#2}}
+\StandaloneSectionSetup{08-gameSkills}{LastPageToolsAndSkills}
+\onehalfspacing
+
+\section{Công cụ, Môi trường và Kỹ năng Nghề nghiệp}
+
+Tài liệu này hợp nhất danh sách các công cụ, môi trường phát triển được sử dụng trong dự án cùng với bộ kỹ năng yêu cầu cho từng vị trí trong nhóm phát triển.
+
+% ======================================================================
+% PHẦN 1: CÔNG CỤ VÀ MÔI TRƯỜNG PHÁT TRIỂN
+% ======================================================================
+\subsection{Danh mục Công cụ \& Môi trường}
+
+\subsubsection{Ngôn ngữ, Trình biên dịch \& Hệ thống xây dựng}
+Dự án sử dụng ngôn ngữ chuẩn \textbf{C++17} với các cờ biên dịch nghiêm ngặt.
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|p{3cm}|p{2cm}|p{8cm}|p{3cm}|}
+\hline
+\rowcolor{gray!20}
+\textbf{Công cụ} & \textbf{Phiên bản} & \textbf{Vai trò} & \textbf{Nền tảng} \\
+\hline
+GCC / G++ & 11+ & Trình biên dịch C++ chính & Ubuntu, macOS \\
+\hline
+MinGW-w64 & 13+ & Trình biên dịch C++ trên Windows & Windows \\
+\hline
+CMake & 3.15+ & Hệ thống tự động hóa xây dựng mã nguồn đa nền tảng & Tất cả \\
+\hline
+Tập lệnh tự viết & Tùy chỉnh & Mã lệnh tự động tải và biên dịch (bash/PowerShell) & Tất cả \\
+\hline
+Emscripten & 3.1.72+ & Trình biên dịch C++ sang mã WebAssembly & Nền tảng Web \\
+\hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Thư viện Lập trình Cốt lõi}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|p{3cm}|p{11.5cm}|}
+\hline
+\rowcolor{gray!20}
+\textbf{Thư viện} & \textbf{Vai trò cốt lõi} \\
+\hline
+\textbf{SDL3} & Quản lý cửa sổ, vẽ đồ họa, xử lý sự kiện và luồng âm thanh. \\
+\hline
+\textbf{SQLite3} & Cơ sở dữ liệu cục bộ nhúng; lưu trữ trạng thái người chơi và cốt truyện. \\
+\hline
+\textbf{nanosvg} & Đọc và chuyển đổi tệp ảnh Vector thành điểm ảnh (dùng cho biểu trưng). \\
+\hline
+\textbf{Cấu trúc JSON} & Phân tích cấu trúc dữ liệu tải từ máy chủ đám mây. \\
+\hline
+\textbf{Thư viện Mạng} & Giao tiếp HTTP đồng bộ/dị bộ (Dùng \texttt{libcurl} cho máy tính, \texttt{fetch} cho Web). \\
+\hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+\subsubsection{Quản lý Dự án, Thiết kế \& Đảm bảo Chất lượng}
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!20}
+\textbf{Danh mục} & \textbf{Công cụ \& Dịch vụ sử dụng} \\
+\hline
+\textbf{Quản lý Mã nguồn} & Git, Nền tảng GitHub (Kho lưu trữ, Yêu cầu gộp mã, Quản lý Vấn đề). \\
+\hline
+\textbf{Giao tiếp \& Quản lý} & Phần mềm Slack (Nhắn tin), Trello (Bảng công việc), Google Meet. \\
+\hline
+\textbf{Máy chủ Đám mây} & Cloudflare D1 (Cơ sở dữ liệu Xếp hạng), GitHub Actions (Tự động biên dịch). \\
+\hline
+\textbf{Kiểm thử Tự động} & Khung kiểm thử Google Test, Phân tích độ bao phủ mã nguồn (gcov). \\
+\hline
+\textbf{Tài liệu \& Đồ họa} & Hệ thống LaTeX/TikZ (Biên soạn tài liệu), Draw.io, phần mềm Inkscape. \\
+\hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+% ======================================================================
+% PHẦN 2: MA TRẬN KỸ NĂNG THEO VAI TRÒ
+% ======================================================================
+\subsection{Ma trận Kỹ năng Nghề nghiệp}
+
+Dự án yêu cầu 5 vai trò chính. Bảng dưới đây đánh giá mức độ ưu tiên kỹ năng: \textbf{Cơ bản}, \textbf{Khá}, và \textbf{Tốt}.
+
+\begin{center}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{|p{4.5cm}|c|c|c|c|c|}
+\hline
+\rowcolor{gray!25}
+\textbf{Nhóm Kỹ năng} & \textbf{Quản lý} & \textbf{Dev chính} & \textbf{Dev CSDL} & \textbf{Dev  Network} & \textbf{Kiểm thử (QA)} \\
+\hline
+Ngôn ngữ C++17 & Cơ bản & Tốt & Tốt & Khá & Cơ bản \\
+\hline
+Hệ thống CMake & Khá & Khá & Khá & Khá & Cơ bản \\
+\hline
+Đồ họa \& Sự kiện (SDL3) & Cơ bản & Tốt & Tốt & Khá & Cơ bản \\
+\hline
+Cơ sở dữ liệu (SQLite) & Cơ bản & Khá & Tốt & Khá & Cơ bản \\
+\hline
+Nền tảng WebAssembly & Cơ bản & Khá & Khá & Cơ bản & Cơ bản \\
+\hline
+Quy trình Git/GitHub & Tốt & Tốt & Tốt & Tốt & Khá \\
+\hline
+Thiết kế \& Dữ liệu JSON & Cơ bản & Cơ bản & Khá & Tốt & Cơ bản \\
+\hline
+Soạn tài liệu (LaTeX) & Tốt & Khá & Khá & Khá & Tốt \\
+\hline
+Kiểm thử phần mềm & Khá & Khá & Khá & Khá & Tốt \\
+\hline
+Giao tiếp \& Lập kế hoạch & Tốt & Khá & Khá & Khá & Khá \\
+\hline
+Làm việc nhóm & Tốt & Tốt & Tốt & Tốt & Tốt \\
+\hline
+\end{tabular}
+\end{adjustbox}
+\end{center}
+
+% ======================================================================
+% PHẦN 3: TIÊU CHÍ TUYỂN DỤNG & LỘ TRÌNH ĐÀO TẠO
+% ======================================================================
+\subsection{Yêu cầu Năng lực Chuyên môn}
+
+\subsubsection{Mô tả Trách nhiệm Cốt lõi}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Quản lý dự án:} Thành thạo quy trình Git, điều phối công việc qua Bảng Kanban, xử lý xung đột nhóm, và có tư duy hệ thống. Không bắt buộc lập trình chuyên sâu nhưng phải đọc hiểu mã nguồn.
+    \item \textbf{Dev chính (Thuật toán):} Thành thạo C++, xử lý tốt các hàm vẽ hình học, vòng lặp trò chơi 60 FPS, và ma trận 2D. Có khả năng tự đánh giá và gỡ lỗi ranh giới (boundary cases).
+    \item \textbf{Dev Bảng điều khiển (Giao diện \& CSDL):} Chuyên môn về thiết kế cấu trúc Cơ sở dữ liệu (các lệnh \texttt{TẠO BẢNG}, \texttt{CẬP NHẬT}). Xây dựng giao diện tương tác thuần túy không dùng thư viện ngoài. Hiểu biết về hệ thống tệp ảo.
+    \item \textbf{Dev Cốt truyện (Mạng \& Dữ liệu):} Xử lý tốt giao thức Mạng (Tải xuống HTTP), phân tích dữ liệu JSON, thuật toán đồng bộ Mã băm (SHA). Có kỹ năng biên tập nội dung.
+    \item \textbf{Chuyên viên Kiểm thử (QA):} Khả năng phân tích và viết kịch bản kiểm thử rõ ràng, kiểm thử đa nền tảng, sử dụng thành thạo hệ thống kiểm thử tự động, và kỹ năng báo cáo lỗi chuyên nghiệp không gây công kích cá nhân.
+\end{itemize}
+
+\subsubsection{Các bước làm quen dự án (Onboarding)}
+Dành cho thành viên mới bắt nhịp vào dự án:
+\begin{enumerate}[nosep]
+    \item \textbf{Giai đoạn 1 (Thiết lập môi trường):} Tải mã nguồn, cài đặt trình biên dịch, chạy thử tập lệnh tự động xây dựng phần mềm trên máy tính cá nhân.
+    \item \textbf{Giai đoạn 2 (Hiểu kiến trúc):} Đọc tài liệu Đặc tả Yêu cầu và Thiết kế. Hiểu rõ luồng di chuyển dữ liệu: \textit{Cốt truyện $\rightarrow$ Bảng điều khiển $\rightarrow$ Lõi trò chơi}.
+    \item \textbf{Giai đoạn 3 (Làm quen mã nguồn):} Đọc các tệp trọng yếu như Vòng lặp trò chơi, Hàm khởi tạo Cơ sở dữ liệu, Cấu trúc Dữ liệu cấu hình chung.
+    \item \textbf{Giai đoạn 4 (Thực hành):} Nhận một tác vụ sửa lỗi nhỏ, áp dụng quy trình: \textit{Tạo nhánh $\rightarrow$ Lập trình $\rightarrow$ Tự kiểm thử $\rightarrow$ Yêu cầu gộp mã (Pull Request)}.
+\end{enumerate}
+
+\subsection{Văn hóa Làm việc Nhóm}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Giao tiếp chủ động:} Phản hồi tin nhắn công việc trong vòng 4 giờ. Cập nhật tiến độ mỗi ngày.
+    \item \textbf{Trách nhiệm Mã nguồn:} Ghi chú rõ ràng khi đẩy mã: \textit{Mô tả thay đổi $\rightarrow$ Lý do $\rightarrow$ Cách kiểm thử}. Không sửa mã của người khác khi chưa thông báo.
+    \item \textbf{Đánh giá tích cực:} Góp ý mã nguồn dựa trên logic và hiệu suất, tuyệt đối không phán xét cá nhân. Tiếp nhận phản hồi với thái độ xây dựng.
+    \item \textbf{Báo cáo lỗi tiêu chuẩn:} Cấu trúc báo cáo lỗi phải có đủ: \textit{Tiêu đề $\rightarrow$ Mức độ $\rightarrow$ Bước tái hiện $\rightarrow$ Kết quả mong muốn $\rightarrow$ Môi trường thiết bị}.
+\end{itemize}
+
+\label{LastPageToolsAndSkills}
+\end{document}
